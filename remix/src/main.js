@@ -20,7 +20,8 @@
     peaks: null,
     segments: [{ bpm: null, beatsPerBar: 4, beatUnit: 4 }], // 段定义（用户输入）
     offset: 0,
-    cursorPos: null, // 播放起点（单击定位）
+    cursorPos: null, // 播放标记点（单击定位）
+    playPos: null, // 当前播放位置（暂停断点；停止/单击时重置）
     pendingSelection: null, // {startBar, endBar} 待添加选区
     grid: null,
     sequence: [],
@@ -42,8 +43,7 @@
   const seqInfo = $('seqInfo');
   const btnOpenFile = $('btnOpenFile');
   const btnSettings = $('btnSettings');
-  const btnPlayOriginal = $('btnPlayOriginal');
-  const btnPause = $('btnPause');
+  const btnPlay = $('btnPlay');
   const btnPlaySeq = $('btnPlaySeq');
   const btnStop = $('btnStop');
   const quickBar = $('quickBar');
@@ -174,13 +174,13 @@
     state.segments = [{ bpm: null, beatsPerBar: 4, beatUnit: 4 }];
     state.offset = 0;
     state.cursorPos = null;
+    state.playPos = null;
     state.pendingSelection = null;
     state.sequence = [];
     state.peaks = null;
     state.playTime = null;
     btnSettings.disabled = false;
-    btnPlayOriginal.disabled = false;
-    btnPause.disabled = false;
+    btnPlay.disabled = false;
     btnPlaySeq.disabled = false;
     btnStop.disabled = false;
     controlBar.hidden = false;
@@ -538,9 +538,16 @@
   let playStartPos = 0;
   let playing = false;
 
-  function stopPlay() {
+  /** 暂停：停止播放但保留断点（playPos），下次「播放」从断点继续。 */
+  function pausePlay() {
+    if (!playing) {
+      // 未播放时也清理播放线等残留
+      state.playTime = null;
+      renderWave();
+      return;
+    }
     playing = false;
-    btnPause.textContent = '⏸ 暂停';
+    btnPlay.textContent = '▶ 播放';
     btnPlaySeq.textContent = '▶ 播放拼接序列';
     if (playTimer) {
       clearTimeout(playTimer);
@@ -562,32 +569,44 @@
     renderWave();
   }
 
+  /** 停止：暂停并把播放位置重置到标记点（下次「播放」从标记点开始）。 */
+  function stopPlay() {
+    pausePlay();
+    state.playPos = state.cursorPos != null ? state.cursorPos : 0;
+  }
+
   /** 时间点描述：秒 + （有网格时）对应的小节/格。 */
   function posDesc(t) {
     const bc = state.grid ? seq.timeToBarCell(state.grid, t) : null;
     return ui.fmtTime(t) + (bc ? '（第 ' + bc.bar + ' 小节 ' + bc.cell + ' 格）' : '');
   }
 
-  /** 单击波形 → 仅移动播放起点（若在播放则暂停），并把顶部 BPM 切换到该段；未导入文件时打开文件选择。 */
+  /** 单击波形 → 重置播放位置与标记点到单击处（播放中则暂停），并把顶部 BPM 切换到该段。 */
   function onWaveClick(t) {
     if (!state.file) {
       fileInput.click();
       return;
     }
-    if (playing) stopPlay();
+    if (playing) pausePlay();
     state.cursorPos = t;
+    state.playPos = t;
     updateQuickBar();
     renderWave();
-    status('播放起点：' + posDesc(t) + '（单击波形仅定位，按「从此处开始播放」试听）');
+    status('播放位置与标记点：' + posDesc(t) + '（点「播放」从此处开始）');
   }
 
-  /** 播放原曲：从播放起点（未定位则从头）播到结尾。 */
+  /** 统一播放按钮：播放中点击 = 暂停（保留断点）；未播放 = 从当前播放位置（断点或标记点）开始。 */
   function playOriginal() {
     if (!state.file) return;
-    stopPlay();
-    const t = state.cursorPos != null ? state.cursorPos : 0;
+    if (playing) {
+      pausePlay();
+      status('已暂停（播放位置保留，点击「播放」从断点继续）');
+      return;
+    }
+    pausePlay(); // 清理残留但不重置播放位置
+    const t = state.playPos != null ? state.playPos : state.cursorPos != null ? state.cursorPos : 0;
     playing = true;
-    btnPause.textContent = '⏸ 暂停';
+    btnPlay.textContent = '⏸ 暂停';
     if (state.kind === 'video' && videoEl.src) {
       playVideoSegment(t, state.duration, () => {
         stopPlay();
@@ -601,7 +620,7 @@
     } else {
       return;
     }
-    status('从 ' + posDesc(t) + ' 开始播放原曲');
+    status('从 ' + posDesc(t) + ' 开始播放');
   }
 
   function playAudioSegment(start, end, onEnd) {
@@ -640,9 +659,6 @@
     if (playCtx && playSource) return playStartPos + (playCtx.currentTime - playStartCtxTime);
     return null;
   }
-
-  // 播放进度：只更新叠加层的播放线（节流每 2 帧），不再整幅重绘波形——
-  // 视频播放卡顿的主因是 rAF 每帧全量 canvas 重绘与解码抢主线程。
   let tickFrame = 0;
   function tickProgress() {
     if (!playing) return;
@@ -651,6 +667,7 @@
       const t = currentPlayTime();
       if (t != null) {
         state.playTime = t;
+        state.playPos = t; // 播放位置跟随（暂停时即断点）
         render.drawPlayHead(playHeadCanvas, state.view, t);
       }
     }
@@ -777,11 +794,7 @@
 
     btnOpenFile.addEventListener('click', () => fileInput.click());
     btnSettings.addEventListener('click', openSettings);
-    btnPlayOriginal.addEventListener('click', playOriginal);
-    btnPause.addEventListener('click', () => {
-      if (playing) stopPlay();
-      else status('未在播放');
-    });
+    btnPlay.addEventListener('click', playOriginal);
     btnPlaySeq.addEventListener('click', () => {
       if (playing && btnPlaySeq.textContent.includes('暂停')) stopPlay();
       else playSequence();
