@@ -273,6 +273,15 @@
       applySettings(cached.segments, cached.offset || 0);
       restoreSequence(seq);
       saveWorkspace();
+      // 恢复上次视图（缩放/平移），越界则回退到全览
+      if (cached.view && isFinite(cached.view.start) && isFinite(cached.view.end)) {
+        const d = state.duration || 1;
+        const span = Math.max(0.5, cached.view.end - cached.view.start);
+        const minS = Math.min(0, d - span);
+        const maxS = Math.max(0, d - span);
+        const start = Math.max(minS, Math.min(maxS, cached.view.start));
+        state.view = { start, end: start + span };
+      }
       renderAll();
       return true;
     }
@@ -304,6 +313,7 @@
         fadeOutMs: it.fadeOutMs,
         invalid: !!it.invalid,
       })),
+      view: state.view ? { start: state.view.start, end: state.view.end } : undefined,
     });
   }
   /** 从缓存恢复拼接序列（时间为主；旧缓存无时间时按小节推算）。 */
@@ -688,6 +698,16 @@
     return last ? last.endTime : 0;
   }
 
+  function currentPlayTime() {
+    if (mixPlaying) {
+      const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
+      return mixToOriginalTime(mt);
+    }
+    if (state.kind === 'video') return videoEl.currentTime;
+    if (playCtx && playSource) return playStartPos + (playCtx.currentTime - playStartCtxTime);
+    return null;
+  }
+
   let tickFrame = 0;
   let lastVideoSeek = 0;
   function tickProgress() {
@@ -759,7 +779,8 @@
       return;
     }
     const parts = seq.itemsToParts(state.sequence, state.sampleRate);
-    const crossfade = Math.round((30 / 1000) * state.sampleRate); // 30ms 余弦交叉，平滑段边界相位跳变
+    const cfMs = store.loadGlobalSettings().crossfadeMs; // 高级设置可调（默认 30ms）
+    const crossfade = Math.round((cfMs / 1000) * state.sampleRate);
     const mix = exp.renderMix(state.rawMono, parts, crossfade);
     if (!mix.length) {
       status('无可播放内容');
@@ -993,6 +1014,36 @@
     }
     window.addEventListener('resize', fitCanvas);
     setTimeout(fitCanvas, 50);
+
+    // 快捷键：空格播放/暂停、Esc 关闭弹窗、←/→ 平移视口
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName) || '';
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target && e.target.isContentEditable;
+      if (typing) return; // 输入框聚焦时不触发
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (mixPlaying || playing) {
+          pausePlay();
+          status('已暂停（播放位置保留，点击「播放」从断点继续）');
+        } else {
+          playOriginal();
+        }
+      } else if (e.key === 'Escape') {
+        MC.modal && MC.modal.close();
+        MC.closeExport && MC.closeExport();
+        manualForm.hidden = true;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const view = state.view || { start: 0, end: 1 };
+        const span = view.end - view.start;
+        const dt = (e.key === 'ArrowLeft' ? -1 : 1) * span * 0.1;
+        const d = state.duration || 1;
+        const minS = Math.min(0, d - span);
+        const maxS = Math.max(0, d - span);
+        const start = Math.max(minS, Math.min(maxS, view.start + dt));
+        state.view = { start, end: start + span };
+        renderWave();
+      }
+    });
 
     status('拖入音频或视频文件开始');
   }

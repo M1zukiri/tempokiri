@@ -69,6 +69,9 @@
     if (!overlay) overlay = buildDom();
     exportCb = callbacks.onExport || null;
     el('xName').value = opts.baseName || 'remix';
+    // 预填交叉淡化 = 全局高级设置（用户可在此窗口单独调整）
+    const g = (MC.store ? MC.store.loadGlobalSettings() : null) || { crossfadeMs: 30 };
+    el('xCrossfade').value = String(g.crossfadeMs);
     const fmt = el('xFormat');
     // 视频格式选项：仅视频文件且浏览器支持 WebCodecs
     const videoOpt = fmt.querySelector('option[value="video"]');

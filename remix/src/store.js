@@ -79,5 +79,37 @@
     writeAll(all);
   }
 
-  return { KEY, fingerprint, saveSettings, loadSettings, clearSettings };
+  const GLOBAL_KEY = 'tempokiri.remix.global.v1';
+  const DEFAULT_GLOBAL = {
+    crossfadeMs: 30,   // 拼接/导出交叉淡化时长
+    sensitivity: 0.9,  // BPM 检测灵敏度（0..1，越大越宽松）
+    minBpm: 60,
+    maxBpm: 200,
+  };
+
+  /** 读取全局高级设置（缺省合并）。 */
+  function loadGlobalSettings() {
+    const s = storage();
+    if (!s) return { ...DEFAULT_GLOBAL };
+    try {
+      const raw = JSON.parse(s.getItem(GLOBAL_KEY) || '{}');
+      return { ...DEFAULT_GLOBAL, ...raw };
+    } catch (e) {
+      return { ...DEFAULT_GLOBAL };
+    }
+  }
+
+  /** 保存全局高级设置（局部合并，未涉及的键保留原值）。 */
+  function saveGlobalSettings(patch) {
+    const s = storage();
+    if (!s) return;
+    try {
+      const cur = loadGlobalSettings();
+      s.setItem(GLOBAL_KEY, JSON.stringify({ ...cur, ...patch }));
+    } catch (e) {
+      // 静默：设置只是优化
+    }
+  }
+
+  return { KEY, fingerprint, saveSettings, loadSettings, clearSettings, GLOBAL_KEY, loadGlobalSettings, saveGlobalSettings };
 });
