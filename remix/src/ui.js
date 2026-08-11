@@ -56,12 +56,14 @@
       const edgeGrid = () => handlers.getGrid();
       const compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
         kind: 'position',
+        edge: 'start',
         getGrid: edgeGrid,
         value: it.invalid ? NaN : it.startTime,
         onChange: (sec) => handlers.onRange(it.id, sec, 'start'),
       });
       const compEnd = MC.UnitInput.create(card.querySelector('.edge-end'), {
         kind: 'position',
+        edge: 'end',
         getGrid: edgeGrid,
         value: it.invalid ? NaN : it.endTime,
         onChange: (sec) => handlers.onRange(it.id, sec, 'end'),

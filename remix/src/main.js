@@ -122,21 +122,39 @@
     });
   }
 
-  /** 序列项起终点手动编辑（sec=null 表示输入非法）。 */
+  /** 序列项起终点手动编辑。sec=null 表示本端输入非法：保留输入、仅标红禁播，不重建清空。 */
   function setRange(id, sec, which) {
     const it = state.sequence.find((x) => x.id === id);
     if (!it) return;
     if (sec == null) {
-      it.invalid = true; // 非法输入：回退未输入状态，标红
-    } else {
-      if (which === 'start') it.startTime = sec;
-      else it.endTime = sec;
-      it.invalid = !(it.startTime < it.endTime);
+      it.invalid = true;
+      it.invalidSide = which;
+      markInvalidCard(it, id);
+      btnPlaySeq.disabled = true;
+      saveWorkspace();
+      return;
+    }
+    if (which === 'start') it.startTime = sec;
+    else it.endTime = sec;
+    const inverted = !(it.startTime < it.endTime);
+    // 倒置（任一端修正可恢复）或另一端仍非法时保持 invalid
+    it.invalid = inverted || (it.invalid && it.invalidSide !== which);
+    it.invalidSide = it.invalid ? (inverted ? null : it.invalidSide) : null;
+    if (it.invalid) {
+      markInvalidCard(it, id);
+      btnPlaySeq.disabled = true;
+      saveWorkspace();
+      return;
     }
     saveWorkspace();
     renderAll();
   }
 
+  /** 给非法卡片加标红 class（不重建 DOM，保留输入内容）。 */
+  function markInvalidCard(it, id) {
+    const card = seqList.querySelector('.seq-card[data-id="' + id + '"]');
+    if (card) card.classList.add('invalid');
+  }
   // ---------- 文件处理 ----------
   async function handleFile(file) {
     // 工作区已有内容且打开的是不同文件 → 询问是否保留
@@ -789,11 +807,13 @@
         maEnd.textContent = '';
         maStartComp = MC.UnitInput.create(maStart, {
           kind: 'position',
+          edge: 'start',
           getGrid: () => state.grid,
           value: state.cursorPos || 0,
         });
         maEndComp = MC.UnitInput.create(maEnd, {
           kind: 'position',
+          edge: 'end',
           getGrid: () => state.grid,
           value: (state.cursorPos || 0) + 1,
         });

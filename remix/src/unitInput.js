@@ -45,6 +45,8 @@
    */
   function create(container, opts) {
     const kind = opts.kind === 'length' ? 'length' : 'position';
+    // 位置组件的端点语义：'start' 取格区间起点，'end' 取格区间终点（包含终点格）
+    const edge = opts.edge === 'end' ? 'end' : 'start';
     let mode = opts.mode === 'time' ? 'time' : 'bars';
     let value = Number.isFinite(opts.value) ? opts.value : NaN;
     let invalid = false;
@@ -106,10 +108,8 @@
         if (bar < 1 || bar > g.bars.length) return null;
         const res = seq().barResolution(g, bar);
         if (!res) return null;
-        const [lo, hi] = cellBounds(kind, res);
-        if (cell < lo || cell > hi) return null;
         const t = seq().barCellToTime(g, bar, cell);
-        return t ? t[0] : null;
+        return t ? (edge === 'end' ? t[1] : t[0]) : null;
       }
       // length
       const st = step();
