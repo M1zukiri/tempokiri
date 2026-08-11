@@ -86,3 +86,49 @@ test('totalDuration: 序列总时长', () => {
   assert.equal(S.totalDuration(items), 8);
   assert.equal(S.itemDuration(items[0]), 4);
 });
+
+test('时间↔小节/格换算', () => {
+  const barDur = 0.5;
+  const grid = {
+    bars: [1, 2, 3, 4, 5, 6].map((n) => ({ barNumber: n, startTime: (n - 1) * barDur, endTime: n * barDur })),
+    segments: [
+      { bars: [1, 2, 3, 4].map((n) => ({ barNumber: n })), resolution: 4 },
+      { bars: [5, 6].map((n) => ({ barNumber: n })), resolution: 8 },
+    ],
+  };
+  const cases = [
+    [0.0, 1, 1], [0.124, 1, 1], [0.125, 1, 2], [0.499, 1, 4],
+    [0.5, 2, 1], [2.0, 5, 1], [2.0625, 5, 2], [2.49, 5, 8], [2.5, 6, 1],
+  ];
+  for (const [t, bar, cell] of cases) {
+    const bc = S.timeToBarCell(grid, t);
+    assert.ok(bc && bc.bar === bar && bc.cell === cell, 't=' + t + ' → ' + bar + '/' + cell + ' got ' + JSON.stringify(bc));
+  }
+  for (const [bar, cell] of [[1, 1], [1, 4], [5, 1], [6, 8]]) {
+    const [st] = S.barCellToTime(grid, bar, cell);
+    const bc = S.timeToBarCell(grid, st);
+    assert.ok(bc && bc.bar === bar && bc.cell === cell, 'roundtrip ' + bar + '/' + cell);
+  }
+  assert.ok(S.timeToBarCell(grid, -0.1) === null, 'negative → null');
+  assert.ok(S.timeToBarCell(grid, 3.5) === null, 'beyond → null');
+});
+
+test('时长↔小节/格换算', () => {
+  const dc = S.durationToBarCell(1.25, 0.5, 0.125);
+  assert.deepEqual(dc, { bars: 2, cells: 2 });
+  assert.ok(Math.abs(S.barCellToDuration(2, 2, 0.5, 0.125) - 1.25) < 1e-9);
+  // 溢出格进位
+  const c = S.durationToBarCell(0.48, 0.5, 0.125); // 3.84 格 → 4 格进位
+  assert.deepEqual(c, { bars: 1, cells: 0 });
+});
+
+test('网格末尾边界归属最后一格', () => {
+  const barDur = 0.5;
+  const grid = {
+    bars: [1, 2, 3].map((n) => ({ barNumber: n, startTime: (n - 1) * barDur, endTime: n * barDur })),
+    segments: [{ bars: [1, 2, 3].map((n) => ({ barNumber: n })), resolution: 4 }],
+  };
+  const bc = S.timeToBarCell(grid, 1.5);
+  assert.deepEqual(bc, { bar: 3, cell: 4 });
+  assert.ok(S.timeToBarCell(grid, 1.51) === null);
+});

@@ -242,6 +242,19 @@
   .seq-card.dragging { opacity: 0.55; border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.4); cursor: grabbing; }
   .seq-card { cursor: grab; user-select: none; }
   .seq-card:active { cursor: grabbing; }
+  .unit-input { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+  .unit-mode-btn { font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); background: rgba(255,255,255,0.06); color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .unit-mode-btn:hover { color: var(--text); border-color: var(--accent); }
+  .unit-fields { display: inline-flex; gap: 3px; }
+  .unit-fields input { width: 42px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 5px; background: rgba(0,0,0,0.35); color: var(--text); font-size: 12px; }
+  .unit-fields.unit-invalid input { border-color: #e5484d; background: rgba(229,72,77,0.14); }
+  .unit-ref { font-size: 11px; color: var(--muted); min-width: 64px; }
+  .unit-ref:has(+ .unit-invalid), .unit-invalid + .unit-ref { color: #e5484d; }
+  .seq-edges { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .edge-label { font-size: 11px; color: var(--muted); }
+  .seq-card.invalid { border-color: #e5484d; box-shadow: 0 0 0 1px #e5484d inset; }
+  .manual-form { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px dashed var(--border); border-radius: 10px; background: rgba(255,255,255,0.03); flex-wrap: wrap; }
+  .manual-form[hidden] { display: none; }
   .modal-actions { display: flex; align-items: center; gap: 8px; }
 </style>
 </head>
@@ -313,7 +326,14 @@
     <div class="seq-header">
       <h2>拼接序列<span id="seqInfo"></span></h2>
       <span class="spacer"></span>
+      <button id="btnManualAdd" class="btn">手动添加</button>
       <button id="btnPlaySeq" class="btn" disabled>▶ 播放拼接序列</button>
+    </div>
+    <div id="manualForm" class="manual-form" hidden>
+      <span class="edge-label">起</span><span id="maStart"></span>
+      <span class="edge-label">止</span><span id="maEnd"></span>
+      <button id="btnManualOk" class="btn btn-mini-wide">添加</button>
+      <button id="btnManualCancel" class="btn btn-mini-wide">取消</button>
     </div>
     <div id="seqList" class="seq-list"></div>
   </section>
@@ -324,6 +344,7 @@
   <script src="lib/mp4-muxer.js"></script>
   <script src="src/analysis.js"></script>
   <script src="src/sequence.js"></script>
+  <script src="src/unitInput.js"></script>
   <script src="src/store.js"></script>
   <script src="src/export.js"></script>
   <script src="src/audio.js"></script>

@@ -37,7 +37,7 @@
         <table class="seg-table">
           <thead>
             <tr>
-              <th>#</th><th>BPM</th><th>拍号</th><th>长度方式</th><th>数量</th><th>网格分辨率<br><span class="th-sub">每小节线数</span></th><th></th><th></th>
+              <th>#</th><th>BPM</th><th>拍号</th><th>长度<br><span class="th-sub">小节/格或时间</span></th><th>网格分辨率<br><span class="th-sub">每小节线数</span></th><th></th><th></th>
             </tr>
           </thead>
           <tbody id="segTbody"></tbody>
@@ -76,8 +76,7 @@
     if (res > 0) seg.resolution = res;
     if (!isLast) {
       const qty = parseFloat(r.qty);
-      if (r.mode === 'bars') seg.bars = qty;
-      else if (r.mode === 'dur') seg.durationSec = qty;
+      if (isFinite(qty) && qty > 0) seg.durationSec = qty;
     }
     return seg;
   }
@@ -96,40 +95,54 @@
           /
           <select class="seg-unit">${UNIT_CHOICES.map((u) => `<option value="${u}" ${u == r.unit ? 'selected' : ''}>${u}</option>`).join('')}</select>
         </td>
-        <td>
-          ${isLast
-            ? '<span class="seg-rest">剩余所有</span>'
-            : `<select class="seg-mode">
-                <option value="bars" ${r.mode === 'bars' ? 'selected' : ''}>小节数</option>
-                <option value="dur" ${r.mode === 'dur' ? 'selected' : ''}>时长（秒）</option>
-              </select>`}
-        </td>
-        <td>
-          ${isLast
-            ? '<span class="seg-rest">—</span>'
-            : `<input type="number" class="seg-qty" min="0" step="0.1" value="${r.qty != null ? r.qty : ''}" placeholder="数量" />`}
+        <td class="seg-length">
+          ${isLast ? '<span class="seg-rest">剩余所有</span>' : ''}
         </td>
         <td><input type="number" class="seg-res" min="1" step="1" value="${r.res != null ? r.res : ''}" placeholder="每小节线数" title="网格分辨率：每小节网格线数，自动识别时默认为拍号分子" /></td>
         <td><button class="btn-mini seg-auto" title="自动识别该段">识别</button></td>
         <td><button class="btn-mini del seg-del" title="删除该段">✕</button></td>`;
-      tr.querySelector('.seg-bpm').addEventListener('change', (e) => (r.bpm = e.target.value));
-      tr.querySelector('.seg-beats').addEventListener('change', (e) => (r.beats = parseInt(e.target.value, 10)));
-      tr.querySelector('.seg-unit').addEventListener('change', (e) => (r.unit = parseInt(e.target.value, 10)));
-      const modeSel = tr.querySelector('.seg-mode');
-      if (modeSel) modeSel.addEventListener('change', (e) => (r.mode = e.target.value));
-      const qtyInput = tr.querySelector('.seg-qty');
-      if (qtyInput) qtyInput.addEventListener('change', (e) => (r.qty = e.target.value));
-      tr.querySelector('.seg-res').addEventListener('change', (e) => (r.res = e.target.value));
+      const refreshLen = () => r._unitInput && r._unitInput.refresh();
+      tr.querySelector('.seg-bpm').addEventListener('change', (e) => { r.bpm = e.target.value; refreshLen(); });
+      tr.querySelector('.seg-beats').addEventListener('change', (e) => { r.beats = parseInt(e.target.value, 10); refreshLen(); });
+      tr.querySelector('.seg-unit').addEventListener('change', (e) => { r.unit = parseInt(e.target.value, 10); refreshLen(); });
+      tr.querySelector('.seg-res').addEventListener('change', (e) => { r.res = e.target.value; refreshLen(); });
       tr.querySelector('.seg-auto').addEventListener('click', () => runAuto(i));
-      tr.querySelector('.seg-bpm').addEventListener('change', (e) => (r.bpm = e.target.value));
       tr.querySelector('.seg-del').addEventListener('click', () => {
         if (rows.length > 1) {
           rows.splice(i, 1);
           renderRows();
         }
       });
+      const lenCell = tr.querySelector('.seg-length');
+      if (lenCell && !isLast) {
+        const comp = MC.UnitInput.create(lenCell, {
+          kind: 'length',
+          getStep: () => stepOf(r),
+          value: parseFloat(r.qty) || 0,
+          onChange: (sec) => { r.qty = sec; },
+        });
+        r._unitInput = comp;
+      }
       tbody.appendChild(tr);
     });
+  }
+
+  /** 该段行当前参数下的小节时长与每格步长（未填 BPM 时按 120 估算）。 */
+  function stepOf(r) {
+    const bpm = parseFloat(r.bpm) || 120;
+    const beats = parseInt(r.beats, 10) || 4;
+    const unit = parseInt(r.unit, 10) || 4;
+    const res = parseInt(r.res, 10) || beats;
+    const barDur = (60 / bpm) * beats * (4 / unit);
+    return { barDur, step: barDur / res };
+  }
+
+  /** 段定义（含 bpm/拍号）下的小节时长。 */
+  function barDurOfSeg(s) {
+    const bpm = parseFloat(s.bpm) || 120;
+    const beats = s.beatsPerBar || 4;
+    const unit = s.beatUnit || 4;
+    return (60 / bpm) * beats * (4 / unit);
   }
 
   async function runAuto(i) {
@@ -175,7 +188,7 @@
       // 末段为"剩余所有"，无需长度
       if (i === rows.length - 1) continue;
       const qty = parseFloat(r.qty);
-      if (!isFinite(qty) || qty <= 0) return '第 ' + (i + 1) + ' 段需填写小节数或时长';
+      if (!isFinite(qty) || qty <= 0) return '第 ' + (i + 1) + ' 段需填写长度（小节/格或时间）';
     }
     const offset = parseFloat(el('mOffset').value);
     if (!isFinite(offset)) return '偏移需为数字（可为负）';
@@ -201,8 +214,7 @@
       bpm: s.bpm != null ? s.bpm : null,
       beats: s.beatsPerBar || 4,
       unit: s.beatUnit || 4,
-      mode: s.durationSec != null ? 'dur' : 'bars',
-      qty: s.durationSec != null ? s.durationSec : s.bars != null ? s.bars : null,
+      qty: s.durationSec != null ? s.durationSec : s.bars != null ? s.bars * barDurOfSeg(s) : null,
       res: s.resolution != null ? s.resolution : null,
     }));
     renderRows();

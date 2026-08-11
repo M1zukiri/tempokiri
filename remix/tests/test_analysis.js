@@ -117,7 +117,8 @@ test('buildGrid: 多段衔接与连续编号', () => {
   assert.equal(g.bars[4].barNumber, 5); // 跨段连续编号
   assert.equal(g.bars[4].startTime, 8);
   assert.equal(g.segments[2].startTime, 12);
-  assert.equal(g.segments[2].bars.length, 0); // 时长模式无小节
+  assert.equal(g.segments[2].bars.length, 2); // 时长模式段按小节切分（150BPM 4/4：barDur 1.6s，3s → 2 小节）
+  assert.equal(g.bars[6].barNumber, 7); // 时长模式段小节连续编号
 });
 
 test('buildGrid: 细分拍线', () => {

@@ -32,6 +32,59 @@
     return bar ? [bar.startTime, bar.endTime] : null;
   }
 
+  /** 某小节所在段的网格分辨率（每小节格数）。 */
+  function barResolution(grid, barNumber) {
+    if (!grid || !grid.segments) return null;
+    const seg = grid.segments.find((sg) => sg.bars && sg.bars.some((b) => b.barNumber === barNumber));
+    return seg ? seg.resolution : null;
+  }
+
+  /** 某小节内第 cell 格的起止时间（格 = 网格线间区间，cell ∈ [1, resolution]）。 */
+  function barCellToTime(grid, barNumber, cell) {
+    const t = barToTime(grid, barNumber);
+    if (!t) return null;
+    const res = barResolution(grid, barNumber);
+    if (!res) return null;
+    const step = (t[1] - t[0]) / res;
+    const c = Math.min(res, Math.max(1, Math.round(cell)));
+    return [t[0] + (c - 1) * step, t[0] + c * step];
+  }
+
+  /** 时间 → 小节/格（时间落在哪一格；超出网格返回 null）。 */
+  function timeToBarCell(grid, t) {
+    if (!grid || !grid.bars || !grid.bars.length) return null;
+    let bar = grid.bars.find((b) => t >= b.startTime && t < b.endTime);
+    if (!bar) {
+      // 网格末尾边界（序列终点常等于最后小节结束）→ 归属最后一格
+      const last = grid.bars[grid.bars.length - 1];
+      if (last && t >= last.startTime && t <= last.endTime + 1e-6) bar = last;
+      else return null;
+    }
+    const res = barResolution(grid, bar.barNumber);
+    if (!res) return null;
+    const step = (bar.endTime - bar.startTime) / res;
+    const cell = Math.min(res, Math.max(1, Math.floor((t - bar.startTime) / step) + 1));
+    return { bar: bar.barNumber, cell };
+  }
+
+  /** 时长 ↔ 小节/格（格 ∈ [0, resolution-1]，0 格 = 整小节）。 */
+  function durationToBarCell(durationSec, barDur, step) {
+    if (barDur <= 0 || step <= 0) return { bars: 0, cells: 0 };
+    const res = Math.round(barDur / step);
+    let bars = Math.floor(durationSec / barDur);
+    let rem = durationSec - bars * barDur;
+    let cells = Math.round(rem / step);
+    if (cells >= res) {
+      bars += 1;
+      cells = 0;
+    }
+    return { bars, cells };
+  }
+
+  function barCellToDuration(bars, cells, barDur, step) {
+    return bars * barDur + cells * step;
+  }
+
   /**
    * 由小节选择创建序列项（fade 用毫秒）。
    * @param {object} grid
@@ -122,6 +175,11 @@
   return {
     newId,
     barToTime,
+    barResolution,
+    barCellToTime,
+    timeToBarCell,
+    durationToBarCell,
+    barCellToDuration,
     createItem,
     itemToPart,
     itemsToParts,

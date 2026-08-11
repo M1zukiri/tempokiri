@@ -368,13 +368,12 @@
       const start = t;
       const end = t + segDur;
       const segBars = [];
-      if (seg.bars) {
-        for (let b = 0; b < seg.bars; b++) {
-          const s = start + b * barDur;
-          const e = Math.min(s + barDur, end);
-          segBars.push({ barNumber, startTime: s, endTime: e });
-          barNumber++;
-        }
+      const nBars = seg.bars || Math.max(1, Math.ceil(segDur / barDur));
+      for (let b = 0; b < nBars; b++) {
+        const s = start + b * barDur;
+        const e = Math.min(s + barDur, end);
+        segBars.push({ barNumber, startTime: s, endTime: e });
+        barNumber++;
       }
       // 拍线（含细分）
       const step = barDur / resolution;

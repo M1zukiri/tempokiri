@@ -43,14 +43,30 @@
       card.dataset.id = it.id;
       card.innerHTML = `
         <span class="seq-num">${idx + 1}</span>
-        <span class="seq-range">${fmtRange(it)}</span>
-        <span class="seq-time">${fmtTime(it.startTime)} – ${fmtTime(it.endTime)}</span>
+        <span class="seq-edges">
+          <span class="edge-label">起</span><span class="edge-start"></span>
+          <span class="edge-label">止</span><span class="edge-end"></span>
+        </span>
         <label class="fade">淡入 <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ms</label>
         <label class="fade">淡出 <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ms</label>
         <span class="spacer"></span>
         <button class="btn-mini up" title="上移">↑</button>
         <button class="btn-mini down" title="下移">↓</button>
         <button class="btn-mini del" title="删除">✕</button>`;
+      const edgeGrid = () => handlers.getGrid();
+      const compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
+        kind: 'position',
+        getGrid: edgeGrid,
+        value: it.invalid ? NaN : it.startTime,
+        onChange: (sec) => handlers.onRange(it.id, sec, 'start'),
+      });
+      const compEnd = MC.UnitInput.create(card.querySelector('.edge-end'), {
+        kind: 'position',
+        getGrid: edgeGrid,
+        value: it.invalid ? NaN : it.endTime,
+        onChange: (sec) => handlers.onRange(it.id, sec, 'end'),
+      });
+      if (it.invalid || compStart.isInvalid() || compEnd.isInvalid()) card.classList.add('invalid');
       card.querySelector('.up').addEventListener('click', () => handlers.onMove(it.id, idx - 1));
       card.querySelector('.down').addEventListener('click', () => handlers.onMove(it.id, idx + 1));
       card.querySelector('.del').addEventListener('click', () => handlers.onRemove(it.id));

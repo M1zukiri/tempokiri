@@ -53,6 +53,12 @@
   const btnAddSelection = $('btnAddSelection');
   const btnExport = $('btnExport');
   const fileInput = $('fileInput');
+  const btnManualAdd = $('btnManualAdd');
+  const manualForm = $('manualForm');
+  const maStart = $('maStart');
+  const maEnd = $('maEnd');
+  const btnManualOk = $('btnManualOk');
+  const btnManualCancel = $('btnManualCancel');
 
   // UMD 模块将导出铺平到 MC 命名空间（MC.analyze、MC.encodeWav 等）
   const mod = MC;
@@ -97,10 +103,38 @@
       onRemove: removeItem,
       onMove: moveItem,
       onFade: setFade,
+      onRange: setRange,
+      getGrid: () => state.grid,
     });
     ui.updateSeqInfo(seqInfo, state.sequence, seq);
+    btnPlaySeq.disabled = anyInvalid();
     updateQuickBar();
     renderWave();
+  }
+
+  /** 序列中是否有非法项（用户输入非法或时间超出网格）。 */
+  function anyInvalid() {
+    const g = state.grid;
+    return state.sequence.some((it) => {
+      if (it.invalid) return true;
+      if (!g) return false;
+      return seq.timeToBarCell(g, it.startTime) === null || seq.timeToBarCell(g, it.endTime) === null;
+    });
+  }
+
+  /** 序列项起终点手动编辑（sec=null 表示输入非法）。 */
+  function setRange(id, sec, which) {
+    const it = state.sequence.find((x) => x.id === id);
+    if (!it) return;
+    if (sec == null) {
+      it.invalid = true; // 非法输入：回退未输入状态，标红
+    } else {
+      if (which === 'start') it.startTime = sec;
+      else it.endTime = sec;
+      it.invalid = !(it.startTime < it.endTime);
+    }
+    saveWorkspace();
+    renderAll();
   }
 
   // ---------- 文件处理 ----------
@@ -234,23 +268,40 @@
       sequence: state.sequence.map((it) => ({
         startBar: it.startBar,
         endBar: it.endBar,
+        startTime: it.startTime,
+        endTime: it.endTime,
         fadeInMs: it.fadeInMs,
         fadeOutMs: it.fadeOutMs,
+        invalid: !!it.invalid,
       })),
     });
   }
-
-  /** 从缓存恢复拼接序列（依赖已重建的网格）。 */
+  /** 从缓存恢复拼接序列（时间为主；旧缓存无时间时按小节推算）。 */
   function restoreSequence(list) {
     state.sequence = [];
-    if (!Array.isArray(list) || !state.grid) return;
+    if (!Array.isArray(list)) return;
     for (const rec of list) {
-      const it = seq.createItem(state.grid, rec.startBar, rec.endBar);
-      if (it) {
-        it.fadeInMs = rec.fadeInMs || 0;
-        it.fadeOutMs = rec.fadeOutMs || 0;
-        state.sequence.push(it);
+      let it = null;
+      if (rec.startTime != null && rec.endTime != null) {
+        it = {
+          id: seq.newId(),
+          startBar: rec.startBar != null ? rec.startBar : null,
+          endBar: rec.endBar != null ? rec.endBar : null,
+          startTime: rec.startTime,
+          endTime: rec.endTime,
+          fadeInMs: rec.fadeInMs || 0,
+          fadeOutMs: rec.fadeOutMs || 0,
+          invalid: !!rec.invalid,
+        };
+      } else if (state.grid && rec.startBar != null && rec.endBar != null) {
+        // 旧缓存：无时间字段，按小节重建
+        it = seq.createItem(state.grid, rec.startBar, rec.endBar);
+        if (it) {
+          it.fadeInMs = rec.fadeInMs || 0;
+          it.fadeOutMs = rec.fadeOutMs || 0;
+        }
       }
+      if (it) state.sequence.push(it);
     }
   }
 
@@ -578,6 +629,10 @@
       status('序列为空，请先在波形上选段');
       return;
     }
+    if (anyInvalid()) {
+      status('存在无效的序列项（标红），请修正后再播放');
+      return;
+    }
     stopPlay();
     const items = state.sequence.slice();
     let idx = 0;
@@ -719,6 +774,55 @@
     });
     btnAddSelection.addEventListener('click', addPendingSelection);
     btnExport.addEventListener('click', openExportDialog);
+    btnManualAdd.addEventListener('click', toggleManualForm);
+    btnManualOk.addEventListener('click', manualAdd);
+    btnManualCancel.addEventListener('click', () => { manualForm.hidden = true; });
+
+    // 手动添加序列：展开/收起表单（每次展开重建输入组件，使用当前网格）
+    let maStartComp = null;
+    let maEndComp = null;
+    function toggleManualForm() {
+      const show = manualForm.hidden;
+      manualForm.hidden = !show;
+      if (show) {
+        maStart.textContent = '';
+        maEnd.textContent = '';
+        maStartComp = MC.UnitInput.create(maStart, {
+          kind: 'position',
+          getGrid: () => state.grid,
+          value: state.cursorPos || 0,
+        });
+        maEndComp = MC.UnitInput.create(maEnd, {
+          kind: 'position',
+          getGrid: () => state.grid,
+          value: (state.cursorPos || 0) + 1,
+        });
+      }
+    }
+    function manualAdd() {
+      if (!maStartComp || !maEndComp) return;
+      const s = maStartComp.getValue();
+      const e = maEndComp.getValue();
+      if (s == null || e == null || s >= e) {
+        status('手动添加失败：起止需合法（小节/格或时间），且起点必须早于终点');
+        return;
+      }
+      const item = {
+        id: seq.newId(),
+        startBar: null,
+        endBar: null,
+        startTime: s,
+        endTime: e,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        invalid: false,
+      };
+      state.sequence.push(item);
+      manualForm.hidden = true;
+      saveWorkspace();
+      renderAll();
+      status('已手动添加：' + ui.fmtTime(s) + ' – ' + ui.fmtTime(e));
+    }
 
     // 波形交互
     interact.bindWaveform(waveCanvas, {
