@@ -240,19 +240,39 @@
       ctx.setLineDash([]);
     }
 
-    // 播放线
-    if (data.playTime != null && data.playTime >= view.start && data.playTime <= view.end) {
-      const x = timeToX(data.playTime, view, cssW);
-      ctx.strokeStyle = THEME.playLine;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, waveH);
-      ctx.stroke();
-    }
+    // 播放线由 drawPlayHead 绘制在叠加层（避免播放时整幅重绘）
 
     // 时间轴
     drawAxis(ctx, view, cssW, cssH, axisH);
+  }
+
+  /**
+   * 动态播放线层：只画播放头竖线，叠加在静态波形层之上。
+   * 播放期间由 tickProgress 高频调用，避免整幅波形每帧重绘（视频播放卡顿主因）。
+   * @param {HTMLCanvasElement} canvas 透明叠加层
+   * @param {object} view
+   * @param {number|null} playTime null 时清空
+   * @param {number} [axisHeight=22]
+   */
+  function drawPlayHead(canvas, view, playTime, axisHeight = 22) {
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || canvas.width;
+    const cssH = canvas.clientHeight || canvas.height;
+    const w = Math.round(cssW * dpr);
+    const h = Math.round(cssH * dpr);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    if (playTime == null || playTime < view.start || playTime > view.end) return;
+    const x = timeToX(playTime, view, cssW);
+    ctx.strokeStyle = THEME.playLine;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, cssH - axisHeight);
+    ctx.stroke();
   }
 
   function drawAxis(ctx, view, cssW, cssH, axisH) {
@@ -292,5 +312,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, timeToX, xToTime, draw, THEME };
+  return { buildPeaks, timeToX, xToTime, draw, drawPlayHead, THEME };
 });

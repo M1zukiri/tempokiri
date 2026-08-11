@@ -32,6 +32,7 @@
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
   const waveCanvas = $('wave');
+  const playHeadCanvas = $('playHead');
   const waveWrap = $('waveWrap');
   const waveHint = $('waveHint');
   const videoEl = $('video');
@@ -96,6 +97,8 @@
         playTime: state.playTime,
         cursorPos: state.cursorPos,
       });
+      // 播放线绘制在叠加层；全量重绘后同步当前播放线（非播放时 state.playTime 为 null → 清空）
+      render.drawPlayHead(playHeadCanvas, state.view, state.playTime);
     });
   }
   function renderAll() {
@@ -638,12 +641,18 @@
     return null;
   }
 
+  // 播放进度：只更新叠加层的播放线（节流每 2 帧），不再整幅重绘波形——
+  // 视频播放卡顿的主因是 rAF 每帧全量 canvas 重绘与解码抢主线程。
+  let tickFrame = 0;
   function tickProgress() {
     if (!playing) return;
-    const t = currentPlayTime();
-    if (t != null) {
-      state.playTime = t;
-      renderWave();
+    tickFrame++;
+    if (tickFrame % 2 === 0) {
+      const t = currentPlayTime();
+      if (t != null) {
+        state.playTime = t;
+        render.drawPlayHead(playHeadCanvas, state.view, t);
+      }
     }
     requestAnimationFrame(tickProgress);
   }
