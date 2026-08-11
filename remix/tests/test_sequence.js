@@ -152,18 +152,23 @@ test('终点含边界换算 timeToBarCellEnd', () => {
   assert.deepEqual(S.timeToBarCell(grid, 0.25), { bar: 1, cell: 3 });
 });
 
-test('浮点容差：起点 7.1 不被上一小节末尾吞掉', () => {
-  // 41.5 BPM + offset 13.235：bar6.endTime 比 bar7.startTime 大 7e-15（累积浮点差）
+test('换算语义：起点 7.1 不被上一小节末尾吞掉（网格精确衔接）', () => {
+  // 41.5 BPM + offset 13.235：非整数小节时长，浮点累积曾导致 bar6.endTime > bar7.startTime
   const A = require('../src/analysis.js');
   const g = A.buildGrid({
     segments: A.resolveSegments([{ bpm: 41.5, beatsPerBar: 4, beatUnit: 4 }], 200),
     offset: 13.235,
     duration: 200,
   });
+  // buildGrid 保证相邻小节精确衔接（同一累积值），不依赖换算层的容差补丁
+  const b6 = g.bars[5];
+  const b7 = g.bars[6];
+  assert.ok(b6.endTime === b7.startTime, '相邻小节应精确衔接，diff=' + (b7.startTime - b6.endTime));
   const t0 = S.barCellToTime(g, 7, 1)[0];
   assert.deepEqual(S.timeToBarCell(g, t0), { bar: 7, cell: 1 });
-  // 时间真正落在 bar6 内（如 bar6 中间）仍归 bar6
+  // 时间真正落在 bar6 内仍归 bar6
   const mid6 = S.barCellToTime(g, 6, 2)[0] + 0.01;
   const bc6 = S.timeToBarCell(g, mid6);
   assert.ok(bc6.bar === 6);
 });
+

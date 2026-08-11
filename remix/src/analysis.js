@@ -369,11 +369,15 @@
       const end = t + segDur;
       const segBars = [];
       const nBars = seg.bars || Math.max(1, Math.ceil(segDur / barDur));
+      // 相邻小节精确衔接：下一小节起点 = 当前小节终点（同一累积值），
+      // 避免 start + b*barDur（乘法链）与 s + barDur（加法链）的浮点差导致
+      // 起点时间戳被上一小节末尾吞掉（如 7.1 显示成 6.4）
+      let s = start;
       for (let b = 0; b < nBars; b++) {
-        const s = start + b * barDur;
         const e = Math.min(s + barDur, end);
         segBars.push({ barNumber, startTime: s, endTime: e });
         barNumber++;
+        s = e;
       }
       // 拍线（含细分）
       const step = barDur / resolution;
