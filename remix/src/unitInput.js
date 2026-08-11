@@ -86,16 +86,13 @@
         }
         return sec.toFixed(3) + 's';
       }
-      // position
       if (mode === 'time') {
         const g = grid();
-        const bc = g ? seq().timeToBarCell(g, sec) : null;
+        const bc = g ? (edge === 'end' ? seq().timeToBarCellEnd(g, sec) : seq().timeToBarCell(g, sec)) : null;
         return bc ? bc.bar + ' 小节 ' + bc.cell + ' 格' : '超出网格';
       }
       return sec.toFixed(3) + 's';
     }
-
-    /** 从当前输入框读数（bars 模式），非法返回 null。 */
     function readBars() {
       const iBar = fields.querySelector('.unit-bar');
       const iCell = fields.querySelector('.unit-cell');
@@ -163,7 +160,7 @@
         // 填充当前值
         if (kind === 'position') {
           if (g) {
-            const bc = seq().timeToBarCell(g, value);
+            const bc = edge === 'end' ? seq().timeToBarCellEnd(g, value) : seq().timeToBarCell(g, value);
             if (bc) {
               iBar.value = String(bc.bar);
               iCell.value = String(bc.cell);

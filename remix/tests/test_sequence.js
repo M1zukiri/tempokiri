@@ -132,3 +132,22 @@ test('网格末尾边界归属最后一格', () => {
   assert.deepEqual(bc, { bar: 3, cell: 4 });
   assert.ok(S.timeToBarCell(grid, 1.51) === null);
 });
+
+test('终点含边界换算 timeToBarCellEnd', () => {
+  const barDur = 0.5;
+  const grid = {
+    bars: [1, 2, 3].map((n) => ({ barNumber: n, startTime: (n - 1) * barDur, endTime: n * barDur })),
+    segments: [{ bars: [1, 2, 3].map((n) => ({ barNumber: n })), resolution: 4 }],
+  };
+  // 格 2 区间终点（= 格 3 起点）应归格 2，避免终点编辑显示 +1
+  assert.deepEqual(S.timeToBarCellEnd(grid, 0.25), { bar: 1, cell: 2 });
+  // 小节末尾归该小节最后一格
+  assert.deepEqual(S.timeToBarCellEnd(grid, 0.5), { bar: 1, cell: 4 });
+  // 网格末尾归最后一格
+  assert.deepEqual(S.timeToBarCellEnd(grid, 1.5), { bar: 3, cell: 4 });
+  // 超出网格 → null
+  assert.ok(S.timeToBarCellEnd(grid, 1.51) === null);
+  // 与 timeToBarCell 的差异：同一边界时间归属不同
+  // 差异：timeToBarCell 边界归下一格（格 3），timeToBarCellEnd 归当前格（格 2）——修复终点编辑 +1 的关键
+  assert.deepEqual(S.timeToBarCell(grid, 0.25), { bar: 1, cell: 3 });
+});

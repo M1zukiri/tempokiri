@@ -67,6 +67,18 @@
     return { bar: bar.barNumber, cell };
   }
 
+  /** 时间 → 小节/格（终点含边界：恰落在格区间终点归当前格，避免编辑终点格时显示 +1）。 */
+  function timeToBarCellEnd(grid, t) {
+    if (!grid || !grid.bars || !grid.bars.length) return null;
+    const bar = grid.bars.find((b) => t >= b.startTime && t <= b.endTime + 1e-6);
+    if (!bar) return null;
+    const res = barResolution(grid, bar.barNumber);
+    if (!res) return null;
+    const step = (bar.endTime - bar.startTime) / res;
+    const cell = Math.min(res, Math.max(1, Math.ceil((t - bar.startTime) / step)));
+    return { bar: bar.barNumber, cell };
+  }
+
   /** 时长 ↔ 小节/格（格 ∈ [0, resolution-1]，0 格 = 整小节）。 */
   function durationToBarCell(durationSec, barDur, step) {
     if (barDur <= 0 || step <= 0) return { bars: 0, cells: 0 };
@@ -171,13 +183,13 @@
     const num = bar ? bar.barNumber : 1;
     return { startBar: num, endBar: num };
   }
-
   return {
     newId,
     barToTime,
     barResolution,
     barCellToTime,
     timeToBarCell,
+    timeToBarCellEnd,
     durationToBarCell,
     barCellToDuration,
     createItem,
