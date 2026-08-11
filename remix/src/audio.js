@@ -1,0 +1,335 @@
+/**
+ * audio.js — 浏览器音频解码与视频音轨 PCM 采集。
+ *
+ * 音频文件：AudioContext.decodeAudioData → 全量 PCM。
+ * 视频文件：<video>.captureStream() + ScriptProcessorNode 静音快速播放采集
+ *           （避开 AudioWorklet 的 Blob URL 限制，兼容 file:// 场景）。
+ */
+(function (global, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('./analysis.js'));
+  } else {
+    global.MC = global.MC || {};
+    Object.assign(global.MC, factory(global.MC));
+  }
+})(typeof self !== 'undefined' ? self : this, function (analysis) {
+  'use strict';
+
+  const AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus', 'webm'];
+  const VIDEO_EXTS = ['mp4', 'm4v', 'webm', 'mov', 'mkv', 'avi', 'ogv'];
+
+  function extOf(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(name || '');
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  /** 判断文件是音频还是视频（按扩展名，未知按 MIME 兜底）。 */
+  function classifyFile(file) {
+    const ext = extOf(file.name);
+    if (VIDEO_EXTS.indexOf(ext) >= 0) return 'video';
+    if (AUDIO_EXTS.indexOf(ext) >= 0) return 'audio';
+    if (file.type && file.type.startsWith('video/')) return 'video';
+    if (file.type && file.type.startsWith('audio/')) return 'audio';
+    return 'audio'; // 未知扩展名按音频处理，让浏览器解码器决定
+  }
+
+  function getAudioContext() {
+    if (typeof AudioContext !== 'undefined') return new AudioContext();
+    if (typeof webkitAudioContext !== 'undefined') return new webkitAudioContext();
+    return null;
+  }
+
+  /**
+   * 用 WebCodecs 直接从视频文件解码音轨（快、准，无 autoplay 限制）。
+   * 备用方案：captureStream 实时采集。
+   * @param {File} file
+   * @param {(p:number)=>void} [onProgress]
+   * @returns {Promise<{pcm:Float32Array, rawMono:Float32Array, sampleRate:number, duration:number}>}
+   */
+  async function decodeVideoAudioTrack(file, onProgress) {
+    if (typeof window.AudioDecoder !== 'function' || (!window.MP4Box && !window.mp4box)) {
+      throw new Error('WebCodecs 不可用');
+    }
+    const MP4Box = window.MP4Box || window.mp4box;
+    const buf = await file.arrayBuffer();
+
+    // 1. mp4box demux 音频轨
+    const audio = await demuxAudioTrack(buf, MP4Box);
+    if (!audio || !audio.samples.length) throw new Error('视频中没有音频轨道');
+    if (!audio.description && /mp4a|aac/i.test(audio.codec || '')) { throw new Error('无法获取音频解码描述（该编码暂不支持音轨提取）'); }
+
+    // 2. AudioDecoder 解码
+    const pcmChunks = [];
+    let decoderError = null;
+    const decoder = new AudioDecoder({
+      output: (audioData) => {
+        const len = audioData.numberOfFrames * audioData.numberOfChannels;
+        const buf32 = new Float32Array(len);
+        audioData.copyTo(buf32, { planeIndex: 0 });
+        // 多声道先合并到 ch0（AudioDecoder f32-planar 各声道独立 plane）
+        pcmChunks.push({ data: buf32, channels: audioData.numberOfChannels, rate: audioData.sampleRate });
+        audioData.close();
+      },
+      error: (e) => {
+        decoderError = new Error('音轨解码失败：' + e.message);
+      },
+    });
+    const decCfg = {
+      codec: audio.codec,
+      sampleRate: audio.sampleRate,
+      numberOfChannels: audio.channels,
+    };
+    if (audio.description) decCfg.description = audio.description;
+    decoder.configure(decCfg);
+
+    for (let i = 0; i < audio.samples.length; i++) {
+      const s = audio.samples[i];
+      const chunk = new EncodedAudioChunk({
+        type: s.is_sync ? 'key' : 'delta',
+        timestamp: Math.round((s.cts / audio.timescale) * 1e6),
+        duration: Math.round((s.duration / audio.timescale) * 1e6),
+        data: s.data,
+      });
+      decoder.decode(chunk);
+      if (i % 64 === 0 && onProgress) onProgress(0.1 + 0.6 * (i / audio.samples.length));
+    }
+    await decoder.flush();
+    if (decoderError) throw decoderError;
+
+    // 3. 汇总为 mono（取声道 0；多声道先做均值）
+    let total = 0;
+    for (const c of pcmChunks) total += c.data.length / c.channels;
+    const mono = new Float32Array(total);
+    const rate = pcmChunks.length ? pcmChunks[0].rate : audio.sampleRate;
+    let off = 0;
+    for (const c of pcmChunks) {
+      const frames = c.data.length / c.channels;
+      if (c.channels === 1) {
+        mono.set(c.data, off);
+      } else {
+        for (let f = 0; f < frames; f++) {
+          let sum = 0;
+          for (let ch = 0; ch < c.channels; ch++) sum += c.data[f * c.channels + ch];
+          mono[off + f] = sum / c.channels;
+        }
+      }
+      off += frames;
+    }
+    if (onProgress) onProgress(0.85);
+    const duration = mono.length / rate;
+    return {
+      pcm: analysis.resample(mono, rate, analysis.DEFAULT_ANALYSIS_SR),
+      rawMono: mono,
+      sampleRate: rate,
+      duration,
+    };
+  }
+
+  /** mp4box 提取音频轨样本与解码描述。 */
+  function demuxAudioTrack(buf, MP4Box) {
+    return new Promise((resolve, reject) => {
+      const file = MP4Box.createFile();
+      let audioTrack = null;
+      let description = null;
+      let ready = false;
+
+      file.onReady = (info) => {
+        const at = info.audioTracks && info.audioTracks[0];
+        if (!at) {
+          resolve(null);
+          return;
+        }
+        audioTrack = at;
+        const track = file.getTrackById(at.id);
+        if (track) {
+          const stsd = track.mdia && track.mdia.minf && track.mdia.minf.stbl && track.mdia.minf.stbl.stsd;
+          const entry = stsd && stsd.entries && stsd.entries[0];
+          description = extractAudioDescription(entry, MP4Box);
+        }
+        file.setExtractionOptions(at.id, null, { nbSamples: Infinity });
+        file.start();
+      };
+
+      file.onSamples = (trackId, user, samples) => {
+        if (!ready) {
+          ready = true;
+          resolve({
+            codec: audioTrack && audioTrack.codec,
+            sampleRate: audioTrack && audioTrack.audio && audioTrack.audio.sample_rate,
+            channels: audioTrack && audioTrack.audio && audioTrack.audio.channel_count,
+            timescale: audioTrack && audioTrack.timescale,
+            samples,
+            description,
+          });
+        }
+      };
+
+      buf.fileStart = 0;
+      file.appendBuffer(buf);
+      file.flush();
+      setTimeout(() => {
+        if (!ready) reject(new Error('无法解析音频轨'));
+      }, 10000);
+    });
+  }
+
+  /** 从音频 sample entry 提取 AudioSpecificConfig（AAC）。 */
+  function extractAudioDescription(entry, MP4Box) {
+    if (!entry) return null;
+    // esds box → DecoderSpecificInfo
+    const esds = entry.esds;
+    if (esds) {
+      const walk = (obj, depth) => {
+        if (!obj || depth > 6) return null;
+        if (obj.tag === 5 && obj.data) {
+          // DecoderSpecificInfo：data 即 AudioSpecificConfig
+          return new Uint8Array(obj.data);
+        }
+        if (obj.decoderSpecificInfo) {
+          const d = obj.decoderSpecificInfo;
+          if (d.data) return new Uint8Array(d.data);
+        }
+        for (const k of Object.keys(obj)) {
+          const v = obj[k];
+          if (v && typeof v === 'object') {
+            const r = Array.isArray(v) ? v.map((x) => walk(x, depth + 1)).find(Boolean) : walk(v, depth + 1);
+            if (r) return r;
+          }
+        }
+        return null;
+      };
+      return walk(esds, 0);
+    }
+    return null;
+  }
+
+  /**
+   * 解码音频文件。
+   * 返回：pcm（降采样分析用）、rawMono（原始采样率，导出用）、audioBuffer（试听用）。
+   * @param {File} file
+   * @returns {Promise<{pcm:Float32Array, rawMono:Float32Array, audioBuffer:AudioBuffer,
+   *                    sampleRate:number, duration:number}>}
+   */
+  async function decodeAudioFile(file) {
+    const ctx = getAudioContext();
+    if (!ctx) throw new Error('当前浏览器不支持 Web Audio API');
+    const buf = await file.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(buf);
+    const channels = [];
+    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+      channels.push(audioBuffer.getChannelData(c));
+    }
+    const mono = analysis.toMono(channels);
+    const sampleRate = audioBuffer.sampleRate;
+    return {
+      pcm: analysis.resample(mono, sampleRate, analysis.DEFAULT_ANALYSIS_SR),
+      rawMono: mono,
+      audioBuffer,
+      sampleRate,
+      duration: audioBuffer.duration,
+    };
+  }
+
+  /**
+   * 从视频采集音轨 PCM（静音快速播放一遍）。
+   * 注意：captureStream 的音频跟随 playbackRate，采集后需按倍速拉伸时间轴。
+   * @param {HTMLVideoElement} video
+   * @param {(progress:number)=>void} [onProgress] 0..1
+   * @param {number} [playbackRate=4]
+   * @returns {Promise<{pcm:Float32Array, sampleRate:number, duration:number}>}
+   */
+  function captureVideoPcm(video, onProgress, playbackRate = 8) {
+    return new Promise((resolve, reject) => {
+      if (!video.captureStream) {
+        reject(new Error('当前浏览器不支持 video.captureStream，无法分析视频音轨'));
+        return;
+      }
+      const ctx = getAudioContext();
+      if (!ctx) {
+        reject(new Error('当前浏览器不支持 Web Audio API'));
+        return;
+      }
+      const stream = video.captureStream();
+      const src = ctx.createMediaStreamSource(stream);
+      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks = [];
+      let sampleRate = ctx.sampleRate;
+
+      const onAudio = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        sampleRate = e.inputBuffer.sampleRate || sampleRate;
+        chunks.push(Float32Array.from(input));
+      };
+
+      const onEnded = () => {
+        cleanup();
+        resolve(finalize(chunks, sampleRate, video.duration, playbackRate));
+      };
+      const onError = (err) => {
+        cleanup();
+        reject(err);
+      };
+
+      let cleanup = () => {
+        proc.onaudioprocess = null;
+        video.removeEventListener('ended', onEnded);
+        video.removeEventListener('error', onError);
+        src.disconnect();
+        proc.disconnect();
+        stream.getTracks().forEach((t) => t.stop());
+        if (ctx.state === 'running') {
+          ctx.close().catch(() => {});
+        }
+      };
+
+      video.muted = true;
+      video.playbackRate = playbackRate;
+      video.addEventListener('ended', onEnded);
+      video.addEventListener('error', onError);
+      video.play().catch((e) => {
+        cleanup();
+        reject(new Error('视频播放失败（可能需用户交互后重试）：' + e.message));
+      });
+      if (onProgress) {
+        const tick = () => {
+          if (video.duration) onProgress(Math.min(1, video.currentTime / video.duration));
+        };
+        video.addEventListener('timeupdate', tick);
+        const origCleanup = cleanup;
+        cleanup = () => {
+          video.removeEventListener('timeupdate', tick);
+          origCleanup();
+        };
+      }
+    });
+  }
+
+  /**
+   * 汇总采集块；playbackRate > 1 时音频被加速，需拉伸回原始时长。
+   * @param {Array<Float32Array>} chunks
+   * @param {number} sampleRate 采集采样率
+   * @param {number} duration 视频时长
+   * @param {number} playbackRate 播放倍速
+   */
+  function finalize(chunks, sampleRate, duration, playbackRate = 1) {
+    let total = 0;
+    for (const c of chunks) total += c.length;
+    let mono = new Float32Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      mono.set(c, off);
+      off += c.length;
+    }
+    // 4x 播放 → 采集音频为 4x 加速：重采样拉伸 4 倍时长
+    if (playbackRate > 1) {
+      mono = analysis.resample(mono, sampleRate, sampleRate * playbackRate);
+    }
+    return {
+      pcm: analysis.resample(mono, sampleRate, analysis.DEFAULT_ANALYSIS_SR),
+      rawMono: mono,
+      sampleRate,
+      duration: duration || mono.length / sampleRate,
+    };
+  }
+  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf };
+});

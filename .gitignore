@@ -18,3 +18,6 @@ Thumbs.db
 
 # Generated test files
 test_*.wav
+
+# Tempokiri workstation build
+remix/dist/
