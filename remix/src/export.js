@@ -51,10 +51,12 @@
     const out = new Float32Array(outLen);
     // a 的前缀（不参与交叉）
     out.set(a.subarray(0, a.length - fl), 0);
-    // 交叉区
+    // 交叉区：等功率余弦曲线（两端斜率平缓），避免线性交叉在段边界处
+    // 的相位跳变产生爆音/锯齿音（段衔接处样本跳变可达全曲平均的 35 倍）
     for (let i = 0; i < fl; i++) {
       const t = i / fl;
-      out[a.length - fl + i] = a[a.length - fl + i] * (1 - t) + b[i] * t;
+      const w = (1 - Math.cos(Math.PI * t)) / 2;
+      out[a.length - fl + i] = a[a.length - fl + i] * (1 - w) + b[i] * w;
     }
     // b 的剩余部分
     out.set(b.subarray(fl), a.length);

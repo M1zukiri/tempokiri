@@ -727,7 +727,7 @@
       return;
     }
     const parts = seq.itemsToParts(state.sequence, state.sampleRate);
-    const crossfade = Math.round((5 / 1000) * state.sampleRate); // 5ms 防爆音交叉
+    const crossfade = Math.round((30 / 1000) * state.sampleRate); // 30ms 余弦交叉，平滑段边界相位跳变
     const mix = exp.renderMix(state.rawMono, parts, crossfade);
     if (!mix.length) {
       status('无可播放内容');
