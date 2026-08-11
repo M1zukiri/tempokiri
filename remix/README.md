@@ -5,23 +5,24 @@
 
 ## 功能
 
-- 拖入音频（mp3/wav/ogg/m4a/flac）或视频（mp4/webm），视频带预览窗
-- 波形 + 节拍网格可视化（滚轮缩放、Shift+拖拽平移）
-- **确认制节拍设置**：BPM / 拍号 / 偏移在小窗口中输入，自动识别只填充、确认才应用
+- 拖入音频（mp3/wav/ogg/m4a/flac）或视频（mp4/mov，带预览窗），未导入时点击波形区也可打开文件
+- 波形 + 节拍网格可视化；**纯滚轮平移、Ctrl+滚轮缩放（指针为中心）、Shift+拖拽平移**
+- **确认制节拍设置**：BPM / 拍号 / 偏移在小窗口中输入，自动识别只填充、确认才应用；末段自动覆盖剩余时长
+- **段级网格分辨率**：每段可独立设置每小节线数；顶部快捷栏 BPM/偏移 ±1/±0.1/±0.01 即时微调
 - 节拍设置持久化：同一文件再次拖入自动应用
-- 按小节点击 / 拖拽选段，多段拼接排序、每段独立淡入淡出
-- 试听序列（音频/视频）
-- 导出 WAV / MP3（内嵌 lamejs，零外部依赖）
+- 单击波形仅定位播放起点（不播放），双击/拖拽选段（**部分覆盖的小节即被选中**），多段拼接、卡片拖动排序或 ↑↓ 调整、每段独立淡入淡出
+- 试听：波形旁「从此处开始播放」原曲、序列区「播放拼接序列」
+- 导出 WAV / MP3 / 视频（MP4/MOV，WebCodecs 合成）
 
 ## 快速开始
 
 ```bash
 # 开发模式：打开 index.html 或起本地服务器
-python -m http.server 8000 --directory .
-# 浏览器打开 http://localhost:8000
+python -m http.server 8734 --directory .
+# 浏览器打开 http://localhost:8734
 
 # 打包为单 HTML（发布物）
-python build.py   # → dist/remix-workstation.html
+python build.py   # → dist/tempokiri-workstation.html
 
 # 运行单元测试（Node 18+）
 node --test tests/test_analysis.js tests/test_export.js tests/test_sequence.js
@@ -31,24 +32,26 @@ node --test tests/test_analysis.js tests/test_export.js tests/test_sequence.js
 
 ```
 src/          开发期 JS 模块（分析/渲染/交互/导出等，可 Node 测试）
-lib/lamejs    MP3 编码（唯一第三方依赖，UMD 包装）
+lib/          lame.min.js（MP3 编码）、mp4box.global.js（demux）、mp4-muxer.js（合成）
 index.html    开发入口（深色 DJ 风格 UI）
-build.py      打包脚本 → dist/remix-workstation.html 单文件
+build.py      打包脚本 → dist/tempokiri-workstation.html 单文件
 tests/        Node 单元测试（算法、编码、序列逻辑）
-examples/     测试音频生成脚本
+examples/     测试素材（合成音频/视频）与生成脚本
 docs/         设计文档
 ```
 
 ## 核心算法
 
-`src/analysis.js` 纯函数实现：FFT → 频谱通量 → librosa 风格 onset 检测（归一化 + peak-pick）→
-网格对齐评分的 BPM 估计（半速/倍速可区分）→ 相位（偏移）估计。检测不准时可手动输入 BPM/偏移微调。
+`src/analysis.js` 纯函数实现：FFT → 频谱通量 → onset 检测（归一化 + peak-pick）→
+**自相关主导周期 + 局部细化的 BPM 估计**（半速/倍速可区分，输出 0.1 精度）→
+offset 取首个 onset 位置（首条网格线对齐音乐实际开始处）。检测不准时可手动微调 BPM/偏移。
 
 ## 视频说明
 
-视频文件的波形分析需先提取音轨：打开「设置节拍」→「自动识别」时，视频会静音 4 倍速快速播放
-一遍采集音频数据（界面显示进度条）。依赖浏览器 `video.captureStream()`。
+视频文件的波形分析需先提取音轨：优先 **WebCodecs 直接解码**（mp4box demux → AudioDecoder，快且准），
+失败时降级为静音 4 倍速 `video.captureStream()` 采集（界面显示进度条）。
+视频导出依赖 WebCodecs（Chrome/Edge 完整支持；Safari 部分；Firefox 不支持时导出面板灰掉视频选项）。
 
 ## License
 
-MIT（lamejs 为 LGPL，见 lib/lamejs 包内 LICENSE）
+MIT（lamejs 为 LGPL，见 lib 包内 LICENSE）

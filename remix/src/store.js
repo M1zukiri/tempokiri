@@ -13,7 +13,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const KEY = 'musiccutter.remix.settings.v1';
+  const KEY = 'tempokiri.remix.settings.v1';
 
   /** @param {File} file */
   function fingerprint(file) {

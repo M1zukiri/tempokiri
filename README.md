@@ -104,6 +104,21 @@ for bar in bars[:5]:
 cutter.cut("1-8, 17-24", "remix.wav")
 ```
 
+
+
+## Tempokiri 工作站（浏览器版）
+
+除 CLI 外，项目附带 **Tempokiri 工作站**（`remix/`）：一个单 HTML 文件交付的浏览器端节奏感知剪辑工具，
+支持音频/视频拖入、波形与节拍网格可视化、按小节选段、多段拼接、导出 WAV/MP3/MP4。
+
+```bash
+cd remix
+python -m http.server 8734   # 开发伺服
+python build.py              # 打包为单 HTML → dist/tempokiri-workstation.html
+```
+
+详细说明见 `remix/README.md`，设计文档见 `remix/docs/superpowers/specs/`。
+
 ## 依赖
 
 - Python 3.10+
