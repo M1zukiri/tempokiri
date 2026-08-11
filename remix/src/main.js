@@ -559,6 +559,12 @@
     renderWave();
   }
 
+  /** 时间点描述：秒 + （有网格时）对应的小节/格。 */
+  function posDesc(t) {
+    const bc = state.grid ? seq.timeToBarCell(state.grid, t) : null;
+    return ui.fmtTime(t) + (bc ? '（第 ' + bc.bar + ' 小节 ' + bc.cell + ' 格）' : '');
+  }
+
   /** 单击波形 → 仅移动播放起点（若在播放则暂停），并把顶部 BPM 切换到该段；未导入文件时打开文件选择。 */
   function onWaveClick(t) {
     if (!state.file) {
@@ -569,7 +575,7 @@
     state.cursorPos = t;
     updateQuickBar();
     renderWave();
-    status('播放起点：' + ui.fmtTime(t) + '（单击波形仅定位，按「从此处开始播放」试听）');
+    status('播放起点：' + posDesc(t) + '（单击波形仅定位，按「从此处开始播放」试听）');
   }
 
   /** 播放原曲：从播放起点（未定位则从头）播到结尾。 */
@@ -592,7 +598,7 @@
     } else {
       return;
     }
-    status('从 ' + ui.fmtTime(t) + ' 开始播放原曲');
+    status('从 ' + posDesc(t) + ' 开始播放原曲');
   }
 
   function playAudioSegment(start, end, onEnd) {
