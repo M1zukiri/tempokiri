@@ -537,8 +537,10 @@
   let playStartCtxTime = 0;
   let playStartPos = 0;
   let playing = false;
+  let mixPlaying = false; // 拼接播放（先拼接成连续 buffer 再一次性播放，消除段间调度间隔）
+  let mixPos = 0; // 拼接时间轴断点（秒）；暂停保留、停止重置为 0
 
-  /** 暂停：停止播放但保留断点（playPos），下次「播放」从断点继续。 */
+  /** 暂停：停止播放但保留断点（playPos / mixPos），下次「播放」从断点继续。 */
   function pausePlay() {
     if (!playing) {
       // 未播放时也清理播放线等残留
@@ -546,7 +548,12 @@
       renderWave();
       return;
     }
+    // 拼接播放暂停：记录拼接时间轴断点
+    if (mixPlaying && playCtx && playSource) {
+      mixPos = playStartPos + (playCtx.currentTime - playStartCtxTime);
+    }
     playing = false;
+    mixPlaying = false;
     btnPlay.textContent = '▶ 播放';
     btnPlaySeq.textContent = '▶ 播放拼接序列';
     if (playTimer) {
@@ -569,10 +576,11 @@
     renderWave();
   }
 
-  /** 停止：暂停并把播放位置重置到标记点（下次「播放」从标记点开始）。 */
+  /** 停止：暂停并把播放位置重置（原曲回标记点、拼接回序列开头）。 */
   function stopPlay() {
     pausePlay();
     state.playPos = state.cursorPos != null ? state.cursorPos : 0;
+    mixPos = 0;
   }
 
   /** 时间点描述：秒 + （有网格时）对应的小节/格。 */
@@ -653,8 +661,24 @@
     playTimer = setTimeout(check, 100);
     tickProgress();
   }
+  /** 拼接时间轴 → 原曲时间（播放线显示用）。 */
+  function mixToOriginalTime(mt) {
+    const items = state.sequence;
+    let acc = 0;
+    for (const it of items) {
+      const d = it.endTime - it.startTime;
+      if (mt < acc + d) return it.startTime + (mt - acc);
+      acc += d;
+    }
+    const last = items[items.length - 1];
+    return last ? last.endTime : 0;
+  }
 
   function currentPlayTime() {
+    if (mixPlaying) {
+      const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
+      return mixToOriginalTime(mt);
+    }
     if (state.kind === 'video') return videoEl.currentTime;
     if (playCtx && playSource) return playStartPos + (playCtx.currentTime - playStartCtxTime);
     return null;
@@ -671,9 +695,18 @@
         render.drawPlayHead(playHeadCanvas, state.view, t);
       }
     }
+    // 拼接播放（视频源）：画面跟随映射的原曲位置（seek 显示当前段画面）
+    if (mixPlaying && state.kind === 'video' && videoEl.src && tickFrame % 4 === 0) {
+      const t = currentPlayTime();
+      if (t != null) videoEl.currentTime = t;
+    }
     requestAnimationFrame(tickProgress);
   }
-
+  /**
+   * 播放拼接序列：先把各段按顺序拼成连续 buffer（含淡化与 5ms 防爆音交叉），
+   * 再一次性播放——消除逐段 setTimeout 调度与音频节点启动造成的段间间隔。
+   * 播放中再点 = 暂停（保留拼接断点）；停止 = 回到序列开头。
+   */
   function playSequence() {
     if (!state.sequence.length) {
       status('序列为空，请先在波形上选段');
@@ -683,29 +716,46 @@
       status('存在无效的序列项（标红），请修正后再播放');
       return;
     }
-    stopPlay();
-    const items = state.sequence.slice();
-    let idx = 0;
+    if (mixPlaying) {
+      pausePlay();
+      status('序列已暂停（播放位置保留，点击「播放拼接序列」从断点继续）');
+      return;
+    }
+    pausePlay(); // 清理残留但不重置拼接断点（暂停后继续从断点；首次 mixPos=0 从头）
+    if (!state.rawMono) {
+      status('缺少音轨数据（视频需先采集音轨）');
+      return;
+    }
+    const parts = seq.itemsToParts(state.sequence, state.sampleRate);
+    const crossfade = Math.round((5 / 1000) * state.sampleRate); // 5ms 防爆音交叉
+    const mix = exp.renderMix(state.rawMono, parts, crossfade);
+    if (!mix.length) {
+      status('无可播放内容');
+      return;
+    }
+    if (!playCtx) playCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = playCtx.createBuffer(1, mix.length, state.sampleRate);
+    buf.copyToChannel(mix, 0);
+    const src = playCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(playCtx.destination);
+    const startOffset = Math.min(mixPos, mix.length / state.sampleRate);
+    src.start(0, startOffset);
+    playSource = src;
+    playStartCtxTime = playCtx.currentTime;
+    playStartPos = startOffset;
     playing = true;
+    mixPlaying = true;
     btnPlaySeq.textContent = '⏸ 暂停序列';
-
-    const next = () => {
-      if (!playing || idx >= items.length) {
+    src.onended = () => {
+      if (mixPlaying) {
         stopPlay();
         btnPlaySeq.textContent = '▶ 播放拼接序列';
         status('试听结束');
-        return;
-      }
-      const it = items[idx++];
-      state.playTime = it.startTime;
-      renderWave();
-      if (state.kind === 'video' && videoEl.src) {
-        playVideoSegment(it.startTime, it.endTime, next);
-      } else {
-        playAudioSegment(it.startTime, it.endTime, next);
       }
     };
-    next();
+    tickProgress();
+    status('正在播放拼接序列（已消除段间间隔）');
   }
 
   // ---------- 导出 ----------
@@ -796,7 +846,7 @@
     btnSettings.addEventListener('click', openSettings);
     btnPlay.addEventListener('click', playOriginal);
     btnPlaySeq.addEventListener('click', () => {
-      if (playing && btnPlaySeq.textContent.includes('暂停')) stopPlay();
+      if (playing && btnPlaySeq.textContent.includes('暂停')) pausePlay(); // 暂停：保留拼接断点
       else playSequence();
     });
     btnStop.addEventListener('click', stopPlay);
