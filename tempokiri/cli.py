@@ -1,4 +1,4 @@
-"""命令行接口 —— musiccutter 的 CLI 入口。"""
+"""命令行接口 —— tempokiri 的 CLI 入口。"""
 
 import sys
 from pathlib import Path
@@ -21,9 +21,9 @@ console = Console()
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="musiccutter")
+@click.version_option(version=__version__, prog_name="tempokiri")
 def cli():
-    """musiccutter — 基于 BPM 的小节级精确音频裁剪工具。
+    """tempokiri — 基于 BPM 的小节级精确音频裁剪工具。
 
     输入音频文件，指定 BPM（或自动检测），按小节选择要保留的段落，
     工具在节拍边界精确裁剪并拼接，保证节奏连贯。
@@ -81,9 +81,9 @@ def info(file: str, bpm: float | None, align: bool):
     total = len(bars)
     console.print(f"\n[green]>> 使用示例：[/green]")
     console.print(f"  保留前 8 个小节：")
-    console.print(f"    [bold]musiccutter cut \"{file}\" --bars 1-8[/bold]")
+    console.print(f"    [bold]tempokiri cut \"{file}\" --bars 1-8[/bold]")
     console.print(f"  选择特定段落：")
-    console.print(f"    [bold]musiccutter cut \"{file}\" --bars \"1-8, 17-24, 33\"[/bold]")
+    console.print(f"    [bold]tempokiri cut \"{file}\" --bars \"1-8, 17-24, 33\"[/bold]")
     console.print()
 
 
@@ -109,7 +109,7 @@ def detect(file: str):
         console.print(f"  每小节约 {bar_duration:.3f}s，共约 {total_bars} 个小节")
 
     console.print(f"\n[green]>> 如果检测结果不准确，可以手动指定 BPM：[/green]")
-    console.print(f"    [bold]musiccutter info \"{file}\" --bpm <你的BPM>[/bold]")
+    console.print(f"    [bold]tempokiri info \"{file}\" --bpm <你的BPM>[/bold]")
     console.print()
 
 

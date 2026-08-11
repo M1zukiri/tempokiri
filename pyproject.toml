@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "musiccutter"
+name = "tempokiri"
 version = "0.1.0"
-description = "musiccutter: 节奏感知的音频剪辑利器——基于 BPM 实现小节级精确裁剪与拼接，让裁剪、拼接后的音乐节奏始终连贯如初。"
+description = "tempokiri: 节奏感知的音频剪辑利器——基于 BPM 实现小节级精确裁剪与拼接，让裁剪、拼接后的音乐节奏始终连贯如初。"
 requires-python = ">=3.10"
 dependencies = [
     "librosa>=0.10.0",
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-musiccutter = "musiccutter.cli:cli"
+tempokiri = "tempokiri.cli:cli"
 
 [tool.setuptools.packages.find]
-include = ["musiccutter*"]
+include = ["tempokiri*"]

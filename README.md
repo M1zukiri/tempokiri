@@ -1,10 +1,10 @@
-# musiccutter 🎵
+# tempokiri 🎵
 
 **节奏感知的音频剪辑利器**
 
-musiccutter 以**拍数/小节**为裁剪单位——输入曲目 BPM，工具自动计算每拍、每小节的精确时间边界，
+tempokiri 以**拍数/小节**为裁剪单位——输入曲目 BPM，工具自动计算每拍、每小节的精确时间边界，
 在节拍层面精确选择要保留的段落。裁剪、拼接后的音频节奏始终连贯如初，彻底告别传统时间轴剪辑导致的节奏断裂。
-不同于普通剪辑软件，musiccutter **懂节奏**。
+不同于普通剪辑软件，tempokiri **懂节奏**。
 
 ## 核心概念
 
@@ -20,7 +20,7 @@ BPM = 120 → 每拍 = 60/120 = 0.5 秒 → 每小节（4拍）= 2 秒
 ## 安装
 
 ```bash
-cd musiccutter
+cd tempokiri
 pip install -r requirements.txt
 
 # 可选：安装为可执行包
@@ -32,31 +32,31 @@ pip install -e .
 ### 1️⃣ 检测 BPM
 
 ```bash
-musiccutter detect track.mp3
+tempokiri detect track.mp3
 ```
 
 ### 2️⃣ 查看小节网格
 
 ```bash
-musiccutter info track.mp3
-musiccutter info track.mp3 --bpm 128       # 手动指定 BPM
-musiccutter info track.mp3 --strict         # 严格数学网格（不对齐实际节拍）
+tempokiri info track.mp3
+tempokiri info track.mp3 --bpm 128       # 手动指定 BPM
+tempokiri info track.mp3 --strict         # 严格数学网格（不对齐实际节拍）
 ```
 
 ### 3️⃣ 裁剪音频
 
 ```bash
 # 保留第 1-8 小节
-musiccutter cut track.mp3 --bars 1-8
+tempokiri cut track.mp3 --bars 1-8
 
 # 选择非连续段落：前奏 + 副歌
-musiccutter cut track.mp3 --bars "1-8, 17-24, 33-40"
+tempokiri cut track.mp3 --bars "1-8, 17-24, 33-40"
 
 # 带 BPM 和输出路径
-musiccutter cut track.mp3 --bpm 140 --bars "1-16" -o chorus.wav
+tempokiri cut track.mp3 --bpm 140 --bars "1-16" -o chorus.wav
 
 # 自定义交叉淡化时长
-musiccutter cut track.mp3 --bars "1-4, 9-12" --crossfade 5
+tempokiri cut track.mp3 --bars "1-4, 9-12" --crossfade 5
 ```
 
 ## 命令行参考
@@ -87,7 +87,7 @@ musiccutter cut track.mp3 --bars "1-4, 9-12" --crossfade 5
 ## Python API 示例
 
 ```python
-from musiccutter.core import MusicCutter
+from tempokiri.core import MusicCutter
 
 # 加载音频
 cutter = MusicCutter("track.mp3")

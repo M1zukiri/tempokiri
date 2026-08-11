@@ -22,7 +22,7 @@ from .cutter import (
 
 
 class MusicCutter:
-    """musiccutter 主控制器 —— 管理音频分析和裁剪的生命周期。"""
+    """tempokiri 主控制器 —— 管理音频分析和裁剪的生命周期。"""
 
     def __init__(self, path: str | Path, sr: Optional[int] = None):
         """加载音频并准备处理。

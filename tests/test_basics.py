@@ -1,4 +1,4 @@
-"""musiccutter 基础功能测试。"""
+"""tempokiri 基础功能测试。"""
 
 import sys
 import os
@@ -8,20 +8,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
-from musiccutter.beat import (
+from tempokiri.beat import (
     Bar,
     compute_bar_grid,
     bpm_to_string,
     bar_time_to_string,
 )
-from musiccutter.cutter import (
+from tempokiri.cutter import (
     Selection,
     parse_selections,
     cut_bars,
     concatenate_segments,
     get_selection_duration,
 )
-from musiccutter.audio import get_audio_info, save_audio, load_audio
+from tempokiri.audio import get_audio_info, save_audio, load_audio
 
 
 def test_parse_selections_simple():
