@@ -53,6 +53,10 @@
   /** 时间 → 小节/格（时间落在哪一格；超出网格返回 null）。 */
   function timeToBarCell(grid, t) {
     if (!grid || !grid.bars || !grid.bars.length) return null;
+    // 浮点容差：t 接近某小节起点（累积误差 < 1e-6）→ 归该小节，避免起点编辑时
+    // 被上一小节末尾的浮点差（如 bar6.endTime > bar7.startTime）吞掉显示成 6.4
+    const near = grid.bars.find((b) => Math.abs(t - b.startTime) < 1e-6);
+    if (near) return { bar: near.barNumber, cell: 1 };
     let bar = grid.bars.find((b) => t >= b.startTime && t < b.endTime);
     if (!bar) {
       // 网格末尾边界（序列终点常等于最后小节结束）→ 归属最后一格
@@ -66,8 +70,6 @@
     const cell = Math.min(res, Math.max(1, Math.floor((t - bar.startTime) / step) + 1));
     return { bar: bar.barNumber, cell };
   }
-
-  /** 时间 → 小节/格（终点含边界：恰落在格区间终点归当前格，避免编辑终点格时显示 +1）。 */
   function timeToBarCellEnd(grid, t) {
     if (!grid || !grid.bars || !grid.bars.length) return null;
     const bar = grid.bars.find((b) => t >= b.startTime && t <= b.endTime + 1e-6);

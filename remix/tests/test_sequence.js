@@ -151,3 +151,19 @@ test('终点含边界换算 timeToBarCellEnd', () => {
   // 差异：timeToBarCell 边界归下一格（格 3），timeToBarCellEnd 归当前格（格 2）——修复终点编辑 +1 的关键
   assert.deepEqual(S.timeToBarCell(grid, 0.25), { bar: 1, cell: 3 });
 });
+
+test('浮点容差：起点 7.1 不被上一小节末尾吞掉', () => {
+  // 41.5 BPM + offset 13.235：bar6.endTime 比 bar7.startTime 大 7e-15（累积浮点差）
+  const A = require('../src/analysis.js');
+  const g = A.buildGrid({
+    segments: A.resolveSegments([{ bpm: 41.5, beatsPerBar: 4, beatUnit: 4 }], 200),
+    offset: 13.235,
+    duration: 200,
+  });
+  const t0 = S.barCellToTime(g, 7, 1)[0];
+  assert.deepEqual(S.timeToBarCell(g, t0), { bar: 7, cell: 1 });
+  // 时间真正落在 bar6 内（如 bar6 中间）仍归 bar6
+  const mid6 = S.barCellToTime(g, 6, 2)[0] + 0.01;
+  const bc6 = S.timeToBarCell(g, mid6);
+  assert.ok(bc6.bar === 6);
+});
