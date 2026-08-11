@@ -63,12 +63,24 @@
     let decoderError = null;
     const decoder = new AudioDecoder({
       output: (audioData) => {
-        const len = audioData.numberOfFrames * audioData.numberOfChannels;
-        const buf32 = new Float32Array(len);
-        audioData.copyTo(buf32, { planeIndex: 0 });
-        // 多声道先合并到 ch0（AudioDecoder f32-planar 各声道独立 plane）
-        pcmChunks.push({ data: buf32, channels: audioData.numberOfChannels, rate: audioData.sampleRate });
-        audioData.close();
+        try {
+          const frames = audioData.numberOfFrames;
+          const channels = audioData.numberOfChannels;
+          // 逐平面拷贝：AudioDecoder 输出 f32-planar，copyTo 必须显式指定
+          // planeIndex（不支持一次拷贝全部平面），dest 每平面恰好 frames 长。
+          // 平面布局 planar[ch * frames + i] 与下方汇总循环的按平面索引
+          // 混合一致；不能把平面数据当交错布局读，否则立体声每个 chunk
+          // 后半段读到 0（产生周期性“有声→静音”锯齿音）
+          const planar = new Float32Array(frames * channels);
+          for (let ch = 0; ch < channels; ch++) {
+            audioData.copyTo(planar.subarray(ch * frames), { planeIndex: ch });
+          }
+          pcmChunks.push({ data: planar, channels, rate: audioData.sampleRate });
+        } catch (e) {
+          decoderError = new Error('AudioData.copyTo 失败：' + e.message);
+        } finally {
+          audioData.close();
+        }
       },
       error: (e) => {
         decoderError = new Error('音轨解码失败：' + e.message);
@@ -95,26 +107,9 @@
     }
     await decoder.flush();
     if (decoderError) throw decoderError;
-
-    // 3. 汇总为 mono（取声道 0；多声道先做均值）
-    let total = 0;
-    for (const c of pcmChunks) total += c.data.length / c.channels;
-    const mono = new Float32Array(total);
+    // 3. 汇总为 mono：data 为平面布局 planar[ch * frames + i]，按平面索引混合
+    const mono = mixPlanarChunks(pcmChunks);
     const rate = pcmChunks.length ? pcmChunks[0].rate : audio.sampleRate;
-    let off = 0;
-    for (const c of pcmChunks) {
-      const frames = c.data.length / c.channels;
-      if (c.channels === 1) {
-        mono.set(c.data, off);
-      } else {
-        for (let f = 0; f < frames; f++) {
-          let sum = 0;
-          for (let ch = 0; ch < c.channels; ch++) sum += c.data[f * c.channels + ch];
-          mono[off + f] = sum / c.channels;
-        }
-      }
-      off += frames;
-    }
     if (onProgress) onProgress(0.85);
     const duration = mono.length / rate;
     return {
@@ -123,6 +118,35 @@
       sampleRate: rate,
       duration,
     };
+  }
+
+  /**
+   * 将平面布局 PCM chunk 混合为 mono。
+   * 每个 chunk：data 为 planar[ch * frames + i]（各声道独立连续段），
+   * 多声道按等权平均。若把平面数据当交错布局读，立体声每个 chunk
+   * 后半段会读到 0（周期性“有声→静音”锯齿音），必须按平面索引混合。
+   * @param {Array<{data:Float32Array, channels:number}>} chunks
+   * @returns {Float32Array}
+   */
+  function mixPlanarChunks(chunks) {
+    let total = 0;
+    for (const c of chunks) total += c.data.length / c.channels;
+    const mono = new Float32Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      const frames = c.data.length / c.channels;
+      if (c.channels === 1) {
+        mono.set(c.data, off);
+      } else {
+        for (let f = 0; f < frames; f++) {
+          let sum = 0;
+          for (let ch = 0; ch < c.channels; ch++) sum += c.data[ch * frames + f];
+          mono[off + f] = sum / c.channels;
+        }
+      }
+      off += frames;
+    }
+    return mono;
   }
 
   /** mp4box 提取音频轨样本与解码描述。 */
@@ -331,5 +355,5 @@
       duration: duration || mono.length / sampleRate,
     };
   }
-  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf };
+  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks };
 });

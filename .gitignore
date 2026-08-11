@@ -21,3 +21,7 @@ test_*.wav
 
 # Tempokiri workstation build
 remix/dist/
+
+# Large local test media (kept locally for browser E2E, not pushed)
+remix/examples/*.mp4
+remix/examples/*.f32
