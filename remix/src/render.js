@@ -77,15 +77,18 @@
   }
 
   const THEME = {
-    bg: '#0e1014',
-    gridBg: '#12151b',
+    bg: '#0a0c10',
+    gridBg: '#0e1117',
     wave: '#22d3ee',
+    waveHigh: '#38e1f5',
+    waveGlow: 'rgba(34,211,238,0.28)',
     waveDim: 'rgba(34,211,238,0.45)',
     barLine: 'rgba(255,255,255,0.75)',
     beatLine: 'rgba(255,255,255,0.14)',
     selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee',
     playLine: '#f43f5e',
+    playGlow: 'rgba(244,63,94,0.4)',
     axis: '#7d8794',
     barLabel: '#9aa4b2',
   };
@@ -153,9 +156,17 @@
         ctx.moveTo(x, y0);
         ctx.lineTo(x, y1);
       }
-      ctx.strokeStyle = THEME.wave;
+      // 渐变笔触：峰值线自上而下青→青蓝渐变 + 轻光晕，增强立体感
+      const grad = ctx.createLinearGradient(0, 0, 0, waveH);
+      grad.addColorStop(0, THEME.waveHigh);
+      grad.addColorStop(0.5, THEME.wave);
+      grad.addColorStop(1, 'rgba(34,211,238,0.55)');
+      ctx.strokeStyle = grad;
       ctx.lineWidth = 1;
+      ctx.shadowColor = THEME.waveGlow;
+      ctx.shadowBlur = 4;
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
 
     // 网格：节拍线（弱）+ 小节线（强 + 标签）
@@ -273,10 +284,13 @@
     const x = timeToX(playTime, view, cssW);
     ctx.strokeStyle = THEME.playLine;
     ctx.lineWidth = 1.5;
+    ctx.shadowColor = THEME.playGlow;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, cssH - axisHeight);
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
   function drawAxis(ctx, view, cssW, cssH, axisH) {

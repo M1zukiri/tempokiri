@@ -115,15 +115,34 @@
   #seqInfo { color: var(--text-dim); font-weight: 400; margin-left: 8px; font-size: 12px; }
   .empty { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
   .seq-card {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 8px 12px;
     font-size: 13px;
     flex-wrap: wrap;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+  }
+  .seq-card:hover {
+    border-color: rgba(34,211,238,0.45);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    transform: translateY(-1px);
+  }
+  .seq-card.playing {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 18px rgba(34,211,238,0.18);
+  }
+  .seq-card.playing::before {
+    content: '';
+    position: absolute;
+    left: -1px; top: 8px; bottom: 8px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--danger);
   }
   .seq-num {
     width: 22px; height: 22px;
@@ -256,6 +275,24 @@
   .manual-form { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px dashed var(--border); border-radius: 10px; background: rgba(255,255,255,0.03); flex-wrap: wrap; }
   .manual-form[hidden] { display: none; }
   .modal-actions { display: flex; align-items: center; gap: 8px; }
+  /* 输入聚焦发光 */
+  .unit-fields input:focus, .fade input:focus, .modal-form input:focus, .modal-form select:focus, .seg-table input:focus, .seg-table select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(34,211,238,0.18);
+  }
+  /* 按钮按压反馈 */
+  .btn:active:not(:disabled), .btn-mini:active, .unit-mode-btn:active { transform: translateY(1px); }
+  .btn-primary { box-shadow: 0 2px 10px rgba(34,211,238,0.22); }
+  /* 细滚动条 */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4560; }
+  body { scrollbar-width: thin; scrollbar-color: #2a3345 var(--bg); }
+  /* 空状态引导（波形区 hint 已有；序列空态增强） */
+  .empty { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; }
+  .empty::before { content: 'ℹ'; color: var(--accent); font-size: 14px; }
 </style>
 </head>
 <body>

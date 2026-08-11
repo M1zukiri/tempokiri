@@ -117,7 +117,7 @@
       onFade: setFade,
       onRange: setRange,
       getGrid: () => state.grid,
-    });
+    }, playingSeqId);
     ui.updateSeqInfo(seqInfo, state.sequence, seq);
     btnPlaySeq.disabled = anyInvalid();
     updateQuickBar();
@@ -548,6 +548,7 @@
   let playing = false;
   let mixPlaying = false; // 拼接播放（先拼接成连续 buffer 再一次性播放，消除段间调度间隔）
   let mixPos = 0; // 拼接时间轴断点（秒）；暂停保留、停止重置为 0
+  let playingSeqId = null; // 拼接播放中当前段的序列卡片 id（用于高亮）；null = 无高亮
 
   /** 暂停：停止播放但保留断点（playPos / mixPos），下次「播放」从断点继续。 */
   function pausePlay() {
@@ -590,6 +591,10 @@
     pausePlay();
     state.playPos = state.cursorPos != null ? state.cursorPos : 0;
     mixPos = 0;
+    if (playingSeqId !== null) {
+      playingSeqId = null;
+      renderAll();
+    }
   }
 
   /** 时间点描述：秒 + （有网格时）对应的小节/格。 */
@@ -694,6 +699,23 @@
         state.playTime = t;
         state.playPos = t; // 播放位置跟随（暂停时即断点）
         render.drawPlayHead(playHeadCanvas, state.view, t);
+      }
+      // 拼接播放：定位当前段并在序列卡片上高亮（每帧轻量线性扫描）
+      if (mixPlaying && state.sequence.length) {
+        let segId = null;
+        for (const it of state.sequence) {
+          if (t != null && t >= it.startTime && t < it.endTime) { segId = it.id; break; }
+        }
+        if (segId !== playingSeqId) {
+          playingSeqId = segId;
+          ui.renderSequenceList(seqList, state.sequence, {
+            onRemove: removeItem,
+            onMove: moveItem,
+            onFade: setFade,
+            onRange: setRange,
+            getGrid: () => state.grid,
+          }, playingSeqId);
+        }
       }
     }
     // 拼接播放（视频源）：画面跟随映射的原曲位置。

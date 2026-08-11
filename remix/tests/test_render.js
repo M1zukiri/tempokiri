@@ -22,7 +22,7 @@ function mockCtx() {
     strokeCount: 0,
     beginPathCount: 0,
     moveTos: 0,
-    fillTexts: 0,
+    clearRect() { calls.push('clearRect'); },
     fillStyle: null,
     strokeStyle: null,
     lineWidth: 1,
@@ -30,7 +30,6 @@ function mockCtx() {
     textAlign: '',
     setLineDash() {},
     fillRect() {},
-    clearRect() {},
     setTransform() {},
     beginPath() { this.beginPathCount++; calls.push('beginPath'); },
     moveTo() { this.moveTos++; calls.push('moveTo'); },
@@ -119,4 +118,28 @@ test('buildPeaks: 金字塔各级长度与 min/max 正确', () => {
   let min = Infinity;
   for (let i = 0; i < bucket; i++) min = Math.min(min, pcm[i]);
   assert.ok(level0[0] <= min + 1e-9);
+});
+
+test('drawPlayHead: 清空 + 视口外不画 + 视口内画线', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx);
+  const view = { start: 0, end: 16 };
+  // playTime null → 只清空不画线
+  R.drawPlayHead(canvas, view, null);
+  const afterNull = { strokes: ctx.strokeCount, clears: ctx.calls.filter((c) => c === 'clearRect').length };
+  // 视口外 → 不画线
+  const ctx2 = mockCtx();
+  const canvas2 = fakeCanvas(ctx2);
+  R.drawPlayHead(canvas2, view, 99);
+  const afterOut = { strokes: ctx2.strokeCount, clears: ctx2.calls.filter((c) => c === 'clearRect').length };
+  // 视口内 → 画一条线
+  const ctx3 = mockCtx();
+  const canvas3 = fakeCanvas(ctx3);
+  R.drawPlayHead(canvas3, view, 8);
+  const afterIn = { strokes: ctx3.strokeCount, moveTos: ctx3.moveTos };
+  assert.equal(afterNull.strokes, 0);
+  assert.equal(afterNull.clears, 1);
+  assert.equal(afterOut.strokes, 0);
+  assert.equal(afterIn.strokes, 1);
+  assert.equal(afterIn.moveTos, 1);
 });

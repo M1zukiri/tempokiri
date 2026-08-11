@@ -31,7 +31,7 @@
    * @param {(id:string, fadeInMs:number, fadeOutMs:number) => void} handlers.onFade
    * @param {() => void} handlers.onRender
    */
-  function renderSequenceList(container, items, handlers) {
+  function renderSequenceList(container, items, handlers, playingId) {
     container.innerHTML = '';
     if (!items.length) {
       container.innerHTML = '<div class="empty">尚未添加段落 —— 在波形上点击或拖拽选择小节（滚轮平移，Ctrl+滚轮缩放，Shift+拖拽平移）</div>';
@@ -39,7 +39,7 @@
     }
     items.forEach((it, idx) => {
       const card = document.createElement('div');
-      card.className = 'seq-card';
+      card.className = 'seq-card' + (playingId && it.id === playingId ? ' playing' : '');
       card.dataset.id = it.id;
       card.innerHTML = `
         <span class="seq-num">${idx + 1}</span>
