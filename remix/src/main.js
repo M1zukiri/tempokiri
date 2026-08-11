@@ -83,8 +83,17 @@
   function status(msg) {
     statusBar.textContent = msg;
   }
+  let waveDirty = false;
+  let waveRafPending = false;
   function renderWave() {
+    // 帧合并：连续多次调用（高频滚轮/拖拽）只排队一次 rAF，实际绘制合并到下一帧
+    waveDirty = true;
+    if (waveRafPending) return;
+    waveRafPending = true;
     requestAnimationFrame(() => {
+      waveRafPending = false;
+      if (!waveDirty) return;
+      waveDirty = false;
       if (!state.pcm) return;
       render.draw(waveCanvas, state.view, {
         pcm: state.pcm,
@@ -674,16 +683,8 @@
     return last ? last.endTime : 0;
   }
 
-  function currentPlayTime() {
-    if (mixPlaying) {
-      const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
-      return mixToOriginalTime(mt);
-    }
-    if (state.kind === 'video') return videoEl.currentTime;
-    if (playCtx && playSource) return playStartPos + (playCtx.currentTime - playStartCtxTime);
-    return null;
-  }
   let tickFrame = 0;
+  let lastVideoSeek = 0;
   function tickProgress() {
     if (!playing) return;
     tickFrame++;
@@ -695,10 +696,19 @@
         render.drawPlayHead(playHeadCanvas, state.view, t);
       }
     }
-    // 拼接播放（视频源）：画面跟随映射的原曲位置（seek 显示当前段画面）
+    // 拼接播放（视频源）：画面跟随映射的原曲位置。
+    // 优化：seek 节流（≥90ms 一次）+ 段内平滑（video 已在目标段附近时跳过，
+    // 仅跨段或明显偏离时 seek）——避免每 4 帧无条件 seek 造成解码器繁忙卡顿。
     if (mixPlaying && state.kind === 'video' && videoEl.src && tickFrame % 4 === 0) {
       const t = currentPlayTime();
-      if (t != null) videoEl.currentTime = t;
+      if (t != null) {
+        const now = performance.now();
+        const drift = Math.abs(videoEl.currentTime - t);
+        if (now - lastVideoSeek >= 90 && drift > 0.05) {
+          videoEl.currentTime = t;
+          lastVideoSeek = now;
+        }
+      }
     }
     requestAnimationFrame(tickProgress);
   }

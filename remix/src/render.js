@@ -172,18 +172,22 @@
         ctx.lineTo(x, waveH);
       }
       ctx.stroke();
-      // 小节线 + 标签
+      // 小节线 + 标签（批量 path 单次 stroke，避免每小节一次绘制调用）
       ctx.strokeStyle = THEME.barLine;
       ctx.fillStyle = THEME.barLabel;
       ctx.font = '10px system-ui, sans-serif';
       ctx.textAlign = 'center';
+      ctx.beginPath();
       for (const bar of grid.bars) {
         const x = timeToX(bar.startTime, view, cssW);
         if (x < -20 || x > cssW + 20) continue;
-        ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, waveH);
-        ctx.stroke();
+      }
+      ctx.stroke();
+      for (const bar of grid.bars) {
+        const x = timeToX(bar.startTime, view, cssW);
+        if (x < -20 || x > cssW + 20) continue;
         ctx.fillText(String(bar.barNumber), x, 11);
       }
     }
@@ -293,17 +297,23 @@
     }
     const start = Math.floor(view.start / step) * step;
     ctx.textAlign = 'center';
+    // 刻度线批量 path 单次 stroke（避免每刻度一次绘制调用）
+    ctx.beginPath();
+    let tickCount = 0;
     for (let t = start; t <= view.end + 1e-6; t += step) {
       if (t < view.start - 1e-6) continue;
       const x = timeToX(t, view, cssW);
-      ctx.beginPath();
       ctx.moveTo(x, cssH - axisH + 4);
       ctx.lineTo(x, cssH - axisH + 8);
-      ctx.stroke();
+      tickCount++;
+    }
+    ctx.stroke();
+    for (let t = start; t <= view.end + 1e-6 && tickCount > 0; t += step) {
+      if (t < view.start - 1e-6) continue;
+      const x = timeToX(t, view, cssW);
       ctx.fillText(fmtTime(t), x, cssH - 5);
     }
   }
-
   function fmtTime(sec) {
     sec = Math.max(0, sec);
     const m = Math.floor(sec / 60);
