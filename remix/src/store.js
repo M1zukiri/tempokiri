@@ -72,5 +72,12 @@
     return hit || null;
   }
 
-  return { KEY, fingerprint, saveSettings, loadSettings };
+  /** 删除某个文件的缓存设置（切换文件时选「不保留」）。 */
+  function clearSettings(file) {
+    const all = readAll();
+    delete all[fingerprint(file)];
+    writeAll(all);
+  }
+
+  return { KEY, fingerprint, saveSettings, loadSettings, clearSettings };
 });

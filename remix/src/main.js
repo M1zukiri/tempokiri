@@ -39,6 +39,7 @@
   const statusBar = $('statusBar');
   const seqList = $('seqList');
   const seqInfo = $('seqInfo');
+  const btnOpenFile = $('btnOpenFile');
   const btnSettings = $('btnSettings');
   const btnPlayOriginal = $('btnPlayOriginal');
   const btnPause = $('btnPause');
@@ -104,6 +105,12 @@
 
   // ---------- 文件处理 ----------
   async function handleFile(file) {
+    // 工作区已有内容且打开的是不同文件 → 询问是否保留
+    if (state.file && state.file !== file && (state.sequence.length || state.grid)) {
+      const keep = await confirmWorkspace();
+      if (keep === null) return; // 取消：不切换
+      if (!keep) store.clearSettings(state.file); // 不保留：清除该文件缓存（下次打开为空白）
+    }
     stopPlay();
     state.file = file;
     state.kind = audio.classifyFile(file);
@@ -197,7 +204,12 @@
     if (!state.file) return false;
     const cached = store.loadSettings(state.file);
     if (cached && cached.segments && cached.segments[0]) {
+      const seq = cached.sequence;
+      // applySettings 内的 saveWorkspace 会用当前（空）序列覆盖缓存，先记下再存回
       applySettings(cached.segments, cached.offset || 0);
+      restoreSequence(seq);
+      saveWorkspace();
+      renderAll();
       return true;
     }
     showHint('点击「设置节拍」配置 BPM 与网格，之后即可在波形上选段。');
@@ -209,8 +221,69 @@
     state.segments = segments;
     state.offset = offset;
     applyGridSettings();
-    store.saveSettings(state.file, { segments, offset });
+    saveWorkspace();
     updateQuickBar();
+  }
+
+  /** 保存当前文件的工作区（节拍设置 + 拼接序列/淡化），切文件时据此恢复。 */
+  function saveWorkspace() {
+    if (!state.file) return;
+    store.saveSettings(state.file, {
+      segments: state.segments,
+      offset: state.offset,
+      sequence: state.sequence.map((it) => ({
+        startBar: it.startBar,
+        endBar: it.endBar,
+        fadeInMs: it.fadeInMs,
+        fadeOutMs: it.fadeOutMs,
+      })),
+    });
+  }
+
+  /** 从缓存恢复拼接序列（依赖已重建的网格）。 */
+  function restoreSequence(list) {
+    state.sequence = [];
+    if (!Array.isArray(list) || !state.grid) return;
+    for (const rec of list) {
+      const it = seq.createItem(state.grid, rec.startBar, rec.endBar);
+      if (it) {
+        it.fadeInMs = rec.fadeInMs || 0;
+        it.fadeOutMs = rec.fadeOutMs || 0;
+        state.sequence.push(it);
+      }
+    }
+  }
+
+  /** 切换文件前询问是否保留当前工作区。返回 true=保留 / false=不保留 / null=取消。 */
+  function confirmWorkspace() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true">
+          <h3>打开新文件</h3>
+          <p class="modal-sub">当前文件的工作区有内容（节拍设置、拼接序列、淡化）。</p>
+          <p class="modal-sub">选择「保留」：新文件打开后，以后重新打开当前文件会恢复这份工作区；</p>
+          <p class="modal-sub">选择「不保留」：清除当前文件的缓存记录，下次打开为空白。</p>
+          <div class="modal-actions">
+            <span class="spacer"></span>
+            <button class="btn" data-act="cancel">取消</button>
+            <button class="btn" data-act="discard">不保留，清空</button>
+            <button class="btn btn-primary" data-act="keep">保留并切换</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const done = (v) => {
+        overlay.remove();
+        resolve(v);
+      };
+      overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => done(null));
+      overlay.querySelector('[data-act="discard"]').addEventListener('click', () => done(false));
+      overlay.querySelector('[data-act="keep"]').addEventListener('click', () => done(true));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) done(null);
+      });
+    });
   }
 
   /** 按当前 state.segments/offset 重建网格并重绘。 */
@@ -352,6 +425,7 @@
     const item = seq.createItem(state.grid, r.startBar, r.endBar);
     if (item) {
       state.sequence.push(item);
+      saveWorkspace();
       state.pendingSelection = null;
       btnAddSelection.disabled = true;
       renderAll();
@@ -361,6 +435,7 @@
 
   function removeItem(id) {
     state.sequence = state.sequence.filter((it) => it.id !== id);
+    saveWorkspace();
     renderAll();
   }
 
@@ -370,6 +445,7 @@
     if (idx < 0 || toIndex < 0 || toIndex >= arr.length || idx === toIndex) return;
     const [it] = arr.splice(idx, 1);
     arr.splice(toIndex, 0, it);
+    saveWorkspace();
     renderAll();
   }
 
@@ -378,6 +454,7 @@
     if (!it) return;
     it.fadeInMs = fadeInMs;
     it.fadeOutMs = fadeOutMs;
+    saveWorkspace();
     renderAll();
   }
 
@@ -610,6 +687,7 @@
       fileInput.value = '';
     });
 
+    btnOpenFile.addEventListener('click', () => fileInput.click());
     btnSettings.addEventListener('click', openSettings);
     btnPlayOriginal.addEventListener('click', playOriginal);
     btnPause.addEventListener('click', () => {
@@ -636,7 +714,7 @@
         state.segments[seg.index].bpm = bpm;
       }
       applyGridSettings();
-      store.saveSettings(state.file, { segments: state.segments, offset: state.offset });
+      saveWorkspace();
       updateQuickBar();
     });
     btnAddSelection.addEventListener('click', addPendingSelection);
