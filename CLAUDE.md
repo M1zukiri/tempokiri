@@ -26,7 +26,7 @@ python -m tempokiri detect track.mp3  # 冒烟
 cd remix
 python -m http.server 8734            # 开发伺服（浏览器缓存 src/*.js 时用无痕/禁用缓存）
 python build.py                       # 打包 → dist/tempokiri-workstation.html
-node --test tests/test_analysis.js tests/test_export.js tests/test_sequence.js  # 单元测试
+node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
 ```
 
 ## 关键约定
@@ -46,11 +46,13 @@ node --test tests/test_analysis.js tests/test_export.js tests/test_sequence.js  
 - **播放线**：`currentPlayTime()` 是 tickProgress 的关键依赖，编辑 tickProgress 时切勿误删（曾致播放线静默失效）
 - **拼接进度条**：`seqProgressMeta`（sequence.progressMeta）给出总时长与各拼接点累计位置；拖动 seek 走 `seekMix`（暂停→设 mixPos→重播）；**pausePlay 停止前必须清空 src.onended**（stop() 的 ended 异步触发，会误杀 seek 后的新播放）
 - **拼接点标记**：进度条上金黄竖线（`.seam`），位于每相邻两段的边界；播放头玫红圆点、已播放填充青色渐变
+- **页脚**：`footer.js` 的 `README_SOURCE`/`VERSION` 由 build.py 注入（src 模式保持占位符，`resolveVersion()` 回退 `dev`、README 弹窗回退提示）；版本号**单源**于 pyproject.toml；`[data-version]` 徽标由 initFooter 填充
+- **build.py 注入**：README/版本替换用**函数式 repl**（lambda）避免 `re.sub` 转义反斜杠；占位符判定用首字符 `'_'` 检查而非字面量比较（会被替换误伤）
 
 ## 版本历史
 
+- **1.0.0**：页脚签名与工具（渐变霓虹签名、Bilibili/GitHub 链接、README 内嵌弹窗、检查更新）；拼接序列进度条（seam 标记/拖动 seek）；视频导出修复（关键帧边界 flush、mux decoderConfig、零丢帧）
 - **0.2.0**：性能（帧合并/批量 path/seek 节流）、设计（渐变波形/播放态卡片）、高级设置（交叉淡化/快捷键/视图持久化）
-- **0.1.1**：修复 mp4 视频音轨平面 PCM 混合错误（锯齿音）
 - **0.1.0**：初始版本
 
 ## 深入文档

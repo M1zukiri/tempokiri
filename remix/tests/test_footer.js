@@ -38,3 +38,8 @@ test('常量: 版本与链接占位符（src 环境为占位，打包后注入�
   assert.equal(F.LINKS.bilibili, 'https://space.bilibili.com/80733922');
   assert.equal(F.LINKS.github, 'https://github.com/M1zukiri');
 });
+
+test('resolveVersion: src 占位符回退 dev', () => {
+  // src 模式 VERSION='__VERSION__'（占位符）→ 'dev'；打包后为真实版本
+  assert.equal(F.resolveVersion(), 'dev');
+});

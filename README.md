@@ -109,7 +109,8 @@ cutter.cut("1-8, 17-24", "remix.wav")
 ## Tempokiri 工作站（浏览器版）
 
 除 CLI 外，项目附带 **Tempokiri 工作站**（`remix/`）：一个单 HTML 文件交付的浏览器端节奏感知剪辑工具，
-支持音频/视频拖入、波形与节拍网格可视化、按小节选段、多段拼接、导出 WAV/MP3/MP4。
+支持音频/视频拖入、波形与节拍网格可视化、按小节选段、多段拼接（带拼接进度条）、导出 WAV/MP3/MP4。
+工作站自带页脚签名与工具（README 内嵌弹窗、GitHub/Bilibili 链接、版本检查），双击 dist 单文件即可离线使用。
 
 ```bash
 cd remix

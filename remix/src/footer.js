@@ -1,3 +1,4 @@
+// 创建时间：2026-08-12 09:04:32
 /**
  * footer.js — 页脚签名与工具：README 弹窗、检查更新、Bilibili/GitHub 链接。
  *
@@ -25,6 +26,13 @@
   };
   const REPO_API = 'https://api.github.com/repos/M1zukiri/tempokiri';
 
+  /**
+   * 解析版本号：build.py 打包时把 '__VERSION__' 替换为 pyproject 版本；
+   * src 模式（直接打开 index.html）下保持占位符，回退显示 'dev'。
+   */
+  function resolveVersion() {
+    return VERSION && VERSION[0] !== '_' ? VERSION : 'dev';
+  }
   /** HTML 转义（防 XSS，README 与版本号渲染共用）。 */
   function esc(s) {
     return String(s)
@@ -88,7 +96,7 @@
     overlay.id = 'readmeOverlay';
     overlay.innerHTML =
       '<div class="modal modal-wide readme-modal" role="dialog" aria-modal="true" aria-label="README">' +
-      '<div class="readme-modal-head"><h3>README</h3><span class="readme-version">v' + esc(VERSION) + '</span>' +
+      '<div class="readme-modal-head"><h3>README</h3><span class="readme-version">v' + esc(resolveVersion()) + '</span>' +
       '<span class="spacer"></span><button class="btn btn-mini" data-close="1">✕</button></div>' +
       '<div class="readme-modal-body">' + body + '</div>' +
       '</div>';
@@ -132,10 +140,12 @@
       }
       if (!latest) {
         toast('无法获取最新版本（网络或仓库限制）');
-      } else if (latest === VERSION) {
-        toast('已是最新版本 v' + VERSION + ' 🎉');
+      } else if (resolveVersion() === 'dev') {
+        toast('GitHub 最新版本 v' + latest + '（当前为开发版）→ ' + LINKS.github);
+      } else if (latest === resolveVersion()) {
+        toast('已是最新版本 v' + resolveVersion() + ' 🎉');
       } else {
-        toast('发现新版本 v' + latest + '（当前 v' + VERSION + '）→ ' + LINKS.github);
+        toast('发现新版本 v' + latest + '（当前 v' + resolveVersion() + '）→ ' + LINKS.github);
       }
     } catch (e) {
       toast('检查更新失败：' + e.message);
@@ -146,7 +156,6 @@
       }
     }
   }
-
   /** 初始化页脚交互（DOMContentLoaded 后调用）。 */
   function initFooter() {
     const links = document.querySelectorAll('[data-href]');
@@ -160,7 +169,10 @@
     if (btnReadme) btnReadme.addEventListener('click', openReadme);
     const btnUpdate = document.getElementById('btnCheckUpdate');
     if (btnUpdate) btnUpdate.addEventListener('click', checkUpdate);
+    // 版本徽标：build.py 已把 '__VERSION__' 替换；src 模式下回退显示 dev
+    const badge = document.querySelector('[data-version]');
+    if (badge) badge.textContent = resolveVersion();
   }
 
-  return { initFooter, openReadme, checkUpdate, renderMarkdown, VERSION, LINKS };
+  return { initFooter, openReadme, checkUpdate, renderMarkdown, VERSION, resolveVersion, LINKS };
 });

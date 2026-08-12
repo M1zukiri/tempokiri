@@ -15,7 +15,11 @@
 - **坐标输入**：序列卡片起终点与「手动添加」表单用统一切换组件（小节/格 ↔ 时间二选一，自动换算显示另一套）；起终点包含终点格（1.1–1.1 允许单格）；输入非法（超界/倒置）时保留输入、卡片标红并禁止播放，网格修改导致越界同样标红
 - **换算语义**：小节/格为半开区间（起点含、终点不含）；起点格取区间起点、终点格取区间终点（含终点格）；显示时起点用通用归属、终点用含端点归属（避免边界时间被归到下一格）；相邻小节在网格构建时精确衔接，无浮点缝隙
 - 试听：统一「播放」按钮（播放中点击=暂停，暂停后从断点继续；停止回到标记点，单击波形重新定位）、序列区「播放拼接序列」（**先拼接成连续音频再一次性播放**，消除段间调度间隔；播放线按段映射回原曲位置；暂停保留断点、停止回序列开头）
-- 导出 WAV / MP3 / 视频（MP4/MOV，WebCodecs 合成）
+- **拼接进度条**：序列面板顶部进度条显示拼接总时长，拖动/点击即定位试听（先混合再播放）；拼接点金黄竖线标记、播放头玫红圆点、已播放部分青色渐变填充
+- **页脚签名与工具**：M1zukiri 渐变霓虹签名 + 跳动红心；Bilibili/GitHub 链接（内联 SVG，零外部请求）；README 弹窗（文档内嵌于单 HTML，离线可读）；「检查更新」对比 GitHub 最新版本（点击时才联网）
+- **高级设置**：全局设置（交叉淡化时长、BPM 范围等）持久化到 localStorage，导出窗口自动预填；快捷键：空格播放/暂停（输入框聚焦忽略）、Esc 关弹窗、←/→ 平移视口；视图状态跨文件恢复
+- 性能优化：波形渲染帧合并、网格/刻度批量 path 单次 stroke、播放 seek 节流——长音频拖拽/缩放流畅
+- 导出 WAV / MP3 / 视频（MP4/MOV，WebCodecs 合成；关键帧边界 flush 保证零丢帧）
 
 ## 快速开始
 
@@ -24,7 +28,7 @@
 python -m http.server 8734 --directory .
 # 浏览器打开 http://localhost:8734
 
-# 打包为单 HTML（发布物）
+node --test tests/test_*.js   # 单元测试（分析/导出/序列/音频/render/ui/store/footer）
 python build.py   # → dist/tempokiri-workstation.html
 
 # 运行单元测试（Node 18+）
@@ -34,7 +38,7 @@ node --test tests/test_analysis.js tests/test_export.js tests/test_sequence.js
 ## 目录结构
 
 ```
-src/          开发期 JS 模块（分析/渲染/交互/导出等，可 Node 测试）
+src/          开发期 JS 模块（分析/渲染/交互/导出/页脚等，可 Node 测试）
 lib/          lame.min.js（MP3 编码）、mp4box.global.js（demux）、mp4-muxer.js（合成）
 index.html    开发入口（深色 DJ 风格 UI）
 build.py      打包脚本 → dist/tempokiri-workstation.html 单文件
