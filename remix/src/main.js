@@ -60,6 +60,12 @@
   const maEnd = $('maEnd');
   const btnManualOk = $('btnManualOk');
   const btnManualCancel = $('btnManualCancel');
+  const seqProgress = $('seqProgress');
+  const seqProgressTrack = $('seqProgressTrack');
+  const seqProgressFill = $('seqProgressFill');
+  const seqProgressSeams = $('seqProgressSeams');
+  const seqProgressKnob = $('seqProgressKnob');
+  const seqProgressTime = $('seqProgressTime');
 
   // UMD 模块将导出铺平到 MC 命名空间（MC.analyze、MC.encodeWav 等）
   const mod = MC;
@@ -110,6 +116,48 @@
       render.drawPlayHead(playHeadCanvas, state.view, state.playTime);
     });
   }
+
+  // ---------- 拼接序列进度条 ----------
+  /**
+   * 渲染进度条：拼接点标记 + 总时长文本（序列变化时调用）。
+   */
+  function renderSeqProgress() {
+    const has = state.sequence.length > 0;
+    seqProgress.hidden = !has;
+    if (!has) return;
+    const { total, seams } = seq.progressMeta(state.sequence);
+    seqProgressSeams.innerHTML = '';
+    for (const s of seams) {
+      const d = document.createElement('div');
+      d.className = 'seam';
+      d.style.left = (total > 0 ? (s / total) * 100 : 0) + '%';
+      d.title = '拼接点 ' + ui.fmtTime(s);
+      seqProgressSeams.appendChild(d);
+    }
+    seqProgressTime.textContent = ui.fmtTime(0) + ' / ' + ui.fmtTime(total);
+    seqProgressFill.style.width = '0%';
+    seqProgressKnob.style.left = '0%';
+  }
+
+  /** 播放中更新进度条（mix 时间轴，秒）。 */
+  function updateSeqProgress(mt) {
+    if (seqProgress.hidden) return;
+    const total = seq.totalDuration(state.sequence);
+    const ratio = total > 0 ? Math.max(0, Math.min(1, mt / total)) : 0;
+    seqProgressFill.style.width = (ratio * 100) + '%';
+    seqProgressKnob.style.left = (ratio * 100) + '%';
+    seqProgressTime.textContent = ui.fmtTime(mt) + ' / ' + ui.fmtTime(total);
+  }
+
+  /** 拖动进度条 → 定位拼接时间轴（暂停后从该处继续播放）。 */
+  function seekMix(mt) {
+    if (!state.sequence.length || anyInvalid()) return;
+    const total = seq.totalDuration(state.sequence);
+    mt = Math.max(0, Math.min(mt, total));
+    pausePlay(); // 记录断点并停止（mixPlaying → false）
+    mixPos = mt;
+    playSequence();
+  }
   function renderAll() {
     ui.renderSequenceList(seqList, state.sequence, {
       onRemove: removeItem,
@@ -119,7 +167,8 @@
       getGrid: () => state.grid,
     }, playingSeqId);
     ui.updateSeqInfo(seqInfo, state.sequence, seq);
-    btnPlaySeq.disabled = anyInvalid();
+    renderSeqProgress();
+    btnPlaySeq.disabled = !state.sequence.length || anyInvalid();
     updateQuickBar();
     renderWave();
   }
@@ -581,6 +630,10 @@
       playTimer = null;
     }
     if (playSource) {
+      // 手动停止前清空 onended：stop() 触发的 onended 是异步的，若后续立即
+      // 重新播放（如进度条 seek），旧 source 的 onended 会在 mixPlaying 已
+      // 恢复 true 后执行，误杀新播放（表现为点击进度条后立即“试听结束”）
+      playSource.onended = null;
       try {
         playSource.stop();
       } catch (e) {
@@ -588,9 +641,6 @@
       }
       playSource.disconnect();
       playSource = null;
-    }
-    if (state.kind === 'video') {
-      videoEl.pause();
     }
     state.playTime = null;
     renderWave();
@@ -720,8 +770,10 @@
         state.playPos = t; // 播放位置跟随（暂停时即断点）
         render.drawPlayHead(playHeadCanvas, state.view, t);
       }
-      // 拼接播放：定位当前段并在序列卡片上高亮（每帧轻量线性扫描）
+      // 拼接播放：进度条跟随 + 定位当前段高亮
       if (mixPlaying && state.sequence.length) {
+        const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
+        updateSeqProgress(mt);
         let segId = null;
         for (const it of state.sequence) {
           if (t != null && t >= it.startTime && t < it.endTime) { segId = it.id; break; }
@@ -1014,6 +1066,52 @@
     }
     window.addEventListener('resize', fitCanvas);
     setTimeout(fitCanvas, 50);
+
+    // 进度条：点击/拖动定位拼接时间轴
+    // pointerdown 立即定位；pointermove 只更新视觉（避免拖动中反复重建音频）；
+    // pointerup 以最终位置定位。setPointerCapture 对合成事件可能抛错，容错忽略。
+    let progDrag = null;
+    const progPos = (e) => {
+      const rect = seqProgressTrack.getBoundingClientRect();
+      if (!rect.width) return 0;
+      return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    };
+    const progApply = (ratio) => {
+      const total = seq.totalDuration(state.sequence);
+      const mt = ratio * total;
+      updateSeqProgress(mt);
+      seekMix(mt);
+    };
+    seqProgressTrack.addEventListener('pointerdown', (e) => {
+      if (!state.sequence.length || anyInvalid()) return;
+      progDrag = { ratio: progPos(e), dragged: false };
+      e.preventDefault();
+      progApply(progDrag.ratio); // 单击即定位
+      try {
+        seqProgressTrack.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* 合成事件无活动指针：忽略 */
+      }
+    });
+    seqProgressTrack.addEventListener('pointermove', (e) => {
+      if (!progDrag) return;
+      progDrag.dragged = true;
+      progDrag.ratio = progPos(e);
+      // 拖动中只更新视觉，避免反复重建音频；松手时统一定位
+      const total = seq.totalDuration(state.sequence);
+      updateSeqProgress(progDrag.ratio * total);
+    });
+    seqProgressTrack.addEventListener('pointerup', (e) => {
+      if (!progDrag) return;
+      const ratio = progPos(e);
+      const dragged = progDrag.dragged;
+      progDrag = null;
+      // 单击（无 move）→ down 已定位，不重复重建；拖动 → 以最终位置定位
+      if (dragged) progApply(ratio);
+    });
+    seqProgressTrack.addEventListener('pointercancel', () => {
+      progDrag = null;
+    });
 
     // 快捷键：空格播放/暂停、Esc 关闭弹窗、←/→ 平移视口
     document.addEventListener('keydown', (e) => {

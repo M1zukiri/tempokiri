@@ -186,6 +186,23 @@
   }
 
   /**
+   * 拼接序列进度条元数据：总时长 + 各拼接点（段边界）位置。
+   * @param {Array} items 序列项（按顺序）
+   * @returns {{total:number, seams:number[]}} seams 为段边界在拼接时间轴上的
+   *   累计位置（不含 0 与末尾；每相邻两段之间一个拼接点）
+   */
+  function progressMeta(items) {
+    const total = totalDuration(items);
+    let acc = 0;
+    const seams = [];
+    for (let i = 0; i < items.length - 1; i++) {
+      acc += itemDuration(items[i]);
+      seams.push(acc);
+    }
+    return { total, seams };
+  }
+
+  /**
    * 将任意时间范围吸附到小节网格，返回小节号区间。
    * 左边界吸附到某小节起点（含该小节），右边界吸附到某小节终点（含该小节）。
    * @param {object} grid
@@ -225,6 +242,7 @@
     itemsToParts,
     itemDuration,
     totalDuration,
+    progressMeta,
     snapRange,
   };
 });

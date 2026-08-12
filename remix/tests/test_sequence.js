@@ -172,3 +172,26 @@ test('换算语义：起点 7.1 不被上一小节末尾吞掉（网格精确衔
   assert.ok(bc6.bar === 6);
 });
 
+
+test('progressMeta: 总时长与拼接点累计位置', () => {
+  const items = [
+    { id: 'a', startTime: 0, endTime: 2 },
+    { id: 'b', startTime: 4, endTime: 6 },
+    { id: 'c', startTime: 10, endTime: 13 },
+  ];
+  const { total, seams } = S.progressMeta(items);
+  assert.equal(total, 7); // 2 + 2 + 3
+  assert.deepEqual(seams, [2, 4]); // 段边界：2s 后、4s 后
+});
+
+test('progressMeta: 单段无拼接点', () => {
+  const { total, seams } = S.progressMeta([{ startTime: 0, endTime: 5 }]);
+  assert.equal(total, 5);
+  assert.deepEqual(seams, []);
+});
+
+test('progressMeta: 空序列总时长 0', () => {
+  const { total, seams } = S.progressMeta([]);
+  assert.equal(total, 0);
+  assert.deepEqual(seams, []);
+});
