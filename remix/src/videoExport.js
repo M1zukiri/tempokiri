@@ -273,13 +273,18 @@
       description: src.description,
     });
 
-    // flush() 后 VideoDecoder 要求下一个 chunk 必须是关键帧；跳过 delta 帧
-    // 直到下一个关键帧，避免 "A key frame is required after configure() or flush()"
-    let needKey = false;
+    // 分批 flush：flush() 后 VideoDecoder 要求下一个 chunk 必须是关键帧。
+    // 因此 flush 时机选在“关键帧边界”——遇到关键帧且本批已 ≥60 帧时先 flush，
+    // 下一帧恰是关键帧，无需跳过任何 delta 帧（若按固定 120 帧强制 flush，
+    // 大 GOP 视频会丢弃大量中间帧，表现为“只有关键帧、没有动画”）
+    let sinceFlush = 0;
     for (let i = 0; i < src.samples.length; i++) {
       const smp = src.samples[i];
-      if (needKey && !smp.is_sync) continue; // 等待关键帧
-      needKey = false;
+      if (smp.is_sync && sinceFlush >= 60) {
+        await decoder.flush();
+        await encVideo.flush();
+        sinceFlush = 0;
+      }
       const chunk = new EncodedVideoChunk({
         type: smp.is_sync ? 'key' : 'delta',
         timestamp: Math.round((smp.cts / src.timescale) * 1e6),
@@ -287,11 +292,7 @@
         data: smp.data,
       });
       decoder.decode(chunk);
-      if (i > 0 && i % 120 === 0) {
-        await decoder.flush();
-        await encVideo.flush();
-        needKey = true;
-      }
+      sinceFlush++;
     }
     await decoder.flush();
     await encVideo.flush();
