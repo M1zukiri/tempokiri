@@ -2,16 +2,27 @@
 """
 build.py — 将 Remix 工作站打包为单 HTML 文件（dist/tempokiri-workstation.html）。
 
-将 index.html 中所有 <script src="..."> 替换为内嵌内容，零外部请求。
+将 index.html 中所有 <script src="..."> 替换为内嵌内容；并把 README.md 全文
+与版本号注入 footer.js 占位符（__README_CONTENT__ / __VERSION__），零外部请求。
 """
+import json
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 SRC = ROOT / "index.html"
 DIST = ROOT / "dist" / "tempokiri-workstation.html"
+README = ROOT / "README.md"
+PYPROJECT = ROOT.parent / "pyproject.toml"
 
 SCRIPT_RE = re.compile(r'<script src="([^"]+)"></script>')
+
+
+def version() -> str:
+    """从 pyproject.toml 读取版本号。"""
+    text = PYPROJECT.read_text(encoding="utf-8")
+    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    return m.group(1) if m else "0.0.0"
 
 
 def main() -> None:
@@ -27,10 +38,27 @@ def main() -> None:
         return f"<script>\n{code}\n</script>"
 
     out = SCRIPT_RE.sub(replace, html)
+
+    # 注入 README 全文（JS 单引号字符串转义，与 footer.js 占位符一致）
+    # 与版本号。json.dumps 产生双引号 JSON，不能直接嵌入单引号 JS 字符串
+    # （\" 与 \\u 会保持字面量）；这里转成单引号安全的 JS 字符串字面量。
+    readme_text = README.read_text(encoding="utf-8")
+    js_readme = (
+        "'"
+        + readme_text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+        + "'"
+    )
+    out = re.sub(
+        r"const README_SOURCE = '__README_CONTENT__';",
+        lambda m: "const README_SOURCE = " + js_readme + ";",  # 用函数避免 repl 转义反斜杠
+        out,
+    )
+    out = out.replace("__VERSION__", version())
+
     DIST.parent.mkdir(parents=True, exist_ok=True)
     DIST.write_text(out, encoding="utf-8")
     size_kb = DIST.stat().st_size / 1024
-    print(f"已打包 → {DIST} ({size_kb:.0f} KB)")
+    print(f"已打包 → {DIST} ({size_kb:.0f} KB) v{version()}")
 
 
 if __name__ == "__main__":

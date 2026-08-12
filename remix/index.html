@@ -358,6 +358,147 @@
     min-width: 110px;
     text-align: right;
   }
+  /* 页脚签名 */
+  .site-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 14px;
+    margin-top: 6px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+  }
+  .footer-sign {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .footer-heart {
+    color: var(--danger);
+    font-size: 16px;
+    text-shadow: 0 0 8px rgba(244,63,94,0.8);
+    animation: footer-heartbeat 1.6s ease-in-out infinite;
+  }
+  @keyframes footer-heartbeat {
+    0%, 100% { transform: scale(1); }
+    12% { transform: scale(1.25); }
+    24% { transform: scale(1); }
+    36% { transform: scale(1.18); }
+    48% { transform: scale(1); }
+  }
+  .footer-name {
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    background: linear-gradient(90deg, var(--accent), #a78bfa, var(--danger));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 18px rgba(34,211,238,0.25);
+  }
+  .footer-tag {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .footer-version {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .footer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+  }
+  .footer-btn:hover {
+    transform: translateY(-1px);
+  }
+  .footer-btn:disabled { opacity: 0.5; cursor: wait; }
+  .footer-bili:hover {
+    border-color: #fb7299;
+    color: #fb7299;
+    box-shadow: 0 0 12px rgba(251,114,153,0.35);
+  }
+  .footer-gh:hover {
+    border-color: #e6edf3;
+    color: #e6edf3;
+    box-shadow: 0 0 12px rgba(230,237,243,0.3);
+  }
+  #btnReadme:hover, #btnCheckUpdate:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(34,211,238,0.3);
+  }
+  .footer-toast {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--text);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 90;
+  }
+  .footer-toast[hidden] { display: none; }
+  /* README 弹窗 */
+  .readme-modal { width: 720px; max-width: calc(100vw - 40px); display: flex; flex-direction: column; max-height: 80vh; }
+  .readme-modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .readme-modal-head h3 { margin: 0; font-size: 16px; }
+  .readme-version { font-size: 11px; color: var(--text-dim); }
+  .readme-modal-body {
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    padding-right: 6px;
+  }
+  .readme-modal-body h2 { font-size: 17px; margin: 14px 0 6px; color: var(--accent); }
+  .readme-modal-body h3 { font-size: 15px; margin: 12px 0 6px; }
+  .readme-modal-body h4 { font-size: 13px; margin: 10px 0 4px; }
+  .readme-modal-body p { margin: 6px 0; }
+  .readme-modal-body ul, .readme-modal-body ol { margin: 6px 0; padding-left: 22px; }
+  .readme-modal-body li { margin: 3px 0; }
+  .readme-modal-body code {
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12px;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .readme-modal-body pre {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+  .readme-modal-body pre code { background: none; padding: 0; }
 </style>
 </head>
 <body>
@@ -448,6 +589,33 @@
     </div>
     <div id="seqList" class="seq-list"></div>
   </section>
+  <footer class="site-footer">
+    <div class="footer-sign">
+      <span class="footer-heart">♥</span>
+      <span class="footer-name">M1zukiri</span>
+      <span class="footer-tag">节奏感知的音频/视频剪辑工作站</span>
+      <span class="footer-version">v<span data-version>__VERSION__</span></span>
+    </div>
+    <div class="footer-actions">
+      <button class="footer-btn footer-bili" data-href="https://space.bilibili.com/80733922" title="Bilibili 主页">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M17.813 4.653h.854c1.51.054 2.769-.578 3.773-1.574a.72.72 0 0 1 1.078.088c.325.414.207 1.035-.156 1.368-1.214 1.187-2.168 1.81-2.913 2.509 2.111.602 3.941 2.296 4.61 4.05.752 1.972.674 4.688-.464 6.992-1.173 2.372-3.153 4.228-5.363 5.278-2.197 1.044-4.756 1.418-7.052.943-2.296-.475-4.344-1.746-5.792-3.493-.895-1.08-1.581-2.32-2.061-3.626-.958-2.605-.477-5.472 1.305-7.487.872-.986 1.942-1.758 3.141-2.295-.946-1.1-2.393-1.855-3.55-2.21-.403-.123-.644-.537-.574-.951.067-.387.374-.692.774-.768 1.959-.371 3.863.31 5.49 1.522.244.18.385.471.385.779v1.342h1.41v-2.66a.79.79 0 0 1 .79-.79h.854zm-.854 2.146h-3.66v2.66c0 .433.356.79.79.79h2.87c.436 0 .789-.354.789-.79v-2.66zM5.69 9.514a.992.992 0 0 0-.989 1.133c.068.683.634 1.17 1.32 1.132.684-.04 1.238-.568 1.24-1.254a.992.992 0 0 0-.995-1.011zm12.276 0a.992.992 0 0 0-.989 1.133c.067.683.633 1.17 1.32 1.132.683-.04 1.237-.568 1.24-1.254a.992.992 0 0 0-.996-1.011zM13.64 13.48c-.79.03-1.53.3-2.183.77a3.87 3.87 0 0 0-1.098 1.245.75.75 0 0 1-1.286-.003 3.87 3.87 0 0 0-1.097-1.244 4.396 4.396 0 0 0-2.184-.77.75.75 0 0 1 .02-1.5 5.52 5.52 0 0 1 3.205 1.048.75.75 0 0 1 .99-.008 5.518 5.518 0 0 1 3.21-1.047.75.75 0 0 1 .031 1.5z"/></svg>
+        <span>Bilibili</span>
+      </button>
+      <button class="footer-btn footer-gh" data-href="https://github.com/M1zukiri" title="GitHub 主页">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </button>
+      <button id="btnReadme" class="footer-btn" title="打开 README 文档">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
+        <span>README</span>
+      </button>
+      <button id="btnCheckUpdate" class="footer-btn" title="检查 GitHub 上是否有新版本">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/></svg>
+        <span>检查更新</span>
+      </button>
+    </div>
+    <div id="updateToast" class="footer-toast" hidden></div>
+  </footer>
 
   <!-- 节拍设置模态框（由 modal.js 注入） -->
   <script src="lib/lame.min.js"></script>
@@ -465,6 +633,10 @@
   <script src="src/exportModal.js"></script>
   <script src="src/videoExport.js"></script>
   <script src="src/ui.js"></script>
+  <script src="src/footer.js"></script>
   <script src="src/main.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => MC.initFooter());
+  </script>
 </body>
 </html>
