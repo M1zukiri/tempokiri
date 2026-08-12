@@ -267,8 +267,13 @@
       description: src.description,
     });
 
+    // flush() 后 VideoDecoder 要求下一个 chunk 必须是关键帧；跳过 delta 帧
+    // 直到下一个关键帧，避免 "A key frame is required after configure() or flush()"
+    let needKey = false;
     for (let i = 0; i < src.samples.length; i++) {
       const smp = src.samples[i];
+      if (needKey && !smp.is_sync) continue; // 等待关键帧
+      needKey = false;
       const chunk = new EncodedVideoChunk({
         type: smp.is_sync ? 'key' : 'delta',
         timestamp: Math.round((smp.cts / src.timescale) * 1e6),
@@ -279,6 +284,7 @@
       if (i > 0 && i % 120 === 0) {
         await decoder.flush();
         await encVideo.flush();
+        needKey = true;
       }
     }
     await decoder.flush();
