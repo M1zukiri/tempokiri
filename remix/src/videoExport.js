@@ -219,8 +219,14 @@
 
     const encodedVideo = [];
     let encError = null;
+    let encDecoderConfig = null; // 编码器输出的 avcC 配置（重编码后与源不同）
     const encVideo = new VideoEncoder({
-      output: (chunk) => encodedVideo.push(chunk),
+      output: (chunk, meta) => {
+        encodedVideo.push(chunk);
+        // meta.decoderConfig 是编码器实际使用的解码描述（SPS/PPS）——
+        // mux 必须用它而非源视频的 avcC，否则播放器初始化解码器失败（绿屏/花屏）
+        if (meta && meta.decoderConfig) encDecoderConfig = meta.decoderConfig;
+      },
       error: (e) => {
         encError = new Error('视频编码失败：' + e.message);
       },
@@ -291,13 +297,14 @@
     await encVideo.flush();
     if (encError) throw encError;
 
-    // 6. mux 样本
+    // 6. mux 样本：decoderConfig 必须用编码器输出的描述（encDecoderConfig），
+    // 而非源视频的 avcC——重编码后的 SPS/PPS 与源不同，混用会导致花屏
     for (const c of encodedVideo) {
       muxer.addVideoChunk(c, {
         timestamp: c.timestamp,
         duration: c.duration,
         type: c.type,
-        decoderConfig: { codec: src.codec, codedWidth: src.width, codedHeight: src.height, description: src.description },
+        decoderConfig: encDecoderConfig || { codec: src.codec, codedWidth: src.width, codedHeight: src.height, description: src.description },
       });
     }
     for (const c of audioChunks) {
