@@ -13,7 +13,7 @@ ROOT = Path(__file__).parent
 SRC = ROOT / "index.html"
 DIST = ROOT / "dist" / "tempokiri-workstation.html"
 README = ROOT / "README.md"
-VERSION_FILE = ROOT.parent / "VERSION"
+VERSION_FILE = ROOT / "VERSION"
 
 SCRIPT_RE = re.compile(r'<script src="([^"]+)"></script>')
 

@@ -12,12 +12,16 @@ BPM = 120 → 每拍 = 60/120 = 0.5 秒 → 每小节（4拍）= 2 秒
 
 ## 功能特性
 
-- **音频/视频拖入**：WAV/MP3 等音频与 MP4/MOV 视频（视频自动提取音轨，支持音画同步试听与视频导出）
-- **波形可视化**：渐变波形、节拍网格叠加、选区拖拽、滚轮平移缩放
-- **自动节拍识别**：自研频谱分析（FFT + 频谱通量 + onset 自相关），一键识别 BPM 与相位偏移，可手动微调
-- **按小节选段**：双击选中整小节，支持多段非连续选择与排序
-- **多段拼接**：等功率余弦交叉淡化（默认 30ms，可调），带拼接进度条（seam 标记 + 拖动 seek），逐段淡入/淡出
-- **导出**：WAV / MP3 / MP4（WebCodecs 视频合成）
+- **音频/视频拖入**：mp3/wav/ogg/m4a/flac 音频与 mp4/mov 视频（视频带预览窗、自动提取音轨，音画同步试听）；「打开文件」随时切换，可保留并恢复工作区（节拍设置 + 序列/淡化）
+- **波形可视化**：渐变波形 + 节拍网格；纯滚轮平移、Ctrl+滚轮缩放（指针为中心）、Shift+拖拽平移
+- **自动节拍识别**：自研频谱分析（FFT + 频谱通量 + onset 自相关），一键识别 BPM 与偏移；**确认制**——识别只填充输入框，确认才应用；顶部快捷栏 BPM/偏移 ± 微调即时生效
+- **按小节选段**：双击/拖拽选中小节（部分覆盖即选中），多段非连续选择、卡片拖动排序或 ↑↓ 调整、每段独立淡入/淡出
+- **坐标输入**：卡片起终点与手动添加用统一切换组件（小节/格 ↔ 时间），非法输入标红禁播
+- **多段拼接**：等功率余弦交叉淡化（默认 30ms，可调）；**拼接进度条**——总时长、seam 金黄竖线标记、点击/拖动即定位试听、已播放青色渐变；播放线按段映射回原曲位置
+- **试听**：播放/暂停/停止（断点保留）、拼接序列先拼成连续音频再一次性播放（消除段间间隔）
+- **导出**：WAV / MP3 / MP4/MOV 视频（WebCodecs 合成，关键帧边界 flush 零丢帧）
+- **页脚**：渐变霓虹签名、Bilibili/GitHub 链接、README 内嵌弹窗（离线可读）、检查更新；高级设置（交叉淡化、BPM 范围）持久化 localStorage
+- **性能**：波形帧合并、批量 path 单次 stroke、拼接 seek 缓存（`getMixBuffer`）与播放段切换只切高亮——长音频拖拽/缩放/seek 流畅
 
 ## 快速开始
 
@@ -25,37 +29,33 @@ BPM = 120 → 每拍 = 60/120 = 0.5 秒 → 每小节（4拍）= 2 秒
 
 ```bash
 # 直接使用
-双击 remix/dist/tempokiri-workstation.html
+双击 dist/tempokiri-workstation.html
 
 # 开发模式（源模块 + 本地伺服）
-cd remix
 python -m http.server 8734 --directory .
 # 浏览器打开 http://localhost:8734
+
+# 单元测试（Node 18+）
+node --test tests/test_*.js
+
+# 打包 → dist/tempokiri-workstation.html
+python build.py
 ```
 
 ## 使用流程
 
 1. **拖入音频或视频文件** → 波形渲染、自动分析就绪
-2. **设置节拍**：打开设置窗口，点「识别」自动检测 BPM 与偏移（可手动指定 BPM/拍号），「确认」应用网格
+2. **设置节拍**：打开设置窗口，点「识别」自动检测 BPM 与偏移（可手动指定 BPM/拍号），「确认」应用网格；同一文件再次拖入自动恢复节拍设置
 3. **选段**：在波形上**双击**选中一小节，点「＋ 添加选中区间」加入序列；重复可添加多段
 4. **拼接试听**：「▶ 播放拼接序列」—— 各段按序拼成连续音频播放，进度条可点击/拖动 seek
 5. **导出**：「导出」选择 WAV/MP3/MP4 与交叉淡化参数
 
-## 开发
-
-```bash
-node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
-python build.py               # 打包 → dist/tempokiri-workstation.html（注入 README 与版本号）
-```
-
-版本号**单源**于仓库根 `VERSION` 文件，由 build.py 注入页脚。
-
 ## 目录结构
 
 ```
-remix/
-├── index.html          主页面（开发期引用 src/*.js）
-├── src/                浏览器模块（UMD 挂到 window.MC）
+├── index.html          开发入口（深色 DJ 风格 UI，引用 src/*.js）
+├── build.py            打包脚本 → dist/tempokiri-workstation.html 单文件
+├── src/                浏览器模块（UMD 挂到 window.MC，可 Node 测试）
 │   ├── main.js         装配层：状态、文件处理、播放、导出流程
 │   ├── analysis.js     核心算法：FFT / 频谱通量 / BPM / 偏移 / 网格
 │   ├── render.js       波形与网格渲染
@@ -63,22 +63,30 @@ remix/
 │   ├── export.js       拼接渲染 + WAV/MP3 编码
 │   ├── audio.js        音频解码/视频音轨提取
 │   ├── ui.js           序列列表渲染、播放态高亮
-│   ├── modal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / log.js
-├── tests/              Node 单元测试（node --test）
-├── examples/           测试音频/视频样本
-├── lib/                第三方库（mp4box、lame.js、mp4-muxer）
-├── build.py            单 HTML 打包脚本
+│   └── modal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / unitInput.js / log.js
+├── tests/              Node 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
+├── lib/                lame.min.js（MP3）、mp4box.global.js（demux）、mp4-muxer.js（合成）
+├── examples/           测试素材（合成音频/视频）与生成脚本
+├── docs/               设计文档
+├── CLAUDE.md           项目约定与版本历史
+├── VERSION             版本号单源（build.py 注入页脚）
 └── dist/               打包产物（gitignore）
 ```
 
-## 算法原理
+## 核心算法
 
-1. **BPM 检测**：resample 到 22050Hz → STFT（radix-2 FFT + Hann 窗）→ 频谱通量 → onset 峰值检测 → onset 自相关估计 BPM
-2. **相位估计**：候选偏移吻合度投票，选出与 onset 序列最吻合的网格偏移（首线 = 首个 onset）
-3. **网格生成**：BPM 网格按段落（BPM/拍号可分段不同）连续编号小节，支持每小节网格分辨率
-4. **精确裁剪**：在采样点级别按小节边界切割（双击选段即网格边界吸附）
-5. **交叉淡化**：拼接处应用等功率余弦曲线交叉淡化（消除线性交叉在段边界的相位跳变爆音），另支持逐段淡入/淡出
+`src/analysis.js` 纯函数实现：resample 到 22050Hz → STFT（radix-2 FFT + Hann 窗）→
+频谱通量 → onset 峰值检测 → **自相关主导周期 + 局部细化的 BPM 估计**（半速/倍速可区分，输出 0.1 精度）→
+候选偏移吻合度投票（offset = 首个 onset，首条网格线对齐音乐实际开始处）。检测不准时可手动微调 BPM/偏移。
+
+拼接交叉淡化用**等功率余弦曲线**（消除线性交叉在段边界的相位跳变爆音）。
+
+## 视频说明
+
+视频文件的波形分析需先提取音轨：优先 **WebCodecs 直接解码**（mp4box demux → AudioDecoder，快且准），
+失败时降级为静音 4 倍速 `video.captureStream()` 采集（界面显示进度条）。
+视频导出依赖 WebCodecs（Chrome/Edge 完整支持；Safari 部分；Firefox 不支持时导出面板灰掉视频选项）。
 
 ## License
 
-MIT
+MIT（lamejs 为 LGPL，见 lib 包内 LICENSE）

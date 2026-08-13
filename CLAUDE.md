@@ -1,22 +1,21 @@
 # CLAUDE.md
 
-Tempokiri — 节奏感知的音频/视频剪辑工作站，以单 HTML 文件交付的浏览器端应用（`remix/`）。
-原 CLI 版本（Python + librosa）已移除——工作站已完整覆盖其功能，产品唯一交付物即打包后的 `remix/dist/tempokiri-workstation.html`。
+Tempokiri — 节奏感知的音频/视频剪辑工作站，以单 HTML 文件交付的浏览器端应用。
+原 CLI 版本（Python + librosa）已移除——工作站已完整覆盖其功能，产品唯一交付物即打包后的 `dist/tempokiri-workstation.html`。
 
 ## 结构速查
 
 ```
-remix/               工作站（浏览器端，开发期多模块 src/）
-remix/src/*.js       浏览器模块，UMD 挂到 window.MC（MC.analyze、MC.buildGrid …）
-remix/dist/          build.py 打包产物（gitignore）
-remix/tests/         Node 单元测试（node --test）
+index.html           主页面（开发期引用 src/*.js）
+src/*.js             浏览器模块，UMD 挂到 window.MC（MC.analyze、MC.buildGrid …）
+dist/                build.py 打包产物（gitignore）
+tests/               Node 单元测试（node --test）
 VERSION              版本号单源（build.py 注入页脚）
 ```
 
 ## 常用命令
 
 ```bash
-cd remix
 python -m http.server 8734            # 开发伺服（浏览器缓存 src/*.js 时用无痕/禁用缓存）
 python build.py                       # 打包 → dist/tempokiri-workstation.html
 node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
@@ -30,7 +29,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 - **offset 语义**：首条网格线（拍线）的绝对位置 = 第一个 onset；顶部快捷栏 ± 按钮即时生效
 - **选区**：`snapRange` 区间交集——部分覆盖的小节即被选中
 - **交互**：单击定位播放起点（不播放）、双击选小节、拖拽选区、卡片按住拖动排序（让位动画）、纯滚轮平移、Ctrl+滚轮缩放
-- **git**：外层仓库 `个人/` 跟踪 remix（历史），内层仓库 `tempokiri/tempokiri/` 是独立仓库（推送 GitHub M1zukiri/tempokiri）；内层仓库**绝不被外层 gitlink 跟踪**（曾误加 3 次）
+- **git**：外层仓库 `个人/` 跟踪本仓库（历史），本仓库 `tempokiri/tempokiri/` 是独立仓库（推送 GitHub M1zukiri/tempokiri）；内层仓库**绝不被外层 gitlink 跟踪**（曾误加 3 次）
 - **视频**：音轨提取优先 WebCodecs 直解（mp4box demux → AudioDecoder），降级 captureStream；导出仅 MP4/MOV（WebCodecs，Firefox 不支持）
 - **视频音轨 PCM**：AudioDecoder 输出 f32-planar，`copyTo` 必须逐平面（`planeIndex`）拷贝到 `planar[ch*frames+i]`，汇总按平面索引混合（`mixPlanarChunks`）——交错读取会致立体声每 chunk 后半静音（锯齿音根因）
 - **交叉淡化**：默认 30ms 等功率余弦；可经全局设置 `crossfadeMs` 调整（store.loadGlobalSettings），导出窗口预填
@@ -44,7 +43,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
-- **1.1.1**：拼接操作性能优化——seekMix 缓存拼接 AudioBuffer（`getMixBuffer`，key 指纹自动失效，seek 全路径 240ms→0.3ms）；播放段切换只切卡片高亮（`ui.setPlayingCard` 替代整列表重建，35.8ms→0.1ms）；**移除 CLI 交付物**（Python+librosa 仅作算法验证，工作站功能已完全覆盖；版本号单源迁移至根级 VERSION 文件）
+- **1.1.1**：拼接操作性能优化——seekMix 缓存拼接 AudioBuffer（`getMixBuffer`，key 指纹自动失效，seek 全路径 240ms→0.3ms）；播放段切换只切卡片高亮（`ui.setPlayingCard` 替代整列表重建，35.8ms→0.1ms）；移除 CLI 交付物（Python+librosa 仅作算法验证，工作站功能已完全覆盖）；版本号单源迁移至根级 VERSION 文件；仓库结构扁平化（remix/ 上移仓库根，README 合并为单一文档）
 - **1.1.0**：波形/视频性能优化（去光晕 shadowBlur、网格二分裁剪、逐像素步长、播放线亚像素阈值）；修复视频暂停/停止不生效（pausePlay 补 videoEl.pause、移除原生 controls）
 - **1.0.0**：页脚签名与工具（渐变霓虹签名、Bilibili/GitHub 链接、README 内嵌弹窗、检查更新）；拼接序列进度条（seam 标记/拖动 seek）；视频导出修复（关键帧边界 flush、mux decoderConfig、零丢帧）
 - **0.2.0**：性能（帧合并/批量 path/seek 节流）、设计（渐变波形/播放态卡片）、高级设置（交叉淡化/快捷键/视图持久化）
@@ -52,5 +51,5 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 深入文档
 
-- 工作站设计文档：`remix/docs/superpowers/specs/2026-08-11-tempokiri-workstation-design.md`（含 CLI→工作站的升级背景）
-- 工作站 README：`remix/README.md`
+- 设计文档：`docs/superpowers/specs/`（工作站设计 + 优化计划，含 CLI→工作站的升级背景）
+- 产品文档（内嵌页脚弹窗）：`README.md`
