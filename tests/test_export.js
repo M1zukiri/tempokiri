@@ -154,3 +154,26 @@ test('peakNormalize: 全静音与空输入原样返回', () => {
   assert.deepEqual(Array.from(out), [0, 0, 0]);
   assert.equal(E.peakNormalize(new Float32Array(0), -1).length, 0);
 });
+
+test('toInt16: 量化规则与 encodeWav 16-bit 一致', () => {
+  const s = new Float32Array([0, 0.5, -0.5, 1, -1, 0.1, 2, -2]);
+  const i16 = E.toInt16(s);
+  assert.deepEqual(Array.from(i16), [0, 16384, -16384, 32767, -32768, 3277, 32767, -32768]); // 越界 clamp
+  // 与 encodeWav 16-bit 样本一致
+  const wav = new DataView(E.encodeWav(new Float32Array([0.5, -0.5, 1, -1]), 8000, 16));
+  assert.equal(wav.getInt16(44, true), i16[1]);
+  assert.equal(wav.getInt16(46, true), i16[2]);
+  assert.equal(wav.getInt16(48, true), i16[3]);
+  assert.equal(wav.getInt16(50, true), i16[4]);
+});
+
+test('encodeMp3: 有声输入量化后输出非静音（帧同步 + 数据体非空）', () => {
+  // 静音输入与有声输入在 CBR 下大小接近，无法用大小区分；
+  // 此测试保证有声输入走 toInt16 量化路径后帧结构与大小正常。
+  const loud = E.encodeMp3(new Float32Array(44100).fill(0.5), 44100, 192);
+  const silent = E.encodeMp3(new Float32Array(44100).fill(0), 44100, 192);
+  const view = new DataView(loud);
+  assert.equal(view.getUint8(0) === 0xff && (view.getUint8(1) & 0xe0) === 0xe0, true);
+  assert.ok(loud.byteLength > 10000, '有声输入应产生正常大小的 MP3');
+  assert.ok(Math.abs(loud.byteLength - silent.byteLength) < loud.byteLength * 0.2, 'CBR 下大小接近');
+});

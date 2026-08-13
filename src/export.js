@@ -159,16 +159,29 @@
    * @returns {ArrayBuffer}
    * @throws 当 lamejs 不可用时
    */
+  /** Float32Array(-1..1) → Int16Array 量化（与 encodeWav 16-bit 同一规则）。 */
+  function toInt16(samples) {
+    const out = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      const v = Math.max(-1, Math.min(1, samples[i]));
+      out[i] = Math.round(v * (v < 0 ? 0x8000 : 0x7fff));
+    }
+    return out;
+  }
+
   function encodeMp3(samples, sampleRate, kbps = 192) {
     const lame = getLame();
     if (!lame) throw new Error('MP3 编码器不可用');
     const targetSr = MP3_SUPPORTED_SR.indexOf(sampleRate) >= 0 ? sampleRate : 44100;
     const pcm = targetSr === sampleRate ? samples : analysis.resample(samples, sampleRate, targetSr);
+    // lamejs 的 encodeBuffer 期望 Int16Array；Float32Array 的 0.x 值会被
+    // 截断为 0 导致输出静音，必须显式量化（toInt16）。
+    const pcm16 = toInt16(pcm);
     const encoder = new lame.Mp3Encoder(1, targetSr, kbps);
     const chunks = [];
     const blockSize = 1152;
-    for (let i = 0; i < pcm.length; i += blockSize) {
-      const chunk = pcm.subarray(i, i + blockSize);
+    for (let i = 0; i < pcm16.length; i += blockSize) {
+      const chunk = pcm16.subarray(i, i + blockSize);
       const out = encoder.encodeBuffer(chunk);
       if (out.length) chunks.push(out);
     }
@@ -204,6 +217,7 @@
     encodeWav,
     encodeMp3,
     peakNormalize,
+    toInt16,
     downloadBlob,
   };
 });
