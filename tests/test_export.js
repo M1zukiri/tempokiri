@@ -88,3 +88,69 @@ test('encodeMp3: 非标准采样率重采样到 44100', () => {
   const buf = E.encodeMp3(samples, 22050);
   assert.ok(buf.byteLength > 0);
 });
+
+test('encodeWav: 24-bit 头字段与样本往返', () => {
+  const sr = 8000;
+  const samples = new Float32Array([0, 0.5, -0.5, 1, -1, 0.25]);
+  const buf = E.encodeWav(samples, sr, 24);
+  const view = new DataView(buf);
+  const readInt24 = (off) => {
+    const u = view.getUint8(off) | (view.getUint8(off + 1) << 8) | (view.getUint8(off + 2) << 16);
+    return u >= 0x800000 ? u - 0x1000000 : u;
+  };
+  assert.equal(view.getUint16(20, true), 1); // PCM
+  assert.equal(view.getUint16(22, true), 1); // mono
+  assert.equal(view.getUint16(32, true), 3); // blockAlign
+  assert.equal(view.getUint16(34, true), 24); // bitsPerSample
+  assert.equal(view.getUint32(28, true), sr * 3); // byteRate
+  assert.equal(buf.byteLength, 44 + samples.length * 3);
+  assert.equal(readInt24(44), 0);
+  assert.equal(readInt24(47), 4194304); // 0.5 * 0x7fffff = 4194303.5 -> round 4194304
+  assert.equal(readInt24(50), -4194304); // -0.5 * 0x800000
+  assert.equal(readInt24(53), 8388607); // 1 * 0x7fffff
+  assert.equal(readInt24(56), -8388608); // -1 * 0x800000
+});
+
+test('encodeWav: 32-bit float 头字段与样本往返', () => {
+  const sr = 8000;
+  const samples = new Float32Array([0, 0.5, -0.5]);
+  const buf = E.encodeWav(samples, sr, 32);
+  const view = new DataView(buf);
+  assert.equal(view.getUint16(20, true), 3); // IEEE float
+  assert.equal(view.getUint16(32, true), 4); // blockAlign
+  assert.equal(view.getUint16(34, true), 32); // bitsPerSample
+  assert.equal(view.getUint32(28, true), sr * 4); // byteRate
+  assert.ok(Math.abs(view.getFloat32(44, true) - 0) < 1e-6); // samples[0] = 0
+  assert.ok(Math.abs(view.getFloat32(48, true) - 0.5) < 1e-6); // samples[1] = 0.5
+  assert.ok(Math.abs(view.getFloat32(52, true) - -0.5) < 1e-6); // samples[2] = -0.5
+});
+
+test('encodeWav: 非法位深回退 16-bit', () => {
+  const buf = E.encodeWav(new Float32Array([0.1]), 8000, 8);
+  const view = new DataView(buf);
+  assert.equal(view.getUint16(34, true), 16);
+  assert.equal(view.getUint16(20, true), 1);
+  assert.equal(view.getUint16(32, true), 2);
+});
+
+test('peakNormalize: 峰值对齐目标 dBFS', () => {
+  const samples = new Float32Array([0.5, -0.25, 0.1]);
+  const out = E.peakNormalize(samples, -1);
+  let peak = 0;
+  for (const x of out) peak = Math.max(peak, Math.abs(x));
+  assert.ok(Math.abs(peak - Math.pow(10, -0.05)) < 1e-3); // -1 dBFS ≈ 0.8913
+  // 不改原数据
+  assert.equal(samples[0], 0.5);
+  // 目标 -6 dBFS
+  const out6 = E.peakNormalize(samples, -6);
+  let peak6 = 0;
+  for (const x of out6) peak6 = Math.max(peak6, Math.abs(x));
+  assert.ok(Math.abs(peak6 - Math.pow(10, -0.3)) < 1e-3);
+});
+
+test('peakNormalize: 全静音与空输入原样返回', () => {
+  const silence = new Float32Array([0, 0, 0]);
+  const out = E.peakNormalize(silence, -1);
+  assert.deepEqual(Array.from(out), [0, 0, 0]);
+  assert.equal(E.peakNormalize(new Float32Array(0), -1).length, 0);
+});

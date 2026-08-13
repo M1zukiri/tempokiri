@@ -83,37 +83,70 @@
   }
 
   /**
-   * 编码 16-bit PCM WAV（mono）。
+   * 编码 PCM WAV（mono），支持 16/24-bit 整数与 32-bit float。
    * @param {Float32Array} samples -1..1
    * @param {number} sampleRate
+   * @param {number} [bitDepth=16] 16 | 24 | 32（32 为 IEEE float），非法值回退 16
    * @returns {ArrayBuffer}
    */
-  function encodeWav(samples, sampleRate) {
+  function encodeWav(samples, sampleRate, bitDepth = 16) {
+    const bd = bitDepth === 24 || bitDepth === 32 ? bitDepth : 16;
+    const bytesPerSample = bd === 32 ? 4 : bd / 8;
+    const fmtCode = bd === 32 ? 3 : 1; // IEEE float | PCM
     const n = samples.length;
-    const buf = new ArrayBuffer(44 + n * 2);
+    const buf = new ArrayBuffer(44 + n * bytesPerSample);
     const view = new DataView(buf);
     const writeStr = (off, s) => {
       for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
     };
+    const writeInt24 = (off, q) => {
+      const u = q < 0 ? q + 0x1000000 : q;
+      view.setUint8(off, u & 0xff);
+      view.setUint8(off + 1, (u >> 8) & 0xff);
+      view.setUint8(off + 2, (u >> 16) & 0xff);
+    };
     writeStr(0, 'RIFF');
-    view.setUint32(4, 36 + n * 2, true);
+    view.setUint32(4, 36 + n * bytesPerSample, true);
     writeStr(8, 'WAVE');
     writeStr(12, 'fmt ');
     view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);                 // PCM
+    view.setUint16(20, fmtCode, true);
     view.setUint16(22, 1, true);                 // mono
     for (let i = 0; i < n; i++) {
       const v = Math.max(-1, Math.min(1, samples[i]));
-      const q = Math.round(v * (v < 0 ? 0x8000 : 0x7fff));
-      view.setInt16(44 + i * 2, q, true);
+      const off = 44 + i * bytesPerSample;
+      if (bd === 32) view.setFloat32(off, v, true);
+      else if (bd === 24) writeInt24(off, Math.round(v * (v < 0 ? 0x800000 : 0x7fffff)));
+      else view.setInt16(off, Math.round(v * (v < 0 ? 0x8000 : 0x7fff)), true);
     }
     view.setUint32(24, sampleRate, true);        // 采样率
-    view.setUint32(28, sampleRate * 2, true);    // 字节率
-    view.setUint16(32, 2, true);                 // 块对齐
-    view.setUint16(34, 16, true);                // 位深
+    view.setUint32(28, sampleRate * bytesPerSample, true); // 字节率
+    view.setUint16(32, bytesPerSample, true);    // 块对齐
+    view.setUint16(34, bd, true);                // 位深
     writeStr(36, 'data');
-    view.setUint32(40, n * 2, true);
+    view.setUint32(40, n * bytesPerSample, true);
     return buf;
+  }
+
+  /**
+   * 峰值归一化：把样本峰值对齐到目标 dBFS（默认 -1）。
+   * @param {Float32Array} samples -1..1
+   * @param {number} [targetDb=-1] 目标峰值（dBFS，≤0）
+   * @returns {Float32Array} 新数组，不改原数据
+   */
+  function peakNormalize(samples, targetDb = -1) {
+    let peak = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const a = Math.abs(samples[i]);
+      if (a > peak) peak = a;
+    }
+    if (!isFinite(peak) || peak <= 0) return Float32Array.from(samples); // 全静音/异常不放大
+    const gain = Math.pow(10, targetDb / 20) / peak;
+    const out = new Float32Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      out[i] = Math.max(-1, Math.min(1, samples[i] * gain));
+    }
+    return out;
   }
 
   const MP3_SUPPORTED_SR = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
@@ -170,6 +203,7 @@
     renderMix,
     encodeWav,
     encodeMp3,
+    peakNormalize,
     downloadBlob,
   };
 });

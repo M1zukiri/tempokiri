@@ -20,6 +20,47 @@
 
   const AUDIO_CODEC = 'mp4a.40.2';
 
+  /** 等比缩放尺寸（宽/高上限，仅降不升，向下取整到偶数，H.264 要求）。 */
+  function computeVideoScale(srcW, srcH, maxW, maxH) {
+    if (maxW == null || maxH == null) return { w: srcW, h: srcH };
+    if (srcW <= maxW && srcH <= maxH) return { w: srcW, h: srcH };
+    const scale = Math.min(maxW / srcW, maxH / srcH);
+    return {
+      w: Math.max(2, Math.floor((srcW * scale) / 2) * 2),
+      h: Math.max(2, Math.floor((srcH * scale) / 2) * 2),
+    };
+  }
+
+  /** 抽帧间隔：targetFps 为 null 或不低于源帧率时不抽（返回 1）。 */
+  function frameKeepInterval(srcFps, targetFps) {
+    if (targetFps == null || !srcFps || targetFps >= srcFps) return 1;
+    return Math.ceil(srcFps / targetFps);
+  }
+
+  /** 从样本时长估算源帧率（VFR 取平均；退化返回 null，不做抽帧）。 */
+  function estimateFps(samples, timescale) {
+    if (!samples || !samples.length || !timescale || timescale <= 0) return null;
+    let sum = 0;
+    for (const smp of samples) sum += smp.duration || 0;
+    const avgDur = sum / samples.length;
+    return avgDur > 0 ? timescale / avgDur : null;
+  }
+
+  // 分辨率缩放用的 canvas（模块级复用，避免每帧创建）
+  let scaleCanvas = null;
+  let scaleCtx = null;
+  function ensureScaleCanvas(w, h) {
+    if (!scaleCanvas) {
+      scaleCanvas = document.createElement('canvas');
+      scaleCtx = scaleCanvas.getContext('2d');
+    }
+    if (scaleCanvas.width !== w || scaleCanvas.height !== h) {
+      scaleCanvas.width = w;
+      scaleCanvas.height = h;
+    }
+    return scaleCtx;
+  }
+
   /** 获取 MP4Box 全局。 */
   function getMP4Box() {
     if (typeof window === 'undefined') return null;
@@ -150,7 +191,7 @@
    */
   async function exportVideo(opts) {
     if (!supportsWebCodecs()) throw new Error('当前浏览器不支持 WebCodecs 视频合成');
-    const { parts, mix, mixSampleRate, fileName } = opts;
+    const { parts, mix, mixSampleRate, fileName, videoBitrate = 6_000_000, framerate = null, maxWidth = null, maxHeight = null, audioBitrate = 128000, mute = false } = opts;
     const buf = await opts.file.arrayBuffer();
 
     const progress = (p) => {
@@ -176,18 +217,24 @@
       return Math.round(acc * 1e6);
     };
 
+    // 分辨率缩放目标与抽帧间隔（muxer 与编码器共用）
+    const scale = computeVideoScale(src.width, src.height, maxWidth, maxHeight);
+    const scaled = scale.w !== src.width || scale.h !== src.height;
+    const srcFps = estimateFps(src.samples, src.timescale);
+    const interval = frameKeepInterval(srcFps, framerate);
+
     // 3. mp4-muxer 输出容器
     const Mp4Muxer = window.Mp4Muxer;
     const muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
-      video: { codec: 'avc', width: src.width, height: src.height },
-      audio: { codec: 'aac', numberOfChannels: 1, sampleRate: mixSampleRate },
+      video: { codec: 'avc', width: scale.w, height: scale.h },
+      audio: mute ? undefined : { codec: 'aac', numberOfChannels: 1, sampleRate: mixSampleRate },
       fastStart: 'in-memory',
       firstTimestampBehavior: 'offset',
     });
 
     const audioChunks = [];
-    if (mix.length) {
+    if (mix.length && !mute) {
       const audioEncoder = new AudioEncoder({
         output: (chunk) => audioChunks.push(chunk),
         error: (e) => {
@@ -198,7 +245,7 @@
         codec: AUDIO_CODEC,
         sampleRate: mixSampleRate,
         numberOfChannels: 1,
-        bitrate: 128000,
+        bitrate: audioBitrate,
       });
       const frameDur = Math.round(mixSampleRate / 44);
       for (let i = 0; i < mix.length; i += frameDur) {
@@ -233,16 +280,17 @@
     });
     encVideo.configure({
       codec: src.codec,
-      width: src.width,
-      height: src.height,
-      bitrate: 6_000_000,
-      framerate: 30,
+      width: scale.w,
+      height: scale.h,
+      bitrate: videoBitrate,
+      framerate: framerate || undefined,
       avc: { format: 'avc' },
     });
 
     let lastOutUs = -1;
     let frameCount = 0;
     const totalFrames = src.samples.length;
+    let keptFrames = 0; // keepTime 通过的帧计数（抽帧时决定是否编码）
 
     const decoder = new VideoDecoder({
       output: (frame) => {
@@ -251,11 +299,21 @@
           if (keepTime(sec)) {
             const t = Math.max(outTsUs(sec), lastOutUs + 1);
             lastOutUs = t;
-            const outFrame = new VideoFrame(frame, { timestamp: t });
-            encVideo.encode(outFrame);
+            let outFrame;
+            if (scaled) {
+              const ctx = ensureScaleCanvas(scale.w, scale.h);
+              ctx.drawImage(frame, 0, 0, scale.w, scale.h);
+              outFrame = new VideoFrame(scaleCanvas, { timestamp: t });
+            } else {
+              outFrame = new VideoFrame(frame, { timestamp: t });
+            }
+            if (keptFrames % interval === 0) {
+              encVideo.encode(outFrame);
+              if (frameCount % 60 === 0) progress(0.05 + 0.75 * (frameCount / totalFrames));
+            }
             outFrame.close();
+            keptFrames++;
             frameCount++;
-            if (frameCount % 60 === 0) progress(0.05 + 0.75 * (frameCount / totalFrames));
           }
           frame.close();
         } catch (e) {
@@ -332,5 +390,5 @@
     done();
   }
 
-  return { exportVideo, supportsWebCodecs, demuxMp4 };
+  return { exportVideo, supportsWebCodecs, demuxMp4, computeVideoScale, frameKeepInterval, estimateFps };
 });

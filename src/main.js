@@ -935,26 +935,63 @@
       try {
         const parts = seq.itemsToParts(state.sequence, state.sampleRate);
         const crossfade = (opts.crossfadeMs / 1000) * state.sampleRate;
-        const mix = exp.renderMix(state.rawMono, parts, crossfade);
-        const name = opts.fileName;
-        if (opts.format === 'wav') {
-          const buf = exp.encodeWav(mix, state.sampleRate);
-          exp.downloadBlob(buf, name + '.wav', 'audio/wav');
-          status('导出完成：' + name + '.wav');
-        } else if (opts.format === 'mp3') {
-          const buf = exp.encodeMp3(mix, state.sampleRate, opts.mp3Bitrate);
-          exp.downloadBlob(buf, name + '.mp3', 'audio/mpeg');
-          status('导出完成：' + name + '.mp3');
-        } else if (opts.format === 'video') {
+        let mix = exp.renderMix(state.rawMono, parts, crossfade);
+        if (opts.tab === 'audio') {
+          let sr = state.sampleRate;
+          if (opts.sampleRate !== 'src') {
+            sr = parseInt(opts.sampleRate, 10);
+            mix = analysis.resample(mix, state.sampleRate, sr);
+          }
+          if (opts.normalize) mix = exp.peakNormalize(mix, opts.peakDb);
+          const name = opts.fileName;
+          if (opts.format === 'wav') {
+            const buf = exp.encodeWav(mix, sr, opts.bitDepth);
+            exp.downloadBlob(buf, name + '.wav', 'audio/wav');
+            status('导出完成：' + name + '.wav');
+          } else {
+            const buf = exp.encodeMp3(mix, sr, opts.mp3Bitrate);
+            exp.downloadBlob(buf, name + '.mp3', 'audio/mpeg');
+            status('导出完成：' + name + '.mp3');
+          }
+        } else if (opts.tab === 'video') {
           await MC.exportVideo({
             file: state.file,
             parts,
             mix,
             mixSampleRate: state.sampleRate,
-            fileName: name,
+            fileName: opts.fileName,
+            videoBitrate: opts.videoBitrate,
+            framerate: opts.framerate,
+            maxWidth: opts.maxWidth,
+            maxHeight: opts.maxHeight,
+            audioBitrate: opts.audioBitrate,
+            mute: false,
             onProgress: (p) => status('视频合成中…' + Math.round(p * 100) + '%'),
           });
-          status('视频导出完成：' + name + '.mp4');
+          status('视频导出完成：' + opts.fileName + '.mp4');
+        } else {
+          // Majdata：bg.mp4（无声，上限 1080P60）+ track.mp3（44100Hz）
+          if (state.kind === 'video') {
+            await MC.exportVideo({
+              file: state.file,
+              parts,
+              mix,
+              mixSampleRate: state.sampleRate,
+              fileName: 'bg',
+              videoBitrate: opts.videoBitrate,
+              framerate: 60,
+              maxWidth: 1920,
+              maxHeight: 1080,
+              audioBitrate: 128000,
+              mute: true,
+              onProgress: (p) => status('bg.mp4 合成中…' + Math.round(p * 100) + '%'),
+            });
+          }
+          let tMix = analysis.resample(mix, state.sampleRate, 44100);
+          if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
+          const buf = exp.encodeMp3(tMix, 44100, opts.mp3Bitrate);
+          exp.downloadBlob(buf, 'track.mp3', 'audio/mpeg');
+          status(state.kind === 'video' ? 'Majdata 导出完成：bg.mp4 + track.mp3' : 'track.mp3 导出完成');
         }
       } catch (e) {
         status('导出失败：' + e.message);
