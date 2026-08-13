@@ -3,6 +3,10 @@
 日期：2026-08-11
 状态：已与用户讨论确认（核心架构 + 交互逻辑），进入实现阶段
 
+> **注（2026-08-13）**：本文档为历史设计稿，正文目录结构快照当时规划（`remix/` 子目录、
+> 产物 `dist/remix-workstation.html`）。当前仓库已扁平化（`remix/` 上移仓库根，CLI 交付物已
+> 移除，产品唯一交付物为 `dist/tempokiri-workstation.html`），请以仓库根 `CLAUDE.md`/`README.md` 为准。
+
 ## 1. 背景与目标
 
 现有 Tempokiri 是纯 CLI 的节奏感知音频剪辑工具（Python + librosa）。本项目将其升级为
