@@ -22,6 +22,10 @@ function mockCtx() {
     strokeCount: 0,
     beginPathCount: 0,
     moveTos: 0,
+    shadowGlowUsed: false,
+    _shadowBlur: 0,
+    get shadowBlur() { return this._shadowBlur; },
+    set shadowBlur(v) { this._shadowBlur = v; if (v > 0) this.shadowGlowUsed = true; },
     clearRect() { calls.push('clearRect'); },
     fillStyle: null,
     strokeStyle: null,
@@ -142,4 +146,127 @@ test('drawPlayHead: 清空 + 视口外不画 + 视口内画线', () => {
   assert.equal(afterOut.strokes, 0);
   assert.equal(afterIn.strokes, 1);
   assert.equal(afterIn.moveTos, 1);
+});
+
+test('draw: 波形描边不使用 shadowBlur 光晕（性能 A1）', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx);
+  const pcm = new Float32Array(6400);
+  for (let i = 0; i < 6400; i++) pcm[i] = Math.sin(i / 20);
+  const peaks = R.buildPeaks(pcm);
+  R.draw(canvas, { start: 0, end: 10 }, { pcm, peaks, sampleRate: 22050, grid: null });
+  assert.equal(ctx.shadowGlowUsed, false, '波形描边不应设置 shadowBlur > 0');
+});
+
+test('drawPlayHead: 播放线不使用 shadowBlur 光晕（性能 A2）', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx);
+  R.drawPlayHead(canvas, { start: 0, end: 16 }, 8);
+  assert.equal(ctx.shadowGlowUsed, false, '播放线不应设置 shadowBlur > 0');
+});
+
+test('bucketIndexStep: 步长索引与朴素除法等价（性能 A5）', () => {
+  const sr = 22050;
+  for (let trial = 0; trial < 60; trial++) {
+    const start = Math.random() * 100;
+    const view = { start, end: start + 1 + Math.random() * 500 };
+    const bucket = 64 * Math.pow(2, Math.floor(Math.random() * 4));
+    const cssW = 200 + Math.floor(Math.random() * 1800);
+    const c = R.bucketIndexStep(view, sr, bucket, cssW);
+    const xs = [0, 1, Math.floor(cssW / 2), cssW - 1];
+    for (let i = 0; i < 20; i++) xs.push(Math.floor(Math.random() * cssW));
+    for (const x of xs) {
+      if (x < 0 || x >= cssW) continue;
+      const naive = Math.floor((view.start + (x / cssW) * (view.end - view.start)) * sr / bucket);
+      const fast = Math.floor((c.start + x * c.step) * c.k);
+      assert.ok(Math.abs(fast - naive) <= 1, `trial=${trial} x=${x}: fast=${fast} naive=${naive}`);
+    }
+  }
+});
+
+test('bucketIndexStep: 索引随像素单调不减（波形正确性不变量）', () => {
+  const sr = 22050;
+  const view = { start: 3.7, end: 240 };
+  const bucket = 128;
+  const cssW = 1200;
+  const c = R.bucketIndexStep(view, sr, bucket, cssW);
+  let prev = -Infinity;
+  for (let x = 0; x < cssW; x++) {
+    const idx = Math.floor((c.start + x * c.step) * c.k);
+    assert.ok(idx >= prev, `x=${x}: idx=${idx} < prev=${prev}`);
+    prev = idx;
+  }
+});
+
+test('lowerBound/upperBound: 二分边界正确（性能 A4）', () => {
+  const a = [1, 3, 3, 5, 7, 9];
+  assert.equal(R.lowerBound(a, 0), 0);
+  assert.equal(R.lowerBound(a, 1), 0);
+  assert.equal(R.lowerBound(a, 3), 1, '第一个 >= 3 是索引 1');
+  assert.equal(R.lowerBound(a, 4), 3, '第一个 >= 4 是索引 3');
+  assert.equal(R.lowerBound(a, 10), 6, '越界 → length');
+  assert.equal(R.upperBound(a, 3), 3, '第一个 > 3 是索引 3');
+  assert.equal(R.upperBound(a, 9), 6);
+  assert.equal(R.upperBound(a, 0), 0);
+  assert.equal(R.lowerBound([], 1), 0);
+  assert.equal(R.upperBound([], 1), 0);
+});
+
+test('lowerBoundBars/upperBoundBars: 小节按 startTime 二分正确（性能 A4）', () => {
+  const bars = [0, 2, 4, 6, 8].map((s) => ({ startTime: s, barNumber: s / 2 + 1 }));
+  assert.equal(R.lowerBoundBars(bars, 0), 0);
+  assert.equal(R.lowerBoundBars(bars, 3), 2, '第一个 startTime >= 3 是 4');
+  assert.equal(R.lowerBoundBars(bars, 8), 4);
+  assert.equal(R.lowerBoundBars(bars, 9), 5, '越界 → length');
+  assert.equal(R.upperBoundBars(bars, 4), 3, '第一个 > 4 是 6');
+  assert.equal(R.upperBoundBars(bars, 8), 5);
+});
+
+test('draw 网格: 二分裁剪与线性筛选区间一致（性能 A4 等价性）', () => {
+  // 500 小节、2000 节拍，随机 view 对比二分区间与线性筛选
+  const bars = [];
+  const beatTimes = [];
+  for (let b = 1; b <= 500; b++) {
+    const st = (b - 1) * 2;
+    bars.push({ barNumber: b, startTime: st, endTime: st + 2 });
+    for (let k = 0; k < 4; k++) beatTimes.push(st + k * 0.5);
+  }
+  for (let trial = 0; trial < 40; trial++) {
+    const start = Math.random() * 500;
+    const view = { start, end: start + 1 + Math.random() * 200 };
+    const margin = (20 / 800) * (view.end - view.start);
+    // 节拍：线性筛选可见索引
+    const linearBeat = [];
+    for (let i = 0; i < beatTimes.length; i++) {
+      if (beatTimes[i] >= view.start && beatTimes[i] <= view.end) linearBeat.push(i);
+    }
+    const bLo = R.lowerBound(beatTimes, view.start);
+    const bHi = R.upperBound(beatTimes, view.end);
+    assert.deepEqual(
+      Array.from({ length: bHi - bLo }, (_, k) => bLo + k),
+      linearBeat,
+      `trial=${trial} 节拍二分区间应与线性筛选一致`
+    );
+    // 小节：线性筛选可见索引
+    const linearBar = [];
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].startTime >= view.start - margin && bars[i].startTime <= view.end + margin) linearBar.push(i);
+    }
+    const sLo = R.lowerBoundBars(bars, view.start - margin);
+    const sHi = R.upperBoundBars(bars, view.end + margin);
+    assert.deepEqual(
+      Array.from({ length: sHi - sLo }, (_, k) => sLo + k),
+      linearBar,
+      `trial=${trial} 小节二分区间应与线性筛选一致`
+    );
+  }
+});
+
+test('playHeadMoved: 播放线像素阈值（性能 A6）', () => {
+  assert.equal(R.playHeadMoved(null, 100), true, '首次（无上一位置）应重绘');
+  assert.equal(R.playHeadMoved(100, 100.5), false, '位移 0.5px 不重绘');
+  assert.equal(R.playHeadMoved(100, 99.2), false, '位移 0.8px 不重绘');
+  assert.equal(R.playHeadMoved(100, 101), true, '位移 1px 重绘');
+  assert.equal(R.playHeadMoved(100, 99), true, '位移 -1px 重绘');
+  assert.equal(R.playHeadMoved(100, 150), true, '大位移重绘');
 });

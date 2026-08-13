@@ -114,6 +114,8 @@
       });
       // 播放线绘制在叠加层；全量重绘后同步当前播放线（非播放时 state.playTime 为 null → 清空）
       render.drawPlayHead(playHeadCanvas, state.view, state.playTime);
+      // 同步 lastPlayHeadX，避免 view 变化后阈值判断用旧像素位置
+      lastPlayHeadX = state.playTime != null ? render.timeToX(state.playTime, state.view, playHeadCanvas.clientWidth || playHeadCanvas.width) : null;
     });
   }
 
@@ -760,15 +762,21 @@
 
   let tickFrame = 0;
   let lastVideoSeek = 0;
+  let lastPlayHeadX = null;
   function tickProgress() {
     if (!playing) return;
     tickFrame++;
     if (tickFrame % 2 === 0) {
       const t = currentPlayTime();
       if (t != null) {
-        state.playTime = t;
-        state.playPos = t; // 播放位置跟随（暂停时即断点）
-        render.drawPlayHead(playHeadCanvas, state.view, t);
+        state.playPos = t; // 播放位置跟随（暂停时即断点，每 tick 更新保证断点精度）
+        const w = playHeadCanvas.clientWidth || playHeadCanvas.width;
+        const x = render.timeToX(t, state.view, w);
+        if (render.playHeadMoved(lastPlayHeadX, x)) {
+          state.playTime = t;
+          render.drawPlayHead(playHeadCanvas, state.view, t);
+          lastPlayHeadX = x;
+        }
       }
       // 拼接播放：进度条跟随 + 定位当前段高亮
       if (mixPlaying && state.sequence.length) {

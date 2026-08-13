@@ -76,19 +76,74 @@
     return view.start + (x / width) * (view.end - view.start);
   }
 
+  /**
+   * 预计算逐像素 bucket 索引常量，消除波形循环内的除法。
+   * bucket 索引 = floor((start + x * step) * k)，与朴素
+   * floor((view.start + x/cssW*(end-start)) * sr / bucket) 数学等价（浮点 ±1）。
+   */
+  function bucketIndexStep(view, sr, bucket, cssW) {
+    return {
+      k: sr / bucket,                        // 秒 → bucket 索引缩放
+      step: (view.end - view.start) / cssW,  // 每像素秒数
+      start: view.start,
+    };
+  }
+
+  /** 第一个 >= target 的索引（二分）。 */
+  function lowerBound(arr, target) {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (arr[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** 第一个 > target 的索引（二分）。 */
+  function upperBound(arr, target) {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (arr[mid] <= target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** 第一个 startTime >= target 的小节索引（二分）。 */
+  function lowerBoundBars(bars, target) {
+    let lo = 0, hi = bars.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (bars[mid].startTime < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** 第一个 startTime > target 的小节索引（二分）。 */
+  function upperBoundBars(bars, target) {
+    let lo = 0, hi = bars.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (bars[mid].startTime <= target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
   const THEME = {
     bg: '#0a0c10',
     gridBg: '#0e1117',
     wave: '#22d3ee',
     waveHigh: '#38e1f5',
-    waveGlow: 'rgba(34,211,238,0.28)',
     waveDim: 'rgba(34,211,238,0.45)',
     barLine: 'rgba(255,255,255,0.75)',
     beatLine: 'rgba(255,255,255,0.14)',
     selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee',
     playLine: '#f43f5e',
-    playGlow: 'rgba(244,63,94,0.4)',
     axis: '#7d8794',
     barLabel: '#9aa4b2',
   };
@@ -143,11 +198,10 @@
       const levelIdx = Math.min(level, data.peaks.mins.length - 1);
       const mArr = data.peaks.mins[levelIdx];
       const xArr = data.peaks.maxs[levelIdx];
+      const c = bucketIndexStep(view, sr, bucket, cssW);
       ctx.beginPath();
       for (let x = 0; x < cssW; x += 1) {
-        const t = view.start + (x / cssW) * (view.end - view.start);
-        const sIdx = t * sr;
-        const bIdx = Math.floor(sIdx / bucket);
+        const bIdx = Math.floor((c.start + x * c.step) * c.k);
         if (bIdx < 0 || bIdx >= mArr.length) continue;
         const lo = mArr[bIdx];
         const hi = xArr[bIdx];
@@ -156,50 +210,49 @@
         ctx.moveTo(x, y0);
         ctx.lineTo(x, y1);
       }
-      // 渐变笔触：峰值线自上而下青→青蓝渐变 + 轻光晕，增强立体感
+      // 渐变笔触：峰值线自上而下青→青蓝渐变，增强立体感
       const grad = ctx.createLinearGradient(0, 0, 0, waveH);
       grad.addColorStop(0, THEME.waveHigh);
       grad.addColorStop(0.5, THEME.wave);
       grad.addColorStop(1, 'rgba(34,211,238,0.55)');
       ctx.strokeStyle = grad;
       ctx.lineWidth = 1;
-      ctx.shadowColor = THEME.waveGlow;
-      ctx.shadowBlur = 4;
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
-    // 网格：节拍线（弱）+ 小节线（强 + 标签）
+    // 网格：节拍线（弱）+ 小节线（强 + 标签），二分定位可见区间避免全量遍历
     if (data.grid && data.grid.bars.length) {
       const grid = data.grid;
       // 节拍线
+      const bLo = lowerBound(grid.beatTimes, view.start);
+      const bHi = upperBound(grid.beatTimes, view.end);
       ctx.strokeStyle = THEME.beatLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (const bt of grid.beatTimes) {
-        if (bt < view.start || bt > view.end) continue;
-        const x = timeToX(bt, view, cssW);
+      for (let i = bLo; i < bHi; i++) {
+        const x = timeToX(grid.beatTimes[i], view, cssW);
         ctx.moveTo(x, 0);
         ctx.lineTo(x, waveH);
       }
       ctx.stroke();
-      // 小节线 + 标签（批量 path 单次 stroke，避免每小节一次绘制调用）
+      // 小节线 + 标签（批量 path 单次 stroke；x 边界 ±20px → 秒 margin）
+      const margin = (20 / cssW) * (view.end - view.start);
+      const sLo = lowerBoundBars(grid.bars, view.start - margin);
+      const sHi = upperBoundBars(grid.bars, view.end + margin);
       ctx.strokeStyle = THEME.barLine;
       ctx.fillStyle = THEME.barLabel;
       ctx.font = '10px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.beginPath();
-      for (const bar of grid.bars) {
-        const x = timeToX(bar.startTime, view, cssW);
-        if (x < -20 || x > cssW + 20) continue;
+      for (let i = sLo; i < sHi; i++) {
+        const x = timeToX(grid.bars[i].startTime, view, cssW);
         ctx.moveTo(x, 0);
         ctx.lineTo(x, waveH);
       }
       ctx.stroke();
-      for (const bar of grid.bars) {
-        const x = timeToX(bar.startTime, view, cssW);
-        if (x < -20 || x > cssW + 20) continue;
-        ctx.fillText(String(bar.barNumber), x, 11);
+      for (let i = sLo; i < sHi; i++) {
+        const x = timeToX(grid.bars[i].startTime, view, cssW);
+        ctx.fillText(String(grid.bars[i].barNumber), x, 11);
       }
     }
 
@@ -284,13 +337,19 @@
     const x = timeToX(playTime, view, cssW);
     ctx.strokeStyle = THEME.playLine;
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = THEME.playGlow;
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, cssH - axisHeight);
     ctx.stroke();
-    ctx.shadowBlur = 0;
+  }
+
+  /**
+   * 播放线是否需要在像素位移 >= 1px 时重绘（跳过亚像素抖动，性能 A6）。
+   * @param {number|null} prevX 上一次绘制位置（null = 首次）
+   * @param {number} newX 当前播放线像素位置
+   */
+  function playHeadMoved(prevX, newX) {
+    return prevX == null || Math.abs(newX - prevX) >= 1;
   }
 
   function drawAxis(ctx, view, cssW, cssH, axisH) {
@@ -336,5 +395,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, timeToX, xToTime, draw, drawPlayHead, THEME };
+  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, THEME };
 });
