@@ -644,6 +644,10 @@
       playSource.disconnect();
       playSource = null;
     }
+    // 视频源：暂停画面（音频源已在上方 stop；视频与音频由统一按钮控制，音画同步）
+    if (state.kind === 'video') {
+      videoEl.pause();
+    }
     state.playTime = null;
     renderWave();
   }
