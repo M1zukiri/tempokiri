@@ -1,133 +1,83 @@
-# tempokiri 🎵
+# Tempokiri 🎵
 
-**节奏感知的音频剪辑利器**
+**节奏感知的音频/视频剪辑工作站** —— 单 HTML 文件交付的浏览器端剪辑工具。
 
-tempokiri 以**拍数/小节**为裁剪单位——输入曲目 BPM，工具自动计算每拍、每小节的精确时间边界，
-在节拍层面精确选择要保留的段落。裁剪、拼接后的音频节奏始终连贯如初，彻底告别传统时间轴剪辑导致的节奏断裂。
+以**拍数/小节**为剪辑单位——自动检测曲目 BPM 并计算每拍、每小节的精确时间边界，
+在节拍层面精确选择要保留的段落。裁剪、拼接后的音乐节奏始终连贯如初，彻底告别传统时间轴剪辑导致的节奏断裂。
 不同于普通剪辑软件，tempokiri **懂节奏**。
-
-## 核心概念
 
 ```
 BPM = 120 → 每拍 = 60/120 = 0.5 秒 → 每小节（4拍）= 2 秒
 ```
 
-- 用户指定 BPM 或自动检测
-- 程序计算每拍、每小节的精确时间边界
-- 裁剪边界会自动对齐到检测到的实际节拍位置
-- 多段裁剪结果用交叉淡化（crossfade）拼接，避免咔嗒声
+## 功能特性
 
-## 安装
+- **音频/视频拖入**：WAV/MP3 等音频与 MP4/MOV 视频（视频自动提取音轨，支持音画同步试听与视频导出）
+- **波形可视化**：渐变波形、节拍网格叠加、选区拖拽、滚轮平移缩放
+- **自动节拍识别**：自研频谱分析（FFT + 频谱通量 + onset 自相关），一键识别 BPM 与相位偏移，可手动微调
+- **按小节选段**：双击选中整小节，支持多段非连续选择与排序
+- **多段拼接**：等功率余弦交叉淡化（默认 30ms，可调），带拼接进度条（seam 标记 + 拖动 seek），逐段淡入/淡出
+- **导出**：WAV / MP3 / MP4（WebCodecs 视频合成）
 
-```bash
-cd tempokiri
-pip install -r requirements.txt
+## 快速开始
 
-# 可选：安装为可执行包
-pip install -e .
-```
-
-## 快速使用
-
-### 1️⃣ 检测 BPM
+打包产物为单个 HTML 文件，双击即可离线使用，零外部请求：
 
 ```bash
-tempokiri detect track.mp3
+# 直接使用
+双击 remix/dist/tempokiri-workstation.html
+
+# 开发模式（源模块 + 本地伺服）
+cd remix
+python -m http.server 8734 --directory .
+# 浏览器打开 http://localhost:8734
 ```
 
-### 2️⃣ 查看小节网格
+## 使用流程
+
+1. **拖入音频或视频文件** → 波形渲染、自动分析就绪
+2. **设置节拍**：打开设置窗口，点「识别」自动检测 BPM 与偏移（可手动指定 BPM/拍号），「确认」应用网格
+3. **选段**：在波形上**双击**选中一小节，点「＋ 添加选中区间」加入序列；重复可添加多段
+4. **拼接试听**：「▶ 播放拼接序列」—— 各段按序拼成连续音频播放，进度条可点击/拖动 seek
+5. **导出**：「导出」选择 WAV/MP3/MP4 与交叉淡化参数
+
+## 开发
 
 ```bash
-tempokiri info track.mp3
-tempokiri info track.mp3 --bpm 128       # 手动指定 BPM
-tempokiri info track.mp3 --strict         # 严格数学网格（不对齐实际节拍）
+node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
+python build.py               # 打包 → dist/tempokiri-workstation.html（注入 README 与版本号）
 ```
 
-### 3️⃣ 裁剪音频
+版本号**单源**于仓库根 `VERSION` 文件，由 build.py 注入页脚。
 
-```bash
-# 保留第 1-8 小节
-tempokiri cut track.mp3 --bars 1-8
+## 目录结构
 
-# 选择非连续段落：前奏 + 副歌
-tempokiri cut track.mp3 --bars "1-8, 17-24, 33-40"
-
-# 带 BPM 和输出路径
-tempokiri cut track.mp3 --bpm 140 --bars "1-16" -o chorus.wav
-
-# 自定义交叉淡化时长
-tempokiri cut track.mp3 --bars "1-4, 9-12" --crossfade 5
 ```
-
-## 命令行参考
-
-| 命令 | 功能 |
-|------|------|
-| `detect <file>` | 检测音频 BPM |
-| `info <file>` | 显示小节网格详情 |
-| `cut <file> --bars <range>` | 按小节裁剪 |
-
-**cut 选项：**
-
-| 选项 | 说明 |
-|------|------|
-| `--bars, -b` | **必填**。小节选择，如 `1-8, 17-24, 33` |
-| `--bpm` | 手动指定 BPM（默认自动检测） |
-| `--output, -o` | 输出文件路径（默认 `{原文件名}_cut.wav`） |
-| `--crossfade, -c` | 拼接淡化时长（毫秒，默认 10ms） |
-| `--align` / `--strict` | 对齐到实际节拍 / 严格数学网格（默认对齐） |
+remix/
+├── index.html          主页面（开发期引用 src/*.js）
+├── src/                浏览器模块（UMD 挂到 window.MC）
+│   ├── main.js         装配层：状态、文件处理、播放、导出流程
+│   ├── analysis.js     核心算法：FFT / 频谱通量 / BPM / 偏移 / 网格
+│   ├── render.js       波形与网格渲染
+│   ├── sequence.js     序列项、小节换算、拼接元数据
+│   ├── export.js       拼接渲染 + WAV/MP3 编码
+│   ├── audio.js        音频解码/视频音轨提取
+│   ├── ui.js           序列列表渲染、播放态高亮
+│   ├── modal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / log.js
+├── tests/              Node 单元测试（node --test）
+├── examples/           测试音频/视频样本
+├── lib/                第三方库（mp4box、lame.js、mp4-muxer）
+├── build.py            单 HTML 打包脚本
+└── dist/               打包产物（gitignore）
+```
 
 ## 算法原理
 
-1. **节拍检测**：使用 librosa 的 onset detection + beat tracking 检测音频中的实际节拍位置。
-2. **网格对齐**：以用户指定（或自动检测）的 BPM 为基准，生成理论节拍网格，然后将每个理论节拍对齐到最近的检测节拍（容差范围内）。
-3. **精确裁剪**：在采样点级别按小节边界切割音频。
-4. **交叉淡化**：在拼接处应用短时（默认 10ms）交叉淡化，消除咔嗒声。
-
-## Python API 示例
-
-```python
-from tempokiri.core import MusicCutter
-
-# 加载音频
-cutter = MusicCutter("track.mp3")
-
-# 分析（自动检测 BPM）
-bpm, bars = cutter.analyze()
-print(f"BPM: {bpm}")
-
-# 查看小节信息
-for bar in bars[:5]:
-    print(f"Bar {bar.bar_number}: {bar.start_time:.3f}s → {bar.end_time:.3f}s")
-
-# 裁剪：保留第 1-8 和第 17-24 小节
-cutter.cut("1-8, 17-24", "remix.wav")
-```
-
-
-
-## Tempokiri 工作站（浏览器版）
-
-除 CLI 外，项目附带 **Tempokiri 工作站**（`remix/`）：一个单 HTML 文件交付的浏览器端节奏感知剪辑工具，
-支持音频/视频拖入、波形与节拍网格可视化、按小节选段、多段拼接（带拼接进度条）、导出 WAV/MP3/MP4。
-工作站自带页脚签名与工具（README 内嵌弹窗、GitHub/Bilibili 链接、版本检查），双击 dist 单文件即可离线使用。
-
-```bash
-cd remix
-python -m http.server 8734   # 开发伺服
-python build.py              # 打包为单 HTML → dist/tempokiri-workstation.html
-```
-
-详细说明见 `remix/README.md`，设计文档见 `remix/docs/superpowers/specs/`。
-
-## 依赖
-
-- Python 3.10+
-- librosa — 音频分析、节拍检测
-- soundfile — 音频读写
-- numpy — 数组运算
-- click — CLI 框架
-- rich — 终端美化输出
+1. **BPM 检测**：resample 到 22050Hz → STFT（radix-2 FFT + Hann 窗）→ 频谱通量 → onset 峰值检测 → onset 自相关估计 BPM
+2. **相位估计**：候选偏移吻合度投票，选出与 onset 序列最吻合的网格偏移（首线 = 首个 onset）
+3. **网格生成**：BPM 网格按段落（BPM/拍号可分段不同）连续编号小节，支持每小节网格分辨率
+4. **精确裁剪**：在采样点级别按小节边界切割（双击选段即网格边界吸附）
+5. **交叉淡化**：拼接处应用等功率余弦曲线交叉淡化（消除线性交叉在段边界的相位跳变爆音），另支持逐段淡入/淡出
 
 ## License
 

@@ -13,16 +13,14 @@ ROOT = Path(__file__).parent
 SRC = ROOT / "index.html"
 DIST = ROOT / "dist" / "tempokiri-workstation.html"
 README = ROOT / "README.md"
-PYPROJECT = ROOT.parent / "pyproject.toml"
+VERSION_FILE = ROOT.parent / "VERSION"
 
 SCRIPT_RE = re.compile(r'<script src="([^"]+)"></script>')
 
 
 def version() -> str:
-    """从 pyproject.toml 读取版本号。"""
-    text = PYPROJECT.read_text(encoding="utf-8")
-    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
-    return m.group(1) if m else "0.0.0"
+    """从根级 VERSION 文件读取版本号（单源）。"""
+    return VERSION_FILE.read_text(encoding="utf-8").strip() or "0.0.0"
 
 
 def main() -> None:

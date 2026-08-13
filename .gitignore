@@ -1,12 +1,5 @@
-# Python
+# Python bytecode cache
 __pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-*.egg
-.pytest_cache/
-*.so
 
 # IDE
 .vscode/
