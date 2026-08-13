@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tempokiri"
-version = "1.1.0"
+version = "1.1.1"
 description = "tempokiri: 节奏感知的音频剪辑利器——基于 BPM 实现小节级精确裁剪与拼接，让裁剪、拼接后的音乐节奏始终连贯如初。"
 requires-python = ">=3.10"
 dependencies = [

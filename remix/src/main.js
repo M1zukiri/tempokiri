@@ -601,6 +601,7 @@
   }
 
   // ---------- 播放 ----------
+  let mixCache = null; // { key: string, buffer: AudioBuffer } —— 序列内容不变的拼接结果缓存
   let playTimer = null;
   let playSource = null;
   let playCtx = null;
@@ -791,14 +792,9 @@
           if (t != null && t >= it.startTime && t < it.endTime) { segId = it.id; break; }
         }
         if (segId !== playingSeqId) {
+          const prevId = playingSeqId;
           playingSeqId = segId;
-          ui.renderSequenceList(seqList, state.sequence, {
-            onRemove: removeItem,
-            onMove: moveItem,
-            onFade: setFade,
-            onRange: setRange,
-            getGrid: () => state.grid,
-          }, playingSeqId);
+          ui.setPlayingCard(seqList, playingSeqId, prevId);
         }
       }
     }
@@ -817,6 +813,20 @@
       }
     }
     requestAnimationFrame(tickProgress);
+  }
+  /** 序列内容不变的拼接结果缓存：命中返回缓存的 AudioBuffer，未命中重新拼接并缓存。 */
+  function getMixBuffer() {
+    const parts = seq.itemsToParts(state.sequence, state.sampleRate);
+    const crossfade = Math.round((store.loadGlobalSettings().crossfadeMs / 1000) * state.sampleRate);
+    const key = JSON.stringify({ parts, crossfade, sr: state.sampleRate });
+    if (mixCache && mixCache.key === key) return mixCache.buffer;
+    const mix = exp.renderMix(state.rawMono, parts, crossfade);
+    if (!mix.length) return null;
+    if (!playCtx) playCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = playCtx.createBuffer(1, mix.length, state.sampleRate);
+    buf.copyToChannel(mix, 0);
+    mixCache = { key, buffer: buf };
+    return buf;
   }
   /**
    * 播放拼接序列：先把各段按顺序拼成连续 buffer（含淡化与 5ms 防爆音交叉），
@@ -842,21 +852,15 @@
       status('缺少音轨数据（视频需先采集音轨）');
       return;
     }
-    const parts = seq.itemsToParts(state.sequence, state.sampleRate);
-    const cfMs = store.loadGlobalSettings().crossfadeMs; // 高级设置可调（默认 30ms）
-    const crossfade = Math.round((cfMs / 1000) * state.sampleRate);
-    const mix = exp.renderMix(state.rawMono, parts, crossfade);
-    if (!mix.length) {
+    const buf = getMixBuffer();
+    if (!buf) {
       status('无可播放内容');
       return;
     }
-    if (!playCtx) playCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = playCtx.createBuffer(1, mix.length, state.sampleRate);
-    buf.copyToChannel(mix, 0);
     const src = playCtx.createBufferSource();
     src.buffer = buf;
     src.connect(playCtx.destination);
-    const startOffset = Math.min(mixPos, mix.length / state.sampleRate);
+    const startOffset = Math.min(mixPos, buf.length / state.sampleRate);
     src.start(0, startOffset);
     playSource = src;
     playStartCtxTime = playCtx.currentTime;

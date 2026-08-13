@@ -172,5 +172,21 @@
     elInfo.textContent = items.length + ' 段 · 总时长 ' + fmtTime(total);
   }
 
-  return { renderSequenceList, updateSeqInfo, fmtRange, fmtTime };
+  /**
+   * 仅切换序列卡片的 playing 高亮（不重建 DOM）。
+   * @param {HTMLElement} container 序列列表容器
+   * @param {(string|null)} playingId 新高亮卡片 id；null = 只移除不高亮
+   * @param {(string|null)} prevId 旧高亮卡片 id；null = 无旧高亮
+   */
+  function setPlayingCard(container, playingId, prevId) {
+    if (prevId != null) {
+      const prev = container.querySelector('.seq-card[data-id="' + prevId + '"]');
+      if (prev) prev.classList.remove('playing');
+    }
+    if (playingId != null) {
+      const cur = container.querySelector('.seq-card[data-id="' + playingId + '"]');
+      if (cur) cur.classList.add('playing');
+    }
+  }
+  return { renderSequenceList, setPlayingCard, updateSeqInfo, fmtRange, fmtTime };
 });
