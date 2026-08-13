@@ -165,9 +165,34 @@
 
   // —— UI 部分（仅浏览器运行时使用）——
   let overlay = null;
+  let helpPop = null; // 单例帮助气泡（挂 body，fixed 定位，避免被 .as-form 滚动容器裁剪）
+  let helpAnchor = null; // 当前气泡锚定的输入框
 
-  function popupFor(row) {
-    return row.querySelector('.help-pop');
+  /** 显示帮助气泡并定位在锚点输入框旁（下方优先，空间不足翻转到上方）。 */
+  function showHelp(anchor, html) {
+    if (!helpPop) return;
+    helpPop.innerHTML = html;
+    helpPop.hidden = false;
+    helpAnchor = anchor;
+    positionHelp(anchor);
+  }
+
+  function hideHelp() {
+    helpAnchor = null;
+    if (helpPop) helpPop.hidden = true;
+  }
+
+  function positionHelp(anchor) {
+    const r = anchor.getBoundingClientRect();
+    const popW = Math.min(300, window.innerWidth - 16);
+    const popH = helpPop.offsetHeight || 120;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - popW - 8));
+    let top;
+    if (window.innerHeight - r.bottom >= popH + 10) top = r.bottom + 8;
+    else if (r.top >= popH + 10) top = r.top - popH - 8;
+    else top = 8;
+    helpPop.style.left = left + 'px';
+    helpPop.style.top = top + 'px';
   }
 
   function buildDom() {
@@ -200,7 +225,7 @@
           '<div class="as-row" data-key="' + f.key + '">' +
           '<div class="as-head"><span class="as-label">' + f.label + '</span>' +
           '<span class="as-desc">' + f.desc + '</span></div>' +
-          '<div class="as-ctrl">' + ctrl + popup(f) + '</div>' +
+          '<div class="as-ctrl">' + ctrl + '</div>' +
           '</div>'
         );
       }).join('') +
@@ -226,16 +251,25 @@
       '.as-ctrl input[type=number]{width:110px}' +
       '.as-ctrl input[type=range]{width:110px}' +
       '.as-ctrl input.invalid{border-color:#e05555;background:rgba(224,85,85,.12)}' +
-      '.help-pop{position:absolute;bottom:calc(100% + 8px);right:0;width:300px;z-index:10;background:#1e1e24;border:1px solid #444;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
+      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:#1e1e24;border:1px solid #444;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
       '.help-pop b{display:block;color:#ddd;font-weight:600}';
     document.head.appendChild(style);
+
+    // 单例气泡挂到 body（overlay 之后，天然盖在弹窗上层）
+    helpPop = document.createElement('div');
+    helpPop.className = 'help-pop';
+    helpPop.hidden = true;
+    document.body.appendChild(helpPop);
+    // 表单滚动时气泡保持贴住聚焦的输入框
+    overlay.querySelector('.as-form').addEventListener('scroll', () => {
+      if (helpAnchor && !helpPop.hidden) positionHelp(helpAnchor);
+    });
 
     // 交互绑定
     FIELD_DEFS.forEach((f) => {
       const row = overlay.querySelector('.as-row[data-key="' + f.key + '"]');
-      const pop = popupFor(row);
-      const sel = row.querySelector('select');
       const num = row.querySelector('input[type=number]');
+      const sel = row.querySelector('select');
       const slider = row.querySelector('input[type=range]');
 
       // 档位 -> 数字框（hop 项换算为毫秒显示）
@@ -259,25 +293,19 @@
           const ok = isFinite(v) && validateField(f.key, st) && crossOk(f, v);
           num.classList.toggle('invalid', !ok);
           if (!ok) {
-            if (pop) {
-              pop.innerHTML = '<b>超出合法范围</b>' + f.help.range;
-              pop.hidden = false;
-            }
+            showHelp(num, '<b>超出合法范围</b>' + f.help.range);
             return;
           }
-          if (pop) pop.hidden = true;
+          hideHelp();
           if (sel) sel.value = 'custom';
           if (slider) slider.value = String(v);
           saveField(f, st);
         });
         num.addEventListener('focus', () => {
-          if (pop) {
-            pop.innerHTML = '<b>作用</b>' + f.help.effect + '<b>范围</b>' + f.help.range + '<b>推荐</b>' + f.help.recommend;
-            pop.hidden = false;
-          }
+          showHelp(num, '<b>作用</b>' + f.help.effect + '<b>范围</b>' + f.help.range + '<b>推荐</b>' + f.help.recommend);
         });
         num.addEventListener('blur', () => {
-          if (pop) pop.hidden = true;
+          hideHelp();
           // 越界/空值时回填上次合法值
           if (num.classList.contains('invalid')) {
             const cur = MC.loadGlobalSettings();
@@ -287,8 +315,8 @@
           }
         });
         num.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape' && pop) {
-            pop.hidden = true;
+          if (e.key === 'Escape') {
+            hideHelp();
             num.blur();
           }
         });
@@ -320,9 +348,6 @@
       (n.unit ? ' aria-label="' + f.label + '（' + n.unit + '）"' : ' aria-label="' + f.label + '"') + ' />';
   }
 
-  function popup(f) {
-    return '<div class="help-pop" hidden></div>';
-  }
 
   function roundNum(v) {
     return Math.round(v * 1000) / 1000;
