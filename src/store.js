@@ -85,6 +85,11 @@
     sensitivity: 0.9,  // BPM 检测灵敏度（0..1，越大越宽松）
     minBpm: 60,
     maxBpm: 200,
+    hop: 512,               // 检测精度：FFT 帧移（采样点），权威值；UI 数字框显示 hop/22.05 毫秒
+    videoExtract: 'auto',   // 'auto' | 'webcodecs' | 'capture'
+    captureRate: 4,         // captureStream 采集倍速（1–16）
+    followMs: 90,           // 视频跟随 seek 节流间隔（毫秒）
+    renderScale: 1.0,       // 波形渲染 DPR 系数（0.1–4）
   };
 
   /** 读取全局高级设置（缺省合并）。 */

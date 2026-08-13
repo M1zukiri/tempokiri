@@ -14,12 +14,30 @@ global.localStorage = {
 
 const S = require('../src/store.js');
 
-test('全局设置：默认值兜底', () => {
+test('全局设置：默认值兜底（含高级设置新键）', () => {
   const g = S.loadGlobalSettings();
   assert.equal(g.crossfadeMs, 30);
   assert.equal(g.sensitivity, 0.9);
   assert.equal(g.minBpm, 60);
   assert.equal(g.maxBpm, 200);
+  assert.equal(g.hop, 512);
+  assert.equal(g.videoExtract, 'auto');
+  assert.equal(g.captureRate, 4);
+  assert.equal(g.followMs, 90);
+  assert.equal(g.renderScale, 1.0);
+});
+
+test('全局设置：高级设置新键局部保存合并不覆盖旧键', () => {
+  mem.clear();
+  S.saveGlobalSettings({ renderScale: 0.5 });
+  const g = S.loadGlobalSettings();
+  assert.equal(g.renderScale, 0.5);
+  assert.equal(g.crossfadeMs, 30); // 未改的旧键保留默认
+  assert.equal(g.hop, 512); // 未改的新键保留默认
+  S.saveGlobalSettings({ hop: 256 });
+  const g2 = S.loadGlobalSettings();
+  assert.equal(g2.hop, 256);
+  assert.equal(g2.renderScale, 0.5); // 前一次保存的值保留
 });
 
 test('全局设置：局部保存后合并读取', () => {

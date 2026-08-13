@@ -14,6 +14,9 @@
   'use strict';
 
   const BASE_BUCKET = 64;
+  let dprScale = 1;
+  /** 设置波形渲染 DPR 缩放系数（0.1–4；非正数回退 1）。 */
+  function setRenderScale(s) { dprScale = (typeof s === 'number' && s > 0) ? s : 1; }
 
   /**
    * 构建 min/max 峰值金字塔。
@@ -164,7 +167,7 @@
    * @param {number} [data.axisHeight=22] 底部时间轴高度
    */
   function draw(canvas, view, data) {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = (window.devicePixelRatio || 1) * dprScale;
     const cssW = canvas.clientWidth || canvas.width;
     const cssH = canvas.clientHeight || canvas.height;
     const w = Math.round(cssW * dpr);
@@ -323,7 +326,7 @@
    * @param {number} [axisHeight=22]
    */
   function drawPlayHead(canvas, view, playTime, axisHeight = 22) {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = (window.devicePixelRatio || 1) * dprScale;
     const cssW = canvas.clientWidth || canvas.width;
     const cssH = canvas.clientHeight || canvas.height;
     const w = Math.round(cssW * dpr);
@@ -395,5 +398,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, THEME };
+  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, setRenderScale, THEME };
 });

@@ -175,6 +175,14 @@
     renderWave();
   }
 
+  /** 应用全局高级设置到运行时缓存（初始化 + 设置变更事件时调用）。 */
+  function refreshAdvancedSettings() {
+    const gs = store.loadGlobalSettings();
+    followMs = gs.followMs;
+    render.setRenderScale(gs.renderScale);
+    if (state.file) renderWave();
+  }
+
   /** 序列中是否有非法项（用户输入非法或时间超出网格）。 */
   function anyInvalid() {
     const g = state.grid;
@@ -260,30 +268,47 @@
       }
       state.duration = videoEl.duration || 0;
       state.view = { start: 0, end: Math.max(state.duration, 1) };
-      // 导入时即提取音轨：优先 WebCodecs 直接解码（快），失败降级 captureStream
-      showHint('正在提取视频音轨…');
-      try {
-        const r = await audio.decodeVideoAudioTrack(file, (p) => {
-          captureBar.hidden = false;
-          captureFill.style.width = Math.round(p * 100) + '%';
-        });
-        captureBar.hidden = true;
-        state.pcm = r.pcm;
-        state.rawMono = r.rawMono;
-        state.sampleRate = r.sampleRate;
-        state.duration = r.duration;
-        state.peaks = render.buildPeaks(r.pcm);
-        state.view = { start: 0, end: state.duration };
-        hideHint();
-        renderWave();
-      } catch (e) {
-        captureBar.hidden = true;
-        showHint('正在静音快速播放采集音轨（WebCodecs 不可用）…');
+      // 导入时即提取音轨：默认优先 WebCodecs 直接解码（快），失败降级 captureStream；
+      // 「高级设置」可强制仅采集或仅 WebCodecs（后者失败只报错、不降级）
+      const gs = store.loadGlobalSettings();
+      if (gs.videoExtract === 'capture') {
+        showHint('正在静音快速播放采集音轨…');
         try {
           await captureVideoPcm();
           hideHint();
         } catch (e2) {
           showHint('音轨提取失败：' + e2.message + '。可点击「设置节拍」手动输入 BPM。');
+        }
+      } else {
+        showHint('正在提取视频音轨…');
+        try {
+          const r = await audio.decodeVideoAudioTrack(file, (p) => {
+            captureBar.hidden = false;
+            captureFill.style.width = Math.round(p * 100) + '%';
+          });
+          captureBar.hidden = true;
+          state.pcm = r.pcm;
+          state.rawMono = r.rawMono;
+          state.sampleRate = r.sampleRate;
+          state.duration = r.duration;
+          state.peaks = render.buildPeaks(r.pcm);
+          state.view = { start: 0, end: state.duration };
+          hideHint();
+          renderWave();
+        } catch (e) {
+          if (gs.videoExtract === 'webcodecs') {
+            captureBar.hidden = true;
+            showHint('音轨提取失败：' + e.message);
+          } else {
+            captureBar.hidden = true;
+            showHint('正在静音快速播放采集音轨（WebCodecs 不可用）…');
+            try {
+              await captureVideoPcm();
+              hideHint();
+            } catch (e2) {
+              showHint('音轨提取失败：' + e2.message + '。可点击「设置节拍」手动输入 BPM。');
+            }
+          }
         }
       }
       const cached = applyCachedSettings();
@@ -512,11 +537,14 @@
 
   function analyzeWindow(startSec, endSec) {
     const sr = analysis.DEFAULT_ANALYSIS_SR; // state.pcm 已降采样到分析采样率
+    const gs = store.loadGlobalSettings();
+    const hop = Math.max(64, Math.min(2048, Math.round(gs.hop)));
+    const delta = 1.6 - 0.9 * Math.max(0, Math.min(1, gs.sensitivity));
     const s = Math.max(0, Math.floor(startSec * sr));
     const e = Math.min(state.pcm.length, Math.ceil(endSec * sr));
     const win = state.pcm.subarray(s, e);
     if (win.length < sr * 1) return { bpm: null, offset: 0 };
-    return analysis.analyze(win, { sampleRate: sr });
+    return analysis.analyze(win, { sampleRate: sr, hop, delta, minBpm: gs.minBpm, maxBpm: gs.maxBpm });
   }
 
   function captureVideoPcm() {
@@ -530,7 +558,7 @@
       audio
         .captureVideoPcm(videoEl, (p) => {
           captureFill.style.width = Math.round(p * 100) + '%';
-        })
+        }, store.loadGlobalSettings().captureRate)
         .then((r) => {
           state.pcm = r.pcm;
           state.rawMono = r.rawMono;
@@ -602,6 +630,7 @@
 
   // ---------- 播放 ----------
   let mixCache = null; // { key: string, buffer: AudioBuffer } —— 序列内容不变的拼接结果缓存
+  let followMs = 90; // 视频跟随 seek 节流间隔（缓存自高级设置）
   let playTimer = null;
   let playSource = null;
   let playCtx = null;
@@ -806,7 +835,7 @@
       if (t != null) {
         const now = performance.now();
         const drift = Math.abs(videoEl.currentTime - t);
-        if (now - lastVideoSeek >= 90 && drift > 0.05) {
+        if (now - lastVideoSeek >= followMs && drift > 0.05) {
           videoEl.currentTime = t;
           lastVideoSeek = now;
         }
@@ -1158,6 +1187,9 @@
         renderWave();
       }
     });
+
+    refreshAdvancedSettings();
+    document.addEventListener('tempokiri:settings-changed', refreshAdvancedSettings);
 
     status('拖入音频或视频文件开始');
   }
