@@ -550,6 +550,17 @@
   .readme-modal-body pre code { background: none; padding: 0; }
   /* 键盘焦点轮廓（可访问性，鼠标点击不显示） */
   .btn:focus-visible, .btn-mini:focus-visible, .unit-mode-btn:focus-visible, .footer-btn:focus-visible, .exp-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* 窄屏（≤480px）：按钮文字不换行压缩，整组换行；保持无水平滚动 */
+  @media (max-width: 480px) {
+    .brand-tag { display: none; }
+    .controlbar { gap: 8px; padding: 6px 8px; }
+    .cb-group { gap: 4px; flex-wrap: wrap; }
+    .cb-group .btn { padding: 5px 9px; font-size: 12px; white-space: nowrap; }
+    .quickbar { gap: 8px; flex-wrap: wrap; width: 100%; }
+    .q-group { gap: 4px; flex-wrap: wrap; }
+    .q-btns .btn-mini { min-width: 30px; padding: 0 4px; font-size: 10px; }
+    #waveWrap { height: 220px; }
+  }
 </style>
 </head>
 <body>

@@ -414,8 +414,14 @@
     overlay.hidden = false;
   }
 
+  /** 关闭高级设置弹窗（Esc 快捷键入口调用）。 */
+  function closeAdvanced() {
+    if (overlay) overlay.hidden = true;
+  }
+
   return {
     openAdvanced,
+    closeAdvanced,
     DEFAULT_VALUES,
     FIELD_DEFS,
     msToHop,

@@ -138,6 +138,9 @@
                 <option value="256">256 ${T('export.kbps')}</option>
               </select>
             </label>
+            <label class="exp-check">
+              <input id="vAudio" type="checkbox" checked /> ${T('export.includeAudio')}
+            </label>
             <label>${T('export.crossfade')}
               <input id="vCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
             </label>
@@ -249,6 +252,25 @@
   }
 
   /**
+   * AAC 码率档位按源采样率动态约束（22050 Hz 下 Chromium 编码器不支持 256k）。
+   * 当前值不合法时回退到 128k。
+   * @param {number} sampleRate
+   */
+  function refreshAacBitrate(sampleRate) {
+    const sel = el('vAudioBitrate');
+    if (!sel) return;
+    const cap = (typeof MC !== 'undefined' && typeof MC.aacBitrateCap === 'function')
+      ? MC.aacBitrateCap(sampleRate)
+      : null;
+    const kbps = [96, 128, 192, 256].filter((k) => !cap || k * 1000 <= cap);
+    const cur = parseInt(sel.value, 10) || 128;
+    const keep = kbps.includes(cur) ? cur : kbps.includes(128) ? 128 : kbps[0];
+    sel.innerHTML = kbps
+      .map((k) => '<option value="' + k + '"' + (k === keep ? ' selected' : '') + '>' + k + ' ' + T('export.kbps') + '</option>')
+      .join('');
+  }
+
+  /**
    * 打开导出窗口。
    * @param {object} opts {baseName, kind:'audio'|'video', canVideo:boolean}
    * @param {object} callbacks {onExport}
@@ -263,6 +285,11 @@
     el('mCrossfade').value = String(g.crossfadeMs);
     el('aName').value = opts.baseName || 'remix';
     el('vName').value = opts.baseName || 'remix';
+    // 视频 AAC 码率按源采样率动态约束（22050 Hz 不支持 256k）
+    refreshAacBitrate(opts.sampleRate || 48000);
+    // 「跟随源」标注实际解码采样率（非 WAV 源按设备率解码，消除误导）
+    const srcOpt = el('aSampleRate').querySelector('option[value="src"]');
+    if (srcOpt) srcOpt.textContent = T('export.followSourceActual', { sr: opts.sampleRate || 48000 });
     // Tab 可用性：视频 Tab 仅视频源 + WebCodecs
     const canVideoTab = opts.kind === 'video' && !!opts.canVideo;
     overlay.querySelector('.exp-tab[data-tab="video"]').disabled = !canVideoTab;
@@ -339,6 +366,7 @@
           maxWidth: res.maxWidth,
           maxHeight: res.maxHeight,
           audioBitrate: parseInt(el('vAudioBitrate').value, 10) * 1000,
+          mute: !el('vAudio').checked,
           crossfadeMs,
           fileName: el('vName').value.trim(),
         });

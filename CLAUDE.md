@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.5.4**：评估修复（P1-P7）——视频导出 AAC 试编码自检（自检失败/Flushing error 映射为可读中文提示）、视频导出「包含音轨」开关（纯视频逃生通道，透传已有 mute）；AAC 码率按采样率动态约束（22050 Hz 仅 96-192k，256k 不可选）；WAV 解码用 OfflineAudioContext 固定源率（「跟随源」不再被设备率 48k 静默改写）+ 导出弹窗「跟随源」标注实际采样率；Esc 统一关闭 README/彩蛋弹窗（页脚自建 overlay）；网格应用后波形提示更新为选段指引；无声源识别秒级返回（RMS 能量预检）+ 识别状态栏反馈；窄屏 360px 媒体查询（按钮不换行压缩）
 - **1.5.3**：README 内容修订——主题名同步（Aoi Aurora / Meltyland's Nightmare / Kamikiri）、高级设置 9 项参数描述、导出补 Majdata
 - **1.5.2**：高级设置弹窗主题化——`.as-desc`/`.help-pop` 从硬编码色（#999/#1e1e24/#ddd）改为 CSS 变量，Kamikiri 浅色主题下可读；帮助气泡合并去重——effect 段并入常驻 desc（desc 吸收独有信息），气泡只显示「范围 + 推荐」，strings.json 删除 10 个 helpEffect key
 - **1.5.1**：文案修订（strings.json）——主题名改英文（Aoi Aurora / Meltyland's Nightmare / Kamikiri）、彩蛋与提示文案精简；测试断言改为与 strings.json 同源（改文案不再破坏测试）；README 补文案系统/主题说明

@@ -51,3 +51,48 @@ test('estimateFps: 从样本时长估算帧率', () => {
   assert.equal(V.estimateFps([{ duration: 0 }], 3000), null); // 全零时长
   assert.equal(V.estimateFps(null, 3000), null); // 缺失样本
 });
+
+test('aacBitrateCap: 22050 Hz 上限 192k，其余采样率不限', () => {
+  assert.equal(V.aacBitrateCap(22050), 192000);
+  assert.equal(V.aacBitrateCap(44100), null);
+  assert.equal(V.aacBitrateCap(48000), null);
+  assert.equal(V.aacBitrateCap(8000), null);
+});
+
+test('probeAacEncode: 自检成功路径（注入假编码器）', async () => {
+  let configured = null;
+  let encoded = 0;
+  class FakeAudioData {
+    constructor(o) { this.o = o; }
+    close() {}
+  }
+  class FakeEncoder {
+    configure(cfg) { configured = cfg; }
+    encode() { encoded++; }
+    flush() { return Promise.resolve(); }
+    close() { this.closed = true; }
+  }
+  await V.probeAacEncode(48000, 128000, FakeEncoder, FakeAudioData);
+  assert.equal(configured.codec, 'mp4a.40.2');
+  assert.equal(configured.sampleRate, 48000);
+  assert.equal(configured.numberOfChannels, 1);
+  assert.equal(configured.bitrate, 128000);
+  assert.equal(encoded, 1, '应编码 1 帧静音样本');
+});
+
+test('probeAacEncode: flush 失败抛出可读错误码', async () => {
+  class FakeAudioData {
+    close() {}
+  }
+  class FailFlushEncoder {
+    configure() {}
+    encode() {}
+    flush() { return Promise.reject(new Error('Flushing error.')); }
+    close() {}
+  }
+  await assert.rejects(
+    () => V.probeAacEncode(22050, 256000, FailFlushEncoder, FakeAudioData),
+    (e) => e.code === 'AAC_ENCODER_UNSUPPORTED' && /AAC/.test(e.message),
+    '应抛出带 AAC_ENCODER_UNSUPPORTED 错误码的可读错误'
+  );
+});

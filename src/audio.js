@@ -228,6 +228,40 @@
   }
 
   /**
+   * 解析 WAV 文件头（RIFF fmt chunk）的真实采样率。
+   * Chromium 的 decodeAudioData 会把解码结果重采样到 AudioContext 的设备率，
+   * 导致「跟随源」导出静默变成 48k；WAV 可从文件头直接取源率。
+   * @param {ArrayBuffer|DataView} buf
+   * @returns {number|null} 采样率；非 WAV/无法解析返回 null
+   */
+  function readWavSampleRate(buf) {
+    try {
+      const dv = buf instanceof DataView ? buf : new DataView(buf);
+      if (dv.byteLength < 44) return null;
+      const tag = (off, n) => {
+        let s = '';
+        for (let i = 0; i < n; i++) s += String.fromCharCode(dv.getUint8(off + i));
+        return s;
+      };
+      if (tag(0, 4) !== 'RIFF' || tag(8, 4) !== 'WAVE') return null;
+      // 遍历 chunk（fmt 不一定是第一个），RIFF chunk 按 2 字节对齐
+      let off = 12;
+      while (off + 8 <= dv.byteLength) {
+        const id = tag(off, 4);
+        const size = dv.getUint32(off + 4, true);
+        if (id === 'fmt ') {
+          if (size < 4 || off + 8 + size > dv.byteLength) return null;
+          return dv.getUint32(off + 8 + 4, true); // audioFormat(2) + channels(2) 之后
+        }
+        off += 8 + size + (size % 2);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * 解码音频文件。
    * 返回：pcm（降采样分析用）、rawMono（原始采样率，导出用）、audioBuffer（试听用）。
    * @param {File} file
@@ -238,7 +272,17 @@
     const ctx = getAudioContext();
     if (!ctx) throw new Error('当前浏览器不支持 Web Audio API');
     const buf = await file.arrayBuffer();
-    const audioBuffer = await ctx.decodeAudioData(buf);
+    // WAV：以源采样率创建 OfflineAudioContext 解码，避免被设备率（常见 48k）
+    // 重采样——否则「跟随源」导出的 WAV 会被静默改为 48k（无损归档场景失真）。
+    // 非 WAV（MP3 等无法可靠读头）保持现状：跟随设备率，弹窗会标注实际率。
+    const wavRate = readWavSampleRate(buf);
+    let audioBuffer;
+    if (wavRate && wavRate > 0) {
+      const octx = new OfflineAudioContext(1, 1, wavRate);
+      audioBuffer = await octx.decodeAudioData(buf);
+    } else {
+      audioBuffer = await ctx.decodeAudioData(buf);
+    }
     const channels = [];
     for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
       channels.push(audioBuffer.getChannelData(c));
@@ -286,13 +330,38 @@
       };
 
       const onEnded = () => {
-        cleanup();
-        resolve(finalize(chunks, sampleRate, video.duration, playbackRate));
+        clearTimeout(guardTimer);
+        try {
+          cleanup();
+          resolve(finalize(chunks, sampleRate, video.duration, playbackRate));
+        } catch (e) {
+          reject(e);
+        }
       };
       const onError = (err) => {
-        cleanup();
+        clearTimeout(guardTimer);
+        try {
+          cleanup();
+        } catch (e) {
+          /* 忽略收尾异常 */
+        }
         reject(err);
       };
+
+      // 超时兜底：受限环境下 video.play() 可能挂起（永不触发 ended），
+      // 按预期播放时长（duration/playbackRate）给出上限，超时按已采集
+      // 数据收尾——chunks 为空时 finalize 抛错，避免无限等待无反馈
+      const expectedMs = ((video.duration || 30) / playbackRate) * 1000;
+      const guardMs = Math.min(15000, Math.max(8000, expectedMs * 2 + 2000));
+      const guardTimer = setTimeout(() => {
+        clearTimeout(guardTimer);
+        try {
+          cleanup();
+          resolve(finalize(chunks, sampleRate, video.duration, playbackRate));
+        } catch (e) {
+          reject(e);
+        }
+      }, guardMs);
 
       let cleanup = () => {
         proc.onaudioprocess = null;
@@ -336,6 +405,11 @@
    * @param {number} playbackRate 播放倍速
    */
   function finalize(chunks, sampleRate, duration, playbackRate = 1) {
+    if (!chunks.length) {
+      // 采集未收到任何音频数据（视频无声/无音轨，或环境不支持音轨采集）：
+      // 直接抛错，避免产出 0 样本的「成功」结果静默污染分析与导出
+      throw new Error('未能采集到视频音轨数据（视频可能无声，或当前环境不支持音轨采集）');
+    }
     let total = 0;
     for (const c of chunks) total += c.length;
     let mono = new Float32Array(total);
@@ -355,5 +429,5 @@
       duration: duration || mono.length / sampleRate,
     };
   }
-  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks };
+  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks, readWavSampleRate };
 });

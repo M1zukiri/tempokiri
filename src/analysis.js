@@ -499,6 +499,18 @@
   }
 
   /**
+   * 窗口 RMS 能量（用于无声/近无声源的快速预检，避免全窗分析空转）。
+   * @param {Float32Array|ArrayLike<number>} samples
+   * @returns {number}
+   */
+  function rmsOf(samples) {
+    let sum = 0;
+    const n = samples.length;
+    for (let i = 0; i < n; i++) sum += samples[i] * samples[i];
+    return Math.sqrt(sum / n);
+  }
+
+  /**
    * 一键分析：flux → onsets → BPM → offset。
 
    * @param {Float32Array} pcm 分析用 mono PCM（任意采样率，内部降采样）
@@ -539,6 +551,7 @@
     buildSimpleGrid,
     resample,
     toMono,
+    rmsOf,
     analyze,
   };
 });

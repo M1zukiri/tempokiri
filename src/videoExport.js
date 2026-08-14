@@ -180,6 +180,58 @@
   }
 
   /**
+   * AAC 编码器试编码自检：configure 后编码 1 帧 1024 样本静音并 flush。
+   * 部分受限环境（如无头浏览器）的 AAC 编码器在 flush 阶段抛 "Flushing error."，
+   * 而 isConfigSupported 仍返回 true——该 API 无法提前探测，只能实编码验证。
+   * 失败时抛出 Error（code='AAC_ENCODER_UNSUPPORTED'，消息含可读中文）。
+   * @param {number} sampleRate
+   * @param {number} bitrate
+   * @param {Function} [encCtor] 测试注入用（默认取全局 AudioEncoder）
+   * @param {Function} [dataCtor] 测试注入用（默认取全局 AudioData）
+   * @returns {Promise<void>}
+   */
+  async function probeAacEncode(sampleRate, bitrate, encCtor, dataCtor) {
+    const EncCtor = encCtor || (typeof AudioEncoder !== 'undefined' ? AudioEncoder : null);
+    const DataCtor = dataCtor || (typeof AudioData !== 'undefined' ? AudioData : null);
+    if (!EncCtor || !DataCtor) return; // 无 WebCodecs：后续 configure 自会失败
+    let enc = null;
+    try {
+      enc = new EncCtor({ output: () => {}, error: () => {} });
+      enc.configure({ codec: AUDIO_CODEC, sampleRate, numberOfChannels: 1, bitrate });
+      const silent = new Float32Array(1024);
+      const data = new DataCtor({
+        format: 'f32-planar',
+        sampleRate,
+        numberOfFrames: silent.length,
+        numberOfChannels: 1,
+        timestamp: 0,
+        data: silent,
+      });
+      enc.encode(data);
+      data.close();
+      await enc.flush();
+      enc.close();
+      enc = null;
+    } catch (e) {
+      try { if (enc) enc.close(); } catch (_) { /* 忽略关闭错误 */ }
+      const err = new Error('当前环境不支持 AAC 音频编码（' + ((e && e.message) || '编码器错误') + '）。可改用 Majdata 导出，或换用 Chrome/Edge 完整环境。');
+      err.code = 'AAC_ENCODER_UNSUPPORTED';
+      throw err;
+    }
+  }
+
+  /**
+   * AAC-LC 码率上限（按采样率）：22050 Hz 下 Chromium 编码器仅支持 96-192 kbps，
+   * 选 256k 会报 "Unsupported bitrate"；其余采样率不限。
+   * @param {number} sampleRate
+   * @returns {number|null} 上限（bps）；null = 不限
+   */
+  function aacBitrateCap(sampleRate) {
+    if (sampleRate === 22050) return 192000;
+    return null;
+  }
+
+  /**
    * 主入口：视频合成导出。
    * @param {object} opts
    * @param {File} opts.file 原视频文件
@@ -235,6 +287,9 @@
 
     const audioChunks = [];
     if (mix.length && !mute) {
+      // 试编码自检：受限环境的 AAC 编码器 flush 会失败且无法用 API 预探测，
+      // 实编码 1 帧静音验证，失败立即抛出可读错误（不浪费整段编码时间）
+      await probeAacEncode(mixSampleRate, audioBitrate);
       const audioEncoder = new AudioEncoder({
         output: (chunk) => audioChunks.push(chunk),
         error: (e) => {
@@ -390,5 +445,5 @@
     done();
   }
 
-  return { exportVideo, supportsWebCodecs, demuxMp4, computeVideoScale, frameKeepInterval, estimateFps };
+  return { exportVideo, supportsWebCodecs, demuxMp4, computeVideoScale, frameKeepInterval, estimateFps, probeAacEncode, aacBitrateCap };
 });

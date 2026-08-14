@@ -108,7 +108,11 @@
     "extractSilentNoWc": "正在静音快速播放采集音轨...",
     "extractRapid": "正在快速播放视频以采集音轨…",
     "configureGrid": "点击「设置节拍」配置 BPM 与网格，之后即可在波形上选段。",
-    "decoding": "正在解码音频…"
+    "decoding": "正在解码音频…",
+    "analyzing": "正在分析音频…",
+    "autoDone": "识别完成：BPM {bpm}，确认后生效。",
+    "noBeat": "未能识别出清晰节拍，请手动输入 BPM。",
+    "lowEnergy": "未检测到节拍（音频能量过低，可能为无声或近无声音轨）。"
   },
   "modal": {
     "openNewTitle": "打开新文件",
@@ -237,6 +241,7 @@
     "kbps": "kbps",
     "sampleRate": "采样率",
     "followSource": "跟随源",
+    "followSourceActual": "跟随源（实际 {sr} Hz）",
     "normalize": "响度归一化（峰值）",
     "peak": "目标峰值",
     "crossfade": "交叉淡化",
@@ -251,11 +256,14 @@
     "res720": "720P",
     "res480": "480P",
     "aacBitrate": "AAC 码率",
+    "includeAudio": "包含音轨",
     "majVideoBitrate": "bg.mp4 码率",
     "majMp3Bitrate": "track.mp3 码率",
     "majNoteVideo": "bg.mp4：无声，上限 1080P 60fps；track.mp3：44100Hz。输出文件固定名为 bg.mp4 与 track.mp3。",
     "majNoteAudio": "当前为纯音频，仅导出 track.mp3（bg.mp4 请自备）。track.mp3：44100Hz。",
     "statusEmptyName": "请填写文件名",
+    "aacEnvHint": "当前环境不支持 AAC 音频编码，视频导出无法带音轨。可改用 Majdata 导出（bg.mp4 纯视频 + 独立 track.mp3），或换用 Chrome/Edge 完整环境。",
+    "aacBitrateHint": "当前采样率下该 AAC 码率不受支持，请选择更低码率。",
     "cancel": "取消",
     "ok": "导出"
   }

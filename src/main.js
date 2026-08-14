@@ -282,12 +282,14 @@
       // 导入时即提取音轨：默认优先 WebCodecs 直接解码（快），失败降级 captureStream；
       // 「高级设置」可强制仅采集或仅 WebCodecs（后者失败只报错、不降级）
       const gs = store.loadGlobalSettings();
+      let extractError = null; // 音轨提取失败消息（收尾时覆盖 hint，避免被缓存恢复提示吞掉）
       if (gs.videoExtract === 'capture') {
         showHint(T('hint.extractSilent'));
         try {
           await captureVideoPcm();
           hideHint();
         } catch (e2) {
+          extractError = e2.message;
           showHint(T('hint.extractFailedManual', { msg: e2.message }));
         }
       } else {
@@ -309,6 +311,7 @@
         } catch (e) {
           if (gs.videoExtract === 'webcodecs') {
             captureBar.hidden = true;
+            extractError = e.message;
             showHint(T('hint.extractFailedManual', { msg: e.message }));
           } else {
             captureBar.hidden = true;
@@ -317,12 +320,14 @@
               await captureVideoPcm();
               hideHint();
             } catch (e2) {
+              extractError = e2.message;
               showHint(T('hint.extractFailedManual', { msg: e2.message }));
             }
           }
         }
       }
       const cached = applyCachedSettings();
+      if (extractError) showHint(T('hint.extractFailedManual', { msg: extractError }));
       renderWave();
       status(cached ? T('status.appliedCached', { name: file.name }) : T('status.videoReady', { name: file.name }));
     } else {
@@ -469,7 +474,7 @@
     try {
       const resolved = analysis.resolveSegments(state.segments, state.duration);
       state.grid = analysis.buildGrid({ segments: resolved, offset: state.offset, duration: state.duration });
-      hideHint();
+      showHint(T('wave.hintInline'));
       renderAll();
     } catch (e) {
       status(T('status.bpmApplyFailed', { msg: e.message }));
@@ -540,8 +545,18 @@
     if (seg.durationSec != null && seg.durationSec >= 0) {
       windowEnd = Math.min(windowStart + seg.durationSec, state.duration);
     }
+    status(T('hint.analyzing'));
+    await new Promise((r) => setTimeout(r, 0)); // 让步一帧，让状态栏提示可见
     const r = analyzeWindow(windowStart, windowEnd);
-    if (!r.bpm) return null;
+    if (r && r.error) {
+      status(r.error);
+      return { error: r.error };
+    }
+    if (!r.bpm) {
+      status(T('hint.noBeat'));
+      return null;
+    }
+    status(T('hint.autoDone', { bpm: r.bpm.toFixed(1) }));
     // 第 1 段返回段内偏移（相对段起点）；后续段只填 BPM（相位按前段衔接）
     return segIndex === 0 ? { bpm: r.bpm, offset: r.offset } : { bpm: r.bpm };
   }
@@ -554,6 +569,9 @@
     const s = Math.max(0, Math.floor(startSec * sr));
     const e = Math.min(state.pcm.length, Math.ceil(endSec * sr));
     const win = state.pcm.subarray(s, e);
+    // 能量预检：无声/近无声窗口直接返回，避免全窗分析空转（近无音轨视频秒级反馈）；
+    // 放在长度检查之前——空/单样本窗口 RMS 为 0 或 NaN，能正确落到对应分支
+    if (analysis.rmsOf(win) < 1e-4) return { bpm: null, offset: 0, error: T('hint.lowEnergy') };
     if (win.length < sr * 1) return { bpm: null, offset: 0 };
     return analysis.analyze(win, { sampleRate: sr, hop, delta, minBpm: gs.minBpm, maxBpm: gs.maxBpm });
   }
@@ -982,7 +1000,7 @@
       typeof window.VideoEncoder === 'function' &&
       typeof window.VideoDecoder === 'function';
     MC.openExport(
-      { baseName: base + '_remix', kind: state.kind, canVideo },
+      { baseName: base + '_remix', kind: state.kind, canVideo, sampleRate: state.sampleRate },
       { onExport: doExport }
     );
   }
@@ -1027,7 +1045,7 @@
             maxWidth: opts.maxWidth,
             maxHeight: opts.maxHeight,
             audioBitrate: opts.audioBitrate,
-            mute: false,
+            mute: !!opts.mute,
             onProgress: (p) => status(T('status.videoRendering', { pct: Math.round(p * 100) })),
           });
           status(T('status.videoExported', { name: opts.fileName }));
@@ -1056,7 +1074,15 @@
           status(state.kind === 'video' ? T('status.majDoneVideo') : T('status.majDoneAudio'));
         }
       } catch (e) {
-        status(T('status.exportFailed', { msg: e.message }));
+        const m = (e && e.message) || String(e);
+        let msg = m;
+        // 已知环境性错误映射为可读提示（AAC 编码器在受限环境 flush 失败/码率受限）
+        if ((e && e.code === 'AAC_ENCODER_UNSUPPORTED') || m.indexOf('Flushing error') !== -1) {
+          msg = T('export.aacEnvHint');
+        } else if (m.indexOf('Unsupported bitrate') !== -1) {
+          msg = T('export.aacBitrateHint');
+        }
+        status(T('status.exportFailed', { msg }));
       }
     }, 30);
   }
@@ -1271,9 +1297,15 @@
           playOriginal();
         }
       } else if (e.key === 'Escape') {
-        MC.modal && MC.modal.close();
+        // 各弹窗体系分别关闭：modal.js 铺平导出为 MC.open/MC.close（无 MC.modal）；
+        // 高级设置挂在 MC.settings（footer.js 同源调用 openAdvanced）；页脚自建
+        // overlay 按 id 移除，避免通用遍历误删持久化节点
+        MC.close && MC.close();
         MC.closeExport && MC.closeExport();
+        MC.settings && MC.settings.closeAdvanced && MC.settings.closeAdvanced();
         manualForm.hidden = true;
+        const footOverlay = document.getElementById('readmeOverlay') || document.getElementById('easterEggOverlay');
+        if (footOverlay) footOverlay.remove();
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const view = state.view || { start: 0, end: 1 };
         const span = view.end - view.start;

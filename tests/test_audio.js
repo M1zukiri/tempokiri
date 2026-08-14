@@ -43,3 +43,37 @@ test('mixPlanarChunks: 多 chunk 顺序拼接', () => {
   const exp = [0.2, 0.4, 0.6, 0.8, 0.1, 0.3, 0.5, 0.7];
   for (let i = 0; i < exp.length; i++) assert.ok(Math.abs(mono[i] - exp[i]) < 1e-6);
 });
+
+/** 构造标准 WAV 头（44 字节，PCM，无数据）。 */
+function wavHeader(sampleRate, channels = 1, bits = 16) {
+  const buf = new ArrayBuffer(44);
+  const dv = new DataView(buf);
+  const w = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+  w(0, 'RIFF');
+  dv.setUint32(4, 36, true);
+  w(8, 'WAVE');
+  w(12, 'fmt ');
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); // PCM
+  dv.setUint16(22, channels, true);
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, (sampleRate * channels * bits) / 8, true);
+  dv.setUint16(32, (channels * bits) / 8, true);
+  dv.setUint16(34, bits, true);
+  w(36, 'data');
+  dv.setUint32(40, 0, true);
+  return buf;
+}
+
+test('readWavSampleRate: 解析 RIFF fmt chunk 采样率', () => {
+  assert.equal(A.readWavSampleRate(wavHeader(44100)), 44100);
+  assert.equal(A.readWavSampleRate(wavHeader(48000)), 48000);
+  assert.equal(A.readWavSampleRate(wavHeader(22050)), 22050);
+  assert.equal(A.readWavSampleRate(wavHeader(96000, 2, 24)), 96000);
+});
+
+test('readWavSampleRate: 非 WAV/非法输入返回 null', () => {
+  assert.equal(A.readWavSampleRate(new ArrayBuffer(10)), null, '不足 44 字节');
+  assert.equal(A.readWavSampleRate(new ArrayBuffer(44)), null, '全零无 RIFF 标记');
+  assert.equal(A.readWavSampleRate(new Uint8Array(64).buffer), null, '无 RIFF/WAVE 标记');
+});

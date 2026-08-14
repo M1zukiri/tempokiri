@@ -179,3 +179,11 @@ test('resolveSegments: 中间段缺长度报错', () => {
 test('resolveSegments: 缺 BPM 报错', () => {
   assert.throws(() => A.resolveSegments([{ beatsPerBar: 4, bars: 2 }], 10));
 });
+
+test('rmsOf: RMS 能量计算', () => {
+  assert.equal(A.rmsOf(new Float32Array([0, 0, 0, 0])), 0);
+  assert.ok(Math.abs(A.rmsOf(new Float32Array([1, -1, 1, -1])) - 1) < 1e-9);
+  assert.ok(Math.abs(A.rmsOf(new Float32Array([0.5, -0.5])) - 0.5) < 1e-9);
+  // 静音接近 0（float 噪声级），低于预检阈值 1e-4
+  assert.ok(A.rmsOf(new Float32Array(4096)) < 1e-4);
+});
