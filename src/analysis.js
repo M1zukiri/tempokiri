@@ -91,7 +91,10 @@
     const flux = new Float32Array(nFrames);
     const re = new Float64Array(frameSize);
     const im = new Float64Array(frameSize);
-    const mags = new Float64Array(frameSize >> 1);
+    // 双缓冲复用幅度数组，消除每帧 Float64Array.from 分配（GC 压力）
+    const magsA = new Float64Array(frameSize >> 1);
+    const magsB = new Float64Array(frameSize >> 1);
+    let mags = magsA;
     let prev = null;
     for (let f = 0; f < nFrames; f++) {
       const start = f * hop;
@@ -100,7 +103,8 @@
         im[i] = 0;
       }
       fft(re, im);
-      for (let i = 0; i < mags.length; i++) mags[i] = Math.hypot(re[i], im[i]);
+      // sqrt(re²+im²) 等价 Math.hypot（幅度上界 ≤2048 无溢出），免 V8 hypot 溢出防护慢路径
+      for (let i = 0; i < mags.length; i++) mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
       if (prev) {
         let s = 0;
         for (let i = 0; i < mags.length; i++) {
@@ -110,7 +114,8 @@
         // flux[f] = 帧 f 与帧 f-1 的差分；flux[0] 恒为 0
         flux[f] = s;
       }
-      prev = Float64Array.from(mags);
+      prev = mags;
+      mags = (mags === magsA) ? magsB : magsA;
     }
     return flux;
   }
@@ -239,21 +244,8 @@
     const lagMin = 60 / maxBpm;
     const lagMax = 60 / minBpm;
     const sorted = Float64Array.from(sample).sort();
-    const hasNear = (t) => {
-      let lo = 0, hi = sorted.length - 1;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        if (sorted[mid] < t - 0.03) lo = mid + 1;
-        else if (sorted[mid] > t + 0.03) hi = mid - 1;
-        else return true;
-      }
-      return false;
-    };
-    const scoreAt = (lag) => {
-      let score = 0;
-      for (let k = 0; k < sample.length; k++) if (hasNear(sample[k] + lag)) score++;
-      return score;
-    };
+    // 双指针单调扫描（模块级 scoreNear，见下）：sample 有序，每 lag O(N)（原二分 O(N log N)）。
+    const scoreAt = (lag) => scoreNear(sorted, sample, lag);
     let bestLag = null;
     let bestScore = -Infinity;
     for (let lag = lagMin; lag <= lagMax + 1e-9; lag += 0.002) {
@@ -283,6 +275,29 @@
     bpm = Math.round(bestBpm * 10) / 10;
     return Math.min(maxBpm, Math.max(minBpm, bpm));
   }
+
+  /**
+   * 双指针单调扫描：sample 有序（t = sample[k]+lag 随 k 单调不减）时，统计
+   * 落在每个 sample[k]+lag 的 ±0.03s 窗口内的 sorted 元素个数（onset 自相关配对）。
+   * 每 lag O(N)；等价于对每个 sample[k] 二分 hasNear。
+   * @param {Float64Array} sorted 有序 onset
+   * @param {number[]} sample 有序 onset（与 sorted 同源）
+   * @param {number} lag 滞后（秒）
+   * @returns {number} 配对 onset 数
+   */
+  function scoreNear(sorted, sample, lag) {
+    let score = 0;
+    let lo = 0, hi = 0;
+    for (let k = 0; k < sample.length; k++) {
+      const t = sample[k] + lag;
+      const loT = t - 0.03, hiT = t + 0.03;
+      while (lo < sorted.length && sorted[lo] < loT) lo++;
+      while (hi < sorted.length && sorted[hi] <= hiT) hi++;
+      if (hi > lo) score++;
+    }
+    return score;
+  }
+
 
   /**
    * 估计网格偏移（第 1 拍相对 0s 的相位）。
@@ -545,6 +560,7 @@
     spectralFlux,
     detectOnsets,
     estimateBpm,
+    scoreNear,
     estimateOffset,
     buildGrid,
     resolveSegments,

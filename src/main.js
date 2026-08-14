@@ -213,7 +213,7 @@
       it.invalidSide = which;
       markInvalidCard(it, id);
       btnPlaySeq.disabled = true;
-      saveWorkspace();
+      debouncedSaveWorkspace();
       return;
     }
     if (which === 'start') it.startTime = sec;
@@ -225,11 +225,14 @@
     if (it.invalid) {
       markInvalidCard(it, id);
       btnPlaySeq.disabled = true;
-      saveWorkspace();
+      debouncedSaveWorkspace();
       return;
     }
-    saveWorkspace();
-    renderAll();
+    debouncedSaveWorkspace();
+    renderWave(); // 波形序列高亮变化（renderWave 内部 rAF 帧合并，连续输入不重复绘制）
+    renderSeqProgress(); // 总时长/拼接点变化
+    ui.updateSeqInfo(seqInfo, state.sequence, seq); // 总时长文本
+    btnPlaySeq.disabled = anyInvalid();
   }
 
   /** 给非法卡片加标红 class（不重建 DOM，保留输入内容）。 */
@@ -239,6 +242,7 @@
   }
   // ---------- 文件处理 ----------
   async function handleFile(file) {
+    flushSaveWorkspace(); // 落盘挂起的防抖输入，避免切文件丢失最后一次编辑
     // 工作区已有内容且打开的是不同文件 → 询问是否保留
     if (state.file && state.file !== file && (state.sequence.length || state.grid)) {
       const keep = await confirmWorkspace();
@@ -256,6 +260,7 @@
     state.playPos = null;
     state.pendingSelection = null;
     state.sequence = [];
+    mixCache = null; // 清空拼接缓存，避免旧拼接 buffer 悬挂到下次播放
     state.peaks = null;
     state.playTime = null;
     btnSettings.disabled = false;
@@ -267,6 +272,7 @@
     btnAddSelection.disabled = true;
 
     if (state.kind === 'video') {
+      if (videoEl.src && videoEl.src.startsWith('blob:')) URL.revokeObjectURL(videoEl.src);
       videoEl.src = URL.createObjectURL(file);
       videoWrap.hidden = false;
       await videoEl.load();
@@ -407,6 +413,17 @@
       })),
       view: state.view ? { start: state.view.start, end: state.view.end } : undefined,
     });
+  }
+
+  /** 序列输入防抖保存：合并连续输入（逐键），250ms 静默后统一落盘。 */
+  let saveWsTimer = null;
+  function debouncedSaveWorkspace() {
+    clearTimeout(saveWsTimer);
+    saveWsTimer = setTimeout(() => { saveWsTimer = null; saveWorkspace(); }, 250);
+  }
+  /** 立即落盘挂起的防抖保存（切文件前调用，避免最后一次输入丢失）。 */
+  function flushSaveWorkspace() {
+    if (saveWsTimer) { clearTimeout(saveWsTimer); saveWsTimer = null; saveWorkspace(); }
   }
   /** 从缓存恢复拼接序列（时间为主；旧缓存无时间时按小节推算）。 */
   function restoreSequence(list) {
@@ -743,11 +760,15 @@
     }
     state.playTime = null;
     renderWave();
+    if (playAnalyser) {
+      try { playAnalyser.disconnect(); } catch (e) { /* 已断开则忽略 */ }
+    }
   }
 
   /** 停止：暂停并把播放位置重置（原曲回标记点、拼接回序列开头）。 */
   function stopPlay() {
     pausePlay();
+    if (playAnalyser) { try { playAnalyser.disconnect(); } catch (e) { /* 已断开则忽略 */ } }
     playAnalyser = null; // 停止后释放分析节点（恢复播放时由 ensureAnalyser 重建）
     drawBrandPulse(PULSE_IDLE); // 律动条恢复静态波形
     state.playPos = state.cursorPos != null ? state.cursorPos : 0;
@@ -920,7 +941,7 @@
         }
       }
     }
-    requestAnimationFrame(tickProgress);
+    if (playing) requestAnimationFrame(tickProgress);
   }
   /** 序列内容不变的拼接结果缓存：命中返回缓存的 AudioBuffer，未命中重新拼接并缓存。 */
   function getMixBuffer() {

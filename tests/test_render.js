@@ -22,6 +22,10 @@ function mockCtx() {
     strokeCount: 0,
     beginPathCount: 0,
     moveTos: 0,
+    moveXs: [],
+    lineXs: [],
+    drawImageCalls: 0,
+    fillTexts: 0,
     shadowGlowUsed: false,
     _shadowBlur: 0,
     get shadowBlur() { return this._shadowBlur; },
@@ -35,9 +39,10 @@ function mockCtx() {
     setLineDash() {},
     fillRect() {},
     setTransform() {},
+    drawImage() { this.drawImageCalls++; calls.push('drawImage'); },
     beginPath() { this.beginPathCount++; calls.push('beginPath'); },
-    moveTo() { this.moveTos++; calls.push('moveTo'); },
-    lineTo() { calls.push('lineTo'); },
+    moveTo(x) { this.moveTos++; this.moveXs.push(x); calls.push('moveTo'); },
+    lineTo(x) { this.lineXs.push(x); calls.push('lineTo'); },
     stroke() { this.strokeCount++; calls.push('stroke'); },
     fillText() { this.fillTexts++; calls.push('fillText'); },
     createLinearGradient() { return { addColorStop() {} }; },
@@ -301,4 +306,63 @@ test('CANVAS_THEMES: 三套主题各含 12 个绘制字段（主题系统）', (
     beatLine: 'rgba(255,255,255,0.14)', selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee', playLine: '#f43f5e', axis: '#7d8794', barLabel: '#9aa4b2',
   });
+});
+
+// ---- P0 增量渲染 ----
+test('drawRange: 全量绘制完整波形（P0·T1）', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx, 800, 300);
+  const n = 220500; // 10s @ 22050Hz，覆盖整个视口
+  const pcm = new Float32Array(n);
+  for (let i = 0; i < n; i++) pcm[i] = Math.sin(i / 10);
+  const peaks = R.buildPeaks(pcm);
+  R.drawRange(canvas, { start: 0, end: 10 }, { pcm, peaks, sampleRate: 22050, grid: makeGrid() }, 0, 800);
+  // 波形每像素一条竖线（moveTo），800px 全量 → 波形 moveTo 数 >= 800
+  assert.ok(ctx.moveXs.length >= 800, `全量波形 moveTo 应 >= 800，实际 ${ctx.moveXs.length}`);
+});
+
+test('drawRange: 条带裁剪——moveTo/lineTo x 坐标 ⊆ [x0,x1)（P0·T2）', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx, 800, 300);
+  const n = 220500; // 10s @ 22050Hz，覆盖整个视口
+  const pcm = new Float32Array(n);
+  for (let i = 0; i < n; i++) pcm[i] = Math.sin(i / 10);
+  const peaks = R.buildPeaks(pcm);
+  R.drawRange(canvas, { start: 0, end: 10 }, { pcm, peaks, sampleRate: 22050, grid: makeGrid() }, 100, 120);
+  for (const x of ctx.moveXs) {
+    assert.ok(x >= 100 && x < 120, `moveTo x=${x} 应落在 [100,120)`);
+  }
+  for (const x of ctx.lineXs) {
+    assert.ok(x >= 100 && x < 120, `lineTo x=${x} 应落在 [100,120)`);
+  }
+});
+
+test('draw: 纯平移走增量路径，波形只重绘露出条带（P0·T3）', () => {
+  const ctx = mockCtx();
+  const canvas = fakeCanvas(ctx, 800, 300);
+  const offCtx = mockCtx();
+  global.OffscreenCanvas = class {
+    constructor(w, h) { this.width = w; this.height = h; }
+    getContext() { return offCtx; }
+  };
+  try {
+    const n = 220500; // 10s @ 22050Hz，覆盖整个视口
+    const pcm = new Float32Array(n);
+    for (let i = 0; i < n; i++) pcm[i] = Math.sin(i / 10);
+    const peaks = R.buildPeaks(pcm);
+    const data = { pcm, peaks, sampleRate: 22050, grid: makeGrid() };
+    R.draw(canvas, { start: 0, end: 10 }, data); // 全量
+    assert.ok(ctx.moveXs.length >= 800, '首次全量绘制完整波形');
+    ctx.moveXs.length = 0;
+    ctx.lineXs.length = 0;
+    R.draw(canvas, { start: 0.1, end: 10.1 }, data); // 纯平移 → 增量
+    const dxPx = Math.round(0.1 * 800 / 10); // 8px
+    const x0 = 800 - dxPx; // 792
+    assert.ok(ctx.moveXs.length < 100, `增量波形 moveTo 应远小于全量，实际 ${ctx.moveXs.length}`);
+    for (const x of ctx.moveXs) {
+      assert.ok(x >= x0 && x < 800, `增量 moveTo x=${x} 应在条带 [${x0},800)`);
+    }
+  } finally {
+    delete global.OffscreenCanvas;
+  }
 });

@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.6.1**：运行时性能优化（optimization-plan-4）——P0 波形平移增量渲染（draw 拆出 drawRange 按 x 区间裁剪 + 离屏缓存 blit，纯平移只重绘露出条带；波形循环累加器化、渐变按 waveH 缓存；顺带修复 v1.6.0 透明背景下全量绘制无 clearRect 导致的重影残留）；P1 tickProgress rAF 生命周期（停止后链终止不再空转）+ analyser→destination 连接释放；P2 spectralFlux 幅度计算（Math.hypot→sqrt + 双缓冲消除每帧 Float64Array.from 分配）；P3 estimateBpm scoreAt 双指针单调扫描（抽 scoreNear 导出可测）；P5 切文件释放旧视频 Blob URL + 清空 mixCache；P4a 序列输入局部更新（setRange 合法路径不再整列表重建）+ saveWorkspace 防抖。验证：115/115 单测全绿、analyze 全链路 639→414ms（<450ms 达标）
 - **1.6.0**：UI 现代化重构（Gemini UI_Improvement 方案落地，纯 CSS/视觉零逻辑侵入）——设计令牌体系（结构/色彩/阴影令牌，三主题全部迁入：aurora 用方案给定值，nebula/paper 沿现有色调翻译；旧变量 --bg/--panel/--border 等全部删除）；表面海拔（toolbar/seq-panel/seq-card 圆角+阴影分层）；空间呼吸感（stage 20px 边距、controlbar/statusBar 重排）；控件现代化（.btn 状态机重写、Segmented Control 微调群组、输入框统一 3.3 套件、焦点环）；音频工作区（#waveWrap 280px 微网格 + canvas bg/gridBg 透明化露出 CSS 网格、进度条 pill 化、seam/knob 令牌化）；页脚视觉降噪（移除心跳动画与渐变签名、数字排版 tnum 等宽）；窄屏 480px 媒体查询补 toolbar/stage/statusBar/footer 压缩。验证：111/111 单测全绿、浏览器断言套件 12 项全 true、三主题像素级校验、360px 无横向溢出、WAV 44100Hz/MP3 192kbps 导出回归通过
 - **1.5.4**：评估修复（P1-P7）——视频导出 AAC 试编码自检（自检失败/Flushing error 映射为可读中文提示）、视频导出「包含音轨」开关（纯视频逃生通道，透传已有 mute）；AAC 码率按采样率动态约束（22050 Hz 仅 96-192k，256k 不可选）；WAV 解码用 OfflineAudioContext 固定源率（「跟随源」不再被设备率 48k 静默改写）+ 导出弹窗「跟随源」标注实际采样率；Esc 统一关闭 README/彩蛋弹窗（页脚自建 overlay）；网格应用后波形提示更新为选段指引；无声源识别秒级返回（RMS 能量预检）+ 识别状态栏反馈；窄屏 360px 媒体查询（按钮不换行压缩）
 - **1.5.3**：README 内容修订——主题名同步（Aoi Aurora / Meltyland's Nightmare / Kamikiri）、高级设置 9 项参数描述、导出补 Majdata

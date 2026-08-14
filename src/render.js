@@ -196,8 +196,50 @@
     },
   };
 
+  // ---------- 波形平移增量渲染（P0）----------
+  let waveCache = null;      // 离屏缓存 canvas（与 #wave 同物理尺寸）
+  let waveCacheCtx = null;
+  let lastView = null;       // 上次绘制的 view { start, end }
+  let lastSpan = 0;
+  let lastSig = null;        // buildSig(data) 结果（引用数组）
+  let themeStamp = 0;        // setTheme 时 +1（主题变化 → 强制全量）
+  let cachedGrad = null;     // 波形渐变对象（按 waveH 缓存，THEME 变化失效）
+  let cachedGradWaveH = -1;
+
+  /** 波形数据版本签名：引用比较关键字段（避免 JSON.stringify 大数组开销）。 */
+  function buildSig(data) {
+    return [data.peaks, data.grid, data.sequence, data.dragRange,
+            data.pendingSelection, data.cursorPos, themeStamp];
+  }
+  function sigEq(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+  /** 确保离屏缓存 canvas 尺寸匹配；创建失败（Node 无 OffscreenCanvas/document）降级全量。 */
+  function ensureCache(w, h) {
+    if (waveCache && waveCache.width === w && waveCache.height === h) return;
+    try {
+      if (typeof OffscreenCanvas !== 'undefined') {
+        waveCache = new OffscreenCanvas(w, h);
+      } else if (typeof document !== 'undefined') {
+        waveCache = document.createElement('canvas');
+        waveCache.width = w;
+        waveCache.height = h;
+      } else {
+        waveCache = null;
+        return;
+      }
+      waveCacheCtx = waveCache.getContext('2d');
+    } catch (e) {
+      waveCache = null;
+    }
+  }
+
   function setTheme(name) {
     Object.assign(THEME, CANVAS_THEMES[name] || CANVAS_THEMES.aurora);
+    themeStamp++;      // 主题变化 → 波形签名变化 → 强制全量重绘
+    cachedGrad = null; // 渐变颜色随 THEME 变化，缓存失效
   }
 
   /**
@@ -221,8 +263,62 @@
     const cssH = canvas.clientHeight || canvas.height;
     const w = Math.round(cssW * dpr);
     const h = Math.round(cssH * dpr);
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
+    if (canvas.width !== w) { canvas.width = w; waveCache = null; lastView = null; }
+    if (canvas.height !== h) { canvas.height = h; waveCache = null; lastView = null; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const span = view.end - view.start;
+    const sig = buildSig(data);
+    const canIncr = lastView && sigEq(sig, lastSig) && waveCache
+      && Math.abs(span - lastSpan) / lastSpan < 0.005;
+    const dxPx = canIncr ? Math.round((view.start - lastView.start) * cssW / lastSpan) : 0;
+
+    if (canIncr && dxPx !== 0 && Math.abs(dxPx) < cssW) {
+      // 纯平移：旧帧 → 离屏缓存 → 物理像素 blit → 只重绘露出条带
+      ensureCache(w, h);
+      waveCacheCtx.setTransform(1, 0, 0, 1, 0, 0);
+      waveCacheCtx.clearRect(0, 0, w, h);
+      waveCacheCtx.drawImage(canvas, 0, 0);
+      const dxPhys = Math.round(dxPx * dpr);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(waveCache, dxPhys, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const x0 = dxPx > 0 ? cssW - dxPx : 0;
+      const x1 = dxPx > 0 ? cssW : -dxPx;
+      ctx.clearRect(x0, 0, x1 - x0, cssH);
+      drawRange(canvas, view, data, x0, x1);
+    } else {
+      // 全量：clearRect 清除旧内容（transparent 背景需显式清除）+ 全幅绘制
+      ctx.clearRect(0, 0, cssW, cssH);
+      drawRange(canvas, view, data, 0, cssW);
+    }
+
+    // 更新离屏缓存与 last* 状态（全量与增量路径共用；Node 无 OffscreenCanvas 时跳过缓存拷贝）
+    ensureCache(w, h);
+    if (waveCache && waveCacheCtx) {
+      waveCacheCtx.setTransform(1, 0, 0, 1, 0, 0);
+      waveCacheCtx.clearRect(0, 0, w, h);
+      waveCacheCtx.drawImage(canvas, 0, 0);
+    }
+    lastView = { start: view.start, end: view.end };
+    lastSpan = span;
+    lastSig = sig;
+  }
+
+  /**
+   * 按 x 区间 [x0, x1) 绘制波形视图（P0 增量渲染的条带重绘；全量 = drawRange(0, cssW)）。
+   * @param {HTMLCanvasElement} canvas
+   * @param {{start:number,end:number}} view 秒
+   * @param {object} data 同 draw
+   * @param {number} x0 起始像素（CSS 坐标，含）
+   * @param {number} x1 结束像素（CSS 坐标，不含）
+   */
+  function drawRange(canvas, view, data, x0, x1) {
+    const dpr = (window.devicePixelRatio || 1) * dprScale;
+    const cssW = canvas.clientWidth || canvas.width;
+    const cssH = canvas.clientHeight || canvas.height;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -231,12 +327,8 @@
     const amp = waveH * 0.45;
     const midY = waveH / 2;
     const sr = data.sampleRate || 22050;
-
-    // 背景
-    ctx.fillStyle = THEME.bg;
-    ctx.fillRect(0, 0, cssW, cssH);
-    ctx.fillStyle = THEME.gridBg;
-    ctx.fillRect(0, 0, cssW, waveH);
+    const t0 = xToTime(x0, view, cssW);
+    const t1 = xToTime(x1, view, cssW);
 
     // 波形
     if (data.pcm && data.peaks) {
@@ -252,8 +344,10 @@
       const xArr = data.peaks.maxs[levelIdx];
       const c = bucketIndexStep(view, sr, bucket, cssW);
       ctx.beginPath();
-      for (let x = 0; x < cssW; x += 1) {
-        const bIdx = Math.floor((c.start + x * c.step) * c.k);
+      let acc = c.start + x0 * c.step; // 累加器起步于 x0，每像素省一次乘法
+      for (let x = x0; x < x1; x += 1) {
+        const bIdx = Math.floor(acc * c.k);
+        acc += c.step;
         if (bIdx < 0 || bIdx >= mArr.length) continue;
         const lo = mArr[bIdx];
         const hi = xArr[bIdx];
@@ -262,35 +356,37 @@
         ctx.moveTo(x, y0);
         ctx.lineTo(x, y1);
       }
-      // 渐变笔触：峰值线自上而下青→青蓝渐变，增强立体感
-      const grad = ctx.createLinearGradient(0, 0, 0, waveH);
-      grad.addColorStop(0, THEME.waveHigh);
-      grad.addColorStop(0.5, THEME.wave);
-      grad.addColorStop(1, 'rgba(34,211,238,0.55)');
-      ctx.strokeStyle = grad;
+      // 渐变笔触缓存（按 waveH；THEME 变化由 setTheme 置 cachedGrad = null 失效）
+      if (!cachedGrad || cachedGradWaveH !== waveH) {
+        cachedGrad = ctx.createLinearGradient(0, 0, 0, waveH);
+        cachedGrad.addColorStop(0, THEME.waveHigh);
+        cachedGrad.addColorStop(0.5, THEME.wave);
+        cachedGrad.addColorStop(1, 'rgba(34,211,238,0.55)');
+        cachedGradWaveH = waveH;
+      }
+      ctx.strokeStyle = cachedGrad;
       ctx.lineWidth = 1;
       ctx.stroke();
     }
 
-    // 网格：节拍线（弱）+ 小节线（强 + 标签），二分定位可见区间避免全量遍历
+    // 网格：节拍线（弱）+ 小节线（强 + 标签），按条带时间区间 [t0, t1] 二分过滤
     if (data.grid && data.grid.bars.length) {
       const grid = data.grid;
-      // 节拍线
-      const bLo = lowerBound(grid.beatTimes, view.start);
-      const bHi = upperBound(grid.beatTimes, view.end);
+      const bLo = lowerBound(grid.beatTimes, t0);
+      const bHi = upperBound(grid.beatTimes, t1);
       ctx.strokeStyle = THEME.beatLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let i = bLo; i < bHi; i++) {
         const x = timeToX(grid.beatTimes[i], view, cssW);
+        if (x < x0 || x >= x1) continue; // 严格半开裁剪到条带
         ctx.moveTo(x, 0);
         ctx.lineTo(x, waveH);
       }
       ctx.stroke();
-      // 小节线 + 标签（批量 path 单次 stroke；x 边界 ±20px → 秒 margin）
       const margin = (20 / cssW) * (view.end - view.start);
-      const sLo = lowerBoundBars(grid.bars, view.start - margin);
-      const sHi = upperBoundBars(grid.bars, view.end + margin);
+      const sLo = lowerBoundBars(grid.bars, t0 - margin);
+      const sHi = upperBoundBars(grid.bars, t1 + margin);
       ctx.strokeStyle = THEME.barLine;
       ctx.fillStyle = THEME.barLabel;
       ctx.font = '10px system-ui, sans-serif';
@@ -298,72 +394,79 @@
       ctx.beginPath();
       for (let i = sLo; i < sHi; i++) {
         const x = timeToX(grid.bars[i].startTime, view, cssW);
+        if (x < x0 || x >= x1) continue; // 严格半开裁剪到条带（增量时不画到未清除区）
         ctx.moveTo(x, 0);
         ctx.lineTo(x, waveH);
       }
       ctx.stroke();
       for (let i = sLo; i < sHi; i++) {
         const x = timeToX(grid.bars[i].startTime, view, cssW);
+        if (x < x0 || x >= x1) continue;
         ctx.fillText(String(grid.bars[i].barNumber), x, 11);
       }
     }
 
-    // 已加入序列的段落高亮
+    // 已加入序列的段落高亮（x 交集裁剪）
     if (data.sequence && data.sequence.length && data.grid) {
       for (const item of data.sequence) {
-        const x0 = timeToX(item.startTime, view, cssW);
-        const x1 = timeToX(item.endTime, view, cssW);
+        const ix0 = Math.max(x0, timeToX(item.startTime, view, cssW));
+        const ix1 = Math.min(x1, timeToX(item.endTime, view, cssW));
+        if (ix1 <= ix0) continue;
         ctx.fillStyle = THEME.selFill;
-        ctx.fillRect(x0, 0, Math.max(1, x1 - x0), waveH);
+        ctx.fillRect(ix0, 0, ix1 - ix0, waveH);
         ctx.strokeStyle = THEME.selBorder;
-        ctx.strokeRect(x0, 0, Math.max(1, x1 - x0), waveH);
+        ctx.strokeRect(ix0, 0, ix1 - ix0, waveH);
       }
     }
 
-    // 拖拽中的临时选区
+    // 拖拽中的临时选区（x 交集裁剪）
     if (data.dragRange) {
-      const x0 = timeToX(Math.min(data.dragRange.t0, data.dragRange.t1), view, cssW);
-      const x1 = timeToX(Math.max(data.dragRange.t0, data.dragRange.t1), view, cssW);
-      ctx.fillStyle = 'rgba(244,63,94,0.18)';
-      ctx.fillRect(x0, 0, Math.max(1, x1 - x0), waveH);
-      ctx.strokeStyle = THEME.playLine;
-      ctx.strokeRect(x0, 0, Math.max(1, x1 - x0), waveH);
+      const ix0 = Math.max(x0, timeToX(Math.min(data.dragRange.t0, data.dragRange.t1), view, cssW));
+      const ix1 = Math.min(x1, timeToX(Math.max(data.dragRange.t0, data.dragRange.t1), view, cssW));
+      if (ix1 > ix0) {
+        ctx.fillStyle = 'rgba(244,63,94,0.18)';
+        ctx.fillRect(ix0, 0, ix1 - ix0, waveH);
+        ctx.strokeStyle = THEME.playLine;
+        ctx.strokeRect(ix0, 0, ix1 - ix0, waveH);
+      }
     }
 
-    // 待添加选区（已选定未入列，金黄高亮）
+    // 待添加选区（已选定未入列，金黄高亮，x 交集裁剪）
     if (data.pendingSelection && data.grid) {
       const p = data.pendingSelection;
       const sBar = data.grid.bars.find((b) => b.barNumber === p.startBar);
       const eBar = data.grid.bars.find((b) => b.barNumber === p.endBar);
       if (sBar && eBar) {
-        const x0 = timeToX(sBar.startTime, view, cssW);
-        const x1 = timeToX(eBar.endTime, view, cssW);
-        ctx.fillStyle = 'rgba(250,204,21,0.25)';
-        ctx.fillRect(x0, 0, Math.max(1, x1 - x0), waveH);
-        ctx.strokeStyle = '#facc15';
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(x0, 0, Math.max(1, x1 - x0), waveH);
+        const ix0 = Math.max(x0, timeToX(sBar.startTime, view, cssW));
+        const ix1 = Math.min(x1, timeToX(eBar.endTime, view, cssW));
+        if (ix1 > ix0) {
+          ctx.fillStyle = 'rgba(250,204,21,0.25)';
+          ctx.fillRect(ix0, 0, ix1 - ix0, waveH);
+          ctx.strokeStyle = '#facc15';
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(ix0, 0, ix1 - ix0, waveH);
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
+    // 播放起点标记（静态黄色虚线；与播放线区分，x 交集裁剪）
+    if (data.cursorPos != null) {
+      const x = timeToX(data.cursorPos, view, cssW);
+      if (x >= x0 && x <= x1) {
+        ctx.strokeStyle = 'rgba(250,204,21,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, cssH - axisH);
+        ctx.stroke();
         ctx.setLineDash([]);
       }
     }
 
-    // 播放起点标记（静态黄色虚线；与播放线区分）
-    if (data.cursorPos != null && data.cursorPos >= view.start && data.cursorPos <= view.end) {
-      const x = timeToX(data.cursorPos, view, cssW);
-      ctx.strokeStyle = 'rgba(250,204,21,0.9)'; // 黄虚线：播放起点标记，与波形青、播放线玫红区分
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, cssH - axisH);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // 播放线由 drawPlayHead 绘制在叠加层（避免播放时整幅重绘）
-
     // 时间轴
-    drawAxis(ctx, view, cssW, cssH, axisH);
+    drawAxis(ctx, view, cssW, cssH, axisH, x0, x1);
   }
 
   /**
@@ -403,9 +506,7 @@
     return prevX == null || Math.abs(newX - prevX) >= 1;
   }
 
-  function drawAxis(ctx, view, cssW, cssH, axisH) {
-    ctx.fillStyle = THEME.bg;
-    ctx.fillRect(0, cssH - axisH, cssW, axisH);
+  function drawAxis(ctx, view, cssW, cssH, axisH, x0, x1) {
     ctx.strokeStyle = THEME.axis;
     ctx.fillStyle = THEME.axis;
     ctx.font = '10px system-ui, sans-serif';
@@ -427,6 +528,7 @@
     for (let t = start; t <= view.end + 1e-6; t += step) {
       if (t < view.start - 1e-6) continue;
       const x = timeToX(t, view, cssW);
+      if (x < x0 || x > x1) continue; // 条带裁剪
       ctx.moveTo(x, cssH - axisH + 4);
       ctx.lineTo(x, cssH - axisH + 8);
       tickCount++;
@@ -435,6 +537,7 @@
     for (let t = start; t <= view.end + 1e-6 && tickCount > 0; t += step) {
       if (t < view.start - 1e-6) continue;
       const x = timeToX(t, view, cssW);
+      if (x < x0 || x > x1) continue;
       ctx.fillText(fmtTime(t), x, cssH - 5);
     }
   }
@@ -446,5 +549,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, setRenderScale, setTheme, CANVAS_THEMES, THEME };
+  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawRange, drawPlayHead, playHeadMoved, setRenderScale, setTheme, CANVAS_THEMES, THEME };
 });

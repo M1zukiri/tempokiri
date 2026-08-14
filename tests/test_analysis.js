@@ -187,3 +187,35 @@ test('rmsOf: RMS 能量计算', () => {
   // 静音接近 0（float 噪声级），低于预检阈值 1e-4
   assert.ok(A.rmsOf(new Float32Array(4096)) < 1e-4);
 });
+
+test('scoreNear: 双指针与二分 hasNear 全 lag 一致（P3）', () => {
+  // 随机合成有序 onset（带抖动），双指针 scoreNear vs 二分参考全 lag 对比
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const sample = [];
+  let t = 0;
+  while (t < 30) {
+    sample.push(t);
+    t += 0.4 + rnd() * 0.2; // 约 0.4-0.6s 间隔，带抖动
+  }
+  const sorted = Float64Array.from(sample).sort();
+  const hasNear = (tt) => {
+    let lo = 0, hi = sorted.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] < tt - 0.03) lo = mid + 1;
+      else if (sorted[mid] > tt + 0.03) hi = mid - 1;
+      else return true;
+    }
+    return false;
+  };
+  const scoreBinary = (lag) => {
+    let score = 0;
+    for (let k = 0; k < sample.length; k++) if (hasNear(sample[k] + lag)) score++;
+    return score;
+  };
+  // 全 lag 扫描（0.3-1.0s，0.002 步长，覆盖 estimateBpm 的滞后范围）
+  for (let lag = 0.3; lag <= 1.0 + 1e-9; lag += 0.002) {
+    assert.equal(A.scoreNear(sorted, sample, lag), scoreBinary(lag), `lag=${lag.toFixed(3)}`);
+  }
+});
