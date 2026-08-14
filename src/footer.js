@@ -106,6 +106,42 @@
     });
   }
 
+  /**
+   * 语义化版本比较（A.B.C 逐段数字比较，缺段补 0；非法段按 0 处理）。
+   * @param {string} a
+   * @param {string} b
+   * @returns {number} a > b 返回 1，a < b 返回 -1，相等返回 0
+   */
+  function compareVersions(a, b) {
+    const pa = String(a || '').split('.').map((s) => parseInt(s, 10));
+    const pb = String(b || '').split('.').map((s) => parseInt(s, 10));
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const va = Number.isFinite(pa[i]) ? pa[i] : 0;
+      const vb = Number.isFinite(pb[i]) ? pb[i] : 0;
+      if (va !== vb) return va > vb ? 1 : -1;
+    }
+    return 0;
+  }
+
+  /** 彩蛋弹窗：本地版本领先于 GitHub 官方（测试者超前版）。 */
+  function showEasterEgg(local, remote) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'easterEggOverlay';
+    overlay.innerHTML =
+      '<div class="modal easter-egg" role="dialog" aria-modal="true" aria-label="超前版本彩蛋">' +
+      '<h3>🎉 领先一步</h3>' +
+      '<p class="modal-sub">你的本地版本 v' + esc(local) + ' 比 GitHub 官方 v' + esc(remote) + ' 更新。</p>' +
+      '<p class="easter-egg-text">这是测试者专属的超前版本——你正跑在发布计划前面，比官方还快一步。继续保持，这份领先只有你的小分队能拿到。</p>' +
+      '<div class="modal-actions"><span class="spacer"></span>' +
+      '<button class="btn btn-primary" data-close="1">知道了</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+  }
+
   /** 检查 GitHub 最新版本（releases → tags 兜底），与当前版本对比。 */
   async function checkUpdate() {
     const toast = (msg) => {
@@ -142,10 +178,15 @@
         toast('无法获取最新版本（网络或仓库限制）');
       } else if (resolveVersion() === 'dev') {
         toast('GitHub 最新版本 v' + latest + '（当前为开发版）→ ' + LINKS.github);
-      } else if (latest === resolveVersion()) {
-        toast('已是最新版本 v' + resolveVersion() + ' 🎉');
       } else {
-        toast('发现新版本 v' + latest + '（当前 v' + resolveVersion() + '）→ ' + LINKS.github);
+        const cmp = compareVersions(latest, resolveVersion());
+        if (cmp === 0) {
+          toast('已是最新版本 v' + resolveVersion() + ' 🎉');
+        } else if (cmp > 0) {
+          toast('发现新版本 v' + latest + '（当前 v' + resolveVersion() + '）→ ' + LINKS.github);
+        } else {
+          showEasterEgg(resolveVersion(), latest); // 本地领先 GitHub：测试者彩蛋
+        }
       }
     } catch (e) {
       toast('检查更新失败：' + e.message);
@@ -176,5 +217,5 @@
     if (badge) badge.textContent = resolveVersion();
   }
 
-  return { initFooter, openReadme, checkUpdate, renderMarkdown, VERSION, resolveVersion, LINKS };
+  return { initFooter, openReadme, checkUpdate, renderMarkdown, compareVersions, VERSION, resolveVersion, LINKS };
 });

@@ -43,3 +43,16 @@ test('resolveVersion: src 占位符回退 dev', () => {
   // src 模式 VERSION='__VERSION__'（占位符）→ 'dev'；打包后为真实版本
   assert.equal(F.resolveVersion(), 'dev');
 });
+
+test('compareVersions: 语义化逐段比较（检查更新分支）', () => {
+  assert.equal(F.compareVersions('1.4.2', '1.1.2'), 1, '本地超前应判定大于');
+  assert.equal(F.compareVersions('1.1.2', '1.4.2'), -1, '落后应判定小于');
+  assert.equal(F.compareVersions('1.4.2', '1.4.2'), 0, '相等');
+  assert.equal(F.compareVersions('1.10.0', '1.9.0'), 1, '语义化：10 大于 9（字符串比较会错）');
+  assert.equal(F.compareVersions('1.4.2', '1.4.10'), -1, '末段多位数正确比较');
+  assert.equal(F.compareVersions('2.0.0', '1.9.9'), 1, '主版本优先');
+  assert.equal(F.compareVersions('1.4', '1.4.0'), 0, '缺段补 0');
+  assert.equal(F.compareVersions('1.4.2', '1.4'), 1, '缺段补 0 后比较');
+  assert.equal(F.compareVersions('v1.4.2', '1.4.2'), -1, '带 v 前缀按 NaN 段处理（调用处已去前缀）');
+  assert.equal(F.compareVersions('', ''), 0, '空串相等');
+});

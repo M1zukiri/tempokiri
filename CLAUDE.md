@@ -43,6 +43,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.4.3**：修复检查更新逻辑——原 else 分支无条件提示「发现新版本」（GitHub 版本低于本地时误报）；新增 `compareVersions` 语义化三段比较（footer.js 导出，纯函数可单测），分支改为：GitHub > 本地 → 正常提示更新；相等 → 已是最新；GitHub < 本地 → 彩蛋弹窗「领先一步」（测试者超前版场景）
 - **1.4.2**：页脚重排——产品身份（标语 + 版本徽标）上移至顶部 brand 区（Tempokiri 渐变字 + tagline + 版本 pill + 律动条），页脚只留作者署名（♥ M1zukiri + 社交/工具按钮）
 - **1.4.1**：高级设置「界面主题」移至第一栏（FIELD_DEFS 首项）；品牌字改用 Georgia 衬线栈（.brand 的 Tempokiri 与页脚 M1zukiri，中文「工作站」保持无衬线）
 - **1.4.0**：三套配色主题（暗夜青蓝默认 / 幽夜霓紫 / 纸墨贝色，`data-theme` 属性 + CSS 变量，高级设置「界面主题」切换并持久化到 `tempokiri.remix.global.v1.theme`）；render.js 新增 `setTheme`/`CANVAS_THEMES` 同步波形 canvas 色；全局精致化（brand 渐变字、focus-visible 轮廓、数字等宽、按钮圆角）；签名元素「律动品牌标」（顶部 brand 旁 8 柱律动条，播放时 AnalyserNode 时域数据驱动，静止正弦包络）；主题相关硬编码色全部收编为 9 个语义变量（--accent-fg/--wave-bg/--input-bg/--chip-bg/--scroll-thumb…）
