@@ -10,9 +10,10 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  const T = (typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k);
 
   function fmtRange(item) {
-    return '第 ' + item.startBar + '–' + item.endBar + ' 小节';
+    return T('seq.range', { start: item.startBar, end: item.endBar });
   }
 
   function fmtTime(sec) {
@@ -34,7 +35,7 @@
   function renderSequenceList(container, items, handlers, playingId) {
     container.innerHTML = '';
     if (!items.length) {
-      container.innerHTML = '<div class="empty">尚未添加段落 —— 在波形上点击或拖拽选择小节（滚轮平移，Ctrl+滚轮缩放，Shift+拖拽平移）</div>';
+      container.innerHTML = `<div class="empty">${T('seq.empty')}</div>`;
       return;
     }
     items.forEach((it, idx) => {
@@ -44,15 +45,15 @@
       card.innerHTML = `
         <span class="seq-num">${idx + 1}</span>
         <span class="seq-edges">
-          <span class="edge-label">起</span><span class="edge-start"></span>
-          <span class="edge-label">止</span><span class="edge-end"></span>
+          <span class="edge-label">${T('seq.edgeStart')}</span><span class="edge-start"></span>
+          <span class="edge-label">${T('seq.edgeEnd')}</span><span class="edge-end"></span>
         </span>
-        <label class="fade">淡入 <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ms</label>
-        <label class="fade">淡出 <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ms</label>
+        <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+        <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
         <span class="spacer"></span>
-        <button class="btn-mini up" title="上移">↑</button>
-        <button class="btn-mini down" title="下移">↓</button>
-        <button class="btn-mini del" title="删除">✕</button>`;
+        <button class="btn-mini up" title="${T('seq.up')}">↑</button>
+        <button class="btn-mini down" title="${T('seq.down')}">↓</button>
+        <button class="btn-mini del" title="${T('seq.del')}">✕</button>`;
       const edgeGrid = () => handlers.getGrid();
       const compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
         kind: 'position',
@@ -169,7 +170,7 @@
       return;
     }
     const total = seqMod.totalDuration(items);
-    elInfo.textContent = items.length + ' 段 · 总时长 ' + fmtTime(total);
+    elInfo.textContent = T('seq.info', { count: items.length, total: fmtTime(total) });
   }
 
   /**

@@ -6,6 +6,7 @@
  */
 (function () {
   'use strict';
+  const T = MC.i18n.T;
 
   const CROSSFADE_MS = 10;
 
@@ -133,7 +134,7 @@
       const d = document.createElement('div');
       d.className = 'seam';
       d.style.left = (total > 0 ? (s / total) * 100 : 0) + '%';
-      d.title = '拼接点 ' + ui.fmtTime(s);
+      d.title = T('seq.seamTitle', { time: ui.fmtTime(s) });
       seqProgressSeams.appendChild(d);
     }
     seqProgressTime.textContent = ui.fmtTime(0) + ' / ' + ui.fmtTime(total);
@@ -282,15 +283,15 @@
       // 「高级设置」可强制仅采集或仅 WebCodecs（后者失败只报错、不降级）
       const gs = store.loadGlobalSettings();
       if (gs.videoExtract === 'capture') {
-        showHint('正在静音快速播放采集音轨…');
+        showHint(T('hint.extractSilent'));
         try {
           await captureVideoPcm();
           hideHint();
         } catch (e2) {
-          showHint('音轨提取失败：' + e2.message + '。可点击「设置节拍」手动输入 BPM。');
+          showHint(T('hint.extractFailedManual', { msg: e2.message }));
         }
       } else {
-        showHint('正在提取视频音轨…');
+        showHint(T('hint.extracting'));
         try {
           const r = await audio.decodeVideoAudioTrack(file, (p) => {
             captureBar.hidden = false;
@@ -308,26 +309,26 @@
         } catch (e) {
           if (gs.videoExtract === 'webcodecs') {
             captureBar.hidden = true;
-            showHint('音轨提取失败：' + e.message);
+            showHint(T('hint.extractFailedManual', { msg: e.message }));
           } else {
             captureBar.hidden = true;
-            showHint('正在静音快速播放采集音轨（WebCodecs 不可用）…');
+            showHint(T('hint.extractSilentNoWc'));
             try {
               await captureVideoPcm();
               hideHint();
             } catch (e2) {
-              showHint('音轨提取失败：' + e2.message + '。可点击「设置节拍」手动输入 BPM。');
+              showHint(T('hint.extractFailedManual', { msg: e2.message }));
             }
           }
         }
       }
       const cached = applyCachedSettings();
       renderWave();
-      status(cached ? '已应用上次节拍设置：' + file.name : '视频就绪：' + file.name);
+      status(cached ? T('status.appliedCached', { name: file.name }) : T('status.videoReady', { name: file.name }));
     } else {
       videoWrap.hidden = true;
       videoEl.removeAttribute('src');
-      showHint('正在解码音频…');
+      showHint(T('hint.decoding'));
       try {
         const r = await audio.decodeAudioFile(file);
         state.pcm = r.pcm;
@@ -340,10 +341,10 @@
         hideHint();
         const cached = applyCachedSettings();
         renderWave();
-        status(cached ? '已应用上次节拍设置：' + file.name : '就绪：' + file.name);
+        status(cached ? T('status.appliedCached', { name: file.name }) : T('status.ready', { name: file.name }));
       } catch (e) {
-        showHint('解码失败：' + e.message);
-        status('解码失败');
+        showHint(T('status.decodeFailedMsg', { msg: e.message }));
+        status(T('status.decodeFailed'));
       }
     }
     renderAll();
@@ -371,7 +372,7 @@
       renderAll();
       return true;
     }
-    showHint('点击「设置节拍」配置 BPM 与网格，之后即可在波形上选段。');
+    showHint(T('hint.configureGrid'));
     return false;
   }
 
@@ -438,15 +439,15 @@
       overlay.className = 'modal-overlay';
       overlay.innerHTML = `
         <div class="modal" role="dialog" aria-modal="true">
-          <h3>打开新文件</h3>
-          <p class="modal-sub">当前文件的工作区有内容（节拍设置、拼接序列、淡化）。</p>
-          <p class="modal-sub">选择「保留」：新文件打开后，以后重新打开当前文件会恢复这份工作区；</p>
-          <p class="modal-sub">选择「不保留」：清除当前文件的缓存记录，下次打开为空白。</p>
+          <h3>${T('modal.openNewTitle')}</h3>
+          <p class="modal-sub">${T('modal.openNewBody1')}</p>
+          <p class="modal-sub">${T('modal.openNewBody2')}</p>
+          <p class="modal-sub">${T('modal.openNewBody3')}</p>
           <div class="modal-actions">
             <span class="spacer"></span>
-            <button class="btn" data-act="cancel">取消</button>
-            <button class="btn" data-act="discard">不保留，清空</button>
-            <button class="btn btn-primary" data-act="keep">保留并切换</button>
+            <button class="btn" data-act="cancel">${T('modal.cancel')}</button>
+            <button class="btn" data-act="discard">${T('modal.discard')}</button>
+            <button class="btn btn-primary" data-act="keep">${T('modal.keep')}</button>
           </div>
         </div>`;
       document.body.appendChild(overlay);
@@ -471,7 +472,7 @@
       hideHint();
       renderAll();
     } catch (e) {
-      status('节拍设置失败：' + e.message);
+      status(T('status.bpmApplyFailed', { msg: e.message }));
     }
   }
 
@@ -490,7 +491,7 @@
     }
     quickBar.hidden = false;
     const seg = currentSegment();
-    qBpmLabel.textContent = seg ? 'BPM（第 ' + (seg.index + 1) + ' 段）' : 'BPM';
+    qBpmLabel.textContent = seg ? T('quick.bpmSeg', { n: seg.index + 1 }) : T('quick.bpm');
     qBpmVal.textContent = seg && seg.bpm != null ? seg.bpm.toFixed(1) : '--';
     qOffsetVal.textContent = (state.offset != null ? state.offset : 0).toFixed(3);
   }
@@ -515,7 +516,7 @@
    */
   async function autoDetect(segIndex, seg, allSegs) {
     if (state.kind === 'video' && !state.pcm) {
-      status('正在快速播放视频以采集音轨…');
+      status(T('hint.extractRapid'));
       await captureVideoPcm();
     }
     if (!state.pcm) throw new Error('没有可分析的音频数据');
@@ -578,7 +579,7 @@
           state.view = { start: 0, end: state.duration };
           captureBar.hidden = true;
           renderWave();
-          status('音轨采集完成');
+          status(T('status.trackDone'));
           resolve(r);
         })
         .catch((e) => {
@@ -589,14 +590,14 @@
   }
   function onSelectRange(t0, t1) {
     if (!state.grid) {
-      status('请先设置节拍网格');
+      status(T('status.needGrid'));
       return;
     }
     const r = seq.snapRange(state.grid, t0, t1);
     state.pendingSelection = r;
     btnAddSelection.disabled = false;
     renderWave();
-    status('已选定：第 ' + r.startBar + '–' + r.endBar + ' 小节。点击「添加选中区间」加入列表。');
+    status(T('status.selectedRange', { start: r.startBar, end: r.endBar }));
   }
 
   function addPendingSelection() {
@@ -609,7 +610,7 @@
       state.pendingSelection = null;
       btnAddSelection.disabled = true;
       renderAll();
-      status('已添加：第 ' + r.startBar + '–' + r.endBar + ' 小节（' + ui.fmtTime(item.startTime) + ' – ' + ui.fmtTime(item.endTime) + '）');
+      status(T('status.addedRange', { start: r.startBar, end: r.endBar, from: ui.fmtTime(item.startTime), to: ui.fmtTime(item.endTime) }));
     }
   }
 
@@ -699,8 +700,8 @@
     }
     playing = false;
     mixPlaying = false;
-    btnPlay.textContent = '▶ 播放';
-    btnPlaySeq.textContent = '▶ 播放拼接序列';
+    btnPlay.textContent = T('wave.play');
+    btnPlaySeq.textContent = T('wave.playSeq');
     if (playTimer) {
       clearTimeout(playTimer);
       playTimer = null;
@@ -742,7 +743,7 @@
   /** 时间点描述：秒 + （有网格时）对应的小节/格。 */
   function posDesc(t) {
     const bc = state.grid ? seq.timeToBarCell(state.grid, t) : null;
-    return ui.fmtTime(t) + (bc ? '（第 ' + bc.bar + ' 小节 ' + bc.cell + ' 格）' : '');
+    return ui.fmtTime(t) + (bc ? T('status.posDesc', { bar: bc.bar, cell: bc.cell }) : '');
   }
 
   /** 单击波形 → 重置播放位置与标记点到单击处（播放中则暂停），并把顶部 BPM 切换到该段。 */
@@ -756,7 +757,7 @@
     state.playPos = t;
     updateQuickBar();
     renderWave();
-    status('播放位置与标记点：' + posDesc(t) + '（点「播放」从此处开始）');
+    status(T('status.cursorSet', { pos: posDesc(t) }));
   }
 
   /** 统一播放按钮：播放中点击 = 暂停（保留断点）；未播放 = 从当前播放位置（断点或标记点）开始。 */
@@ -764,27 +765,27 @@
     if (!state.file) return;
     if (playing) {
       pausePlay();
-      status('已暂停（播放位置保留，点击「播放」从断点继续）');
+      status(T('status.paused'));
       return;
     }
     pausePlay(); // 清理残留但不重置播放位置
     const t = state.playPos != null ? state.playPos : state.cursorPos != null ? state.cursorPos : 0;
     playing = true;
-    btnPlay.textContent = '⏸ 暂停';
+    btnPlay.textContent = T('wave.pause');
     if (state.kind === 'video' && videoEl.src) {
       playVideoSegment(t, state.duration, () => {
         stopPlay();
-        status('播放结束');
+        status(T('status.playEnd'));
       });
     } else if (state.audioBuffer) {
       playAudioSegment(t, state.duration, () => {
         stopPlay();
-        status('播放结束');
+        status(T('status.playEnd'));
       });
     } else {
       return;
     }
-    status('从 ' + posDesc(t) + ' 开始播放');
+    status(T('status.playFrom', { pos: posDesc(t) }));
   }
 
   function playAudioSegment(start, end, onEnd) {
@@ -924,26 +925,26 @@
    */
   function playSequence() {
     if (!state.sequence.length) {
-      status('序列为空，请先在波形上选段');
+      status(T('status.seqEmpty'));
       return;
     }
     if (anyInvalid()) {
-      status('存在无效的序列项（标红），请修正后再播放');
+      status(T('status.seqInvalid'));
       return;
     }
     if (mixPlaying) {
       pausePlay();
-      status('序列已暂停（播放位置保留，点击「播放拼接序列」从断点继续）');
+      status(T('status.pausedSeq'));
       return;
     }
     pausePlay(); // 清理残留但不重置拼接断点（暂停后继续从断点；首次 mixPos=0 从头）
     if (!state.rawMono) {
-      status('缺少音轨数据（视频需先采集音轨）');
+      status(T('status.noTrack'));
       return;
     }
     const buf = getMixBuffer();
     if (!buf) {
-      status('无可播放内容');
+      status(T('status.nothingToPlay'));
       return;
     }
     const src = playCtx.createBufferSource();
@@ -957,22 +958,22 @@
     playStartPos = startOffset;
     playing = true;
     mixPlaying = true;
-    btnPlaySeq.textContent = '⏸ 暂停序列';
+    btnPlaySeq.textContent = T('wave.pauseSeq');
     src.onended = () => {
       if (mixPlaying) {
         stopPlay();
-        btnPlaySeq.textContent = '▶ 播放拼接序列';
-        status('试听结束');
+        btnPlaySeq.textContent = T('wave.playSeq');
+        status(T('status.previewEnd'));
       }
     };
     tickProgress();
-    status('正在播放拼接序列（已消除段间间隔）');
+    status(T('status.playingSeq'));
   }
 
   // ---------- 导出 ----------
   function openExportDialog() {
     if (!state.sequence.length) {
-      status('序列为空，没有可导出的内容');
+      status(T('status.nothingToExport'));
       return;
     }
     const base = (state.file.name || 'remix').replace(/\.[^.]+$/, '');
@@ -988,10 +989,10 @@
 
   function doExport(opts) {
     if (!state.rawMono) {
-      status('缺少音轨数据（视频需先采集音轨）');
+      status(T('status.noTrack'));
       return;
     }
-    status('正在渲染拼接…');
+    status(T('status.rendering'));
     setTimeout(async () => {
       try {
         const parts = seq.itemsToParts(state.sequence, state.sampleRate);
@@ -1008,11 +1009,11 @@
           if (opts.format === 'wav') {
             const buf = exp.encodeWav(mix, sr, opts.bitDepth);
             exp.downloadBlob(buf, name + '.wav', 'audio/wav');
-            status('导出完成：' + name + '.wav');
+            status(T('status.exportedWav', { name: name }));
           } else {
             const buf = exp.encodeMp3(mix, sr, opts.mp3Bitrate);
             exp.downloadBlob(buf, name + '.mp3', 'audio/mpeg');
-            status('导出完成：' + name + '.mp3');
+            status(T('status.exportedMp3', { name: name }));
           }
         } else if (opts.tab === 'video') {
           await MC.exportVideo({
@@ -1027,9 +1028,9 @@
             maxHeight: opts.maxHeight,
             audioBitrate: opts.audioBitrate,
             mute: false,
-            onProgress: (p) => status('视频合成中…' + Math.round(p * 100) + '%'),
+            onProgress: (p) => status(T('status.videoRendering', { pct: Math.round(p * 100) })),
           });
-          status('视频导出完成：' + opts.fileName + '.mp4');
+          status(T('status.videoExported', { name: opts.fileName }));
         } else {
           // Majdata：bg.mp4（无声，上限 1080P60）+ track.mp3（44100Hz）
           if (state.kind === 'video') {
@@ -1045,17 +1046,17 @@
               maxHeight: 1080,
               audioBitrate: 128000,
               mute: true,
-              onProgress: (p) => status('bg.mp4 合成中…' + Math.round(p * 100) + '%'),
+              onProgress: (p) => status(T('status.majRendering', { pct: Math.round(p * 100) })),
             });
           }
           let tMix = analysis.resample(mix, state.sampleRate, 44100);
           if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
           const buf = exp.encodeMp3(tMix, 44100, opts.mp3Bitrate);
           exp.downloadBlob(buf, 'track.mp3', 'audio/mpeg');
-          status(state.kind === 'video' ? 'Majdata 导出完成：bg.mp4 + track.mp3' : 'track.mp3 导出完成');
+          status(state.kind === 'video' ? T('status.majDoneVideo') : T('status.majDoneAudio'));
         }
       } catch (e) {
-        status('导出失败：' + e.message);
+        status(T('status.exportFailed', { msg: e.message }));
       }
     }, 30);
   }
@@ -1094,7 +1095,7 @@
     btnSettings.addEventListener('click', openSettings);
     btnPlay.addEventListener('click', playOriginal);
     btnPlaySeq.addEventListener('click', () => {
-      if (playing && btnPlaySeq.textContent.includes('暂停')) pausePlay(); // 暂停：保留拼接断点
+      if (playing && btnPlaySeq.textContent.includes('⏸')) pausePlay(); // 暂停：保留拼接断点
       else playSequence();
     });
     btnStop.addEventListener('click', stopPlay);
@@ -1150,7 +1151,7 @@
       const s = maStartComp.getValue();
       const e = maEndComp.getValue();
       if (s == null || e == null || s >= e) {
-        status('手动添加失败：起止需合法（小节/格或时间），且起点必须早于终点');
+        status(T('status.manualAddFailed'));
         return;
       }
       const item = {
@@ -1167,7 +1168,7 @@
       manualForm.hidden = true;
       saveWorkspace();
       renderAll();
-      status('已手动添加：' + ui.fmtTime(s) + ' – ' + ui.fmtTime(e));
+      status(T('status.manualAdded', { from: ui.fmtTime(s), to: ui.fmtTime(e) }));
     }
 
     // 波形交互
@@ -1265,7 +1266,7 @@
         e.preventDefault();
         if (mixPlaying || playing) {
           pausePlay();
-          status('已暂停（播放位置保留，点击「播放」从断点继续）');
+          status(T('status.paused'));
         } else {
           playOriginal();
         }
@@ -1290,7 +1291,9 @@
     document.addEventListener('tempokiri:settings-changed', refreshAdvancedSettings);
 
     drawBrandPulse(PULSE_IDLE); // 品牌律动条初始静态波形
-    status('拖入音频或视频文件开始');
+    document.title = T('app.title');
+    MC.i18n.applyStatic(); // 静态文字按 strings.json 填充（data-i18n）
+    status(T('status.dragToStart'));
   }
 
   document.addEventListener('DOMContentLoaded', init);

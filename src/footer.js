@@ -16,6 +16,7 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  const T = (typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k);
 
   const README_SOURCE = '__README_CONTENT__';
   const VERSION = '__VERSION__';
@@ -90,13 +91,13 @@
   function openReadme() {
     // 占位符以 '_' 开头（'__README_CONTENT__'）；注入后是真实 README 文本
     const hasReadme = README_SOURCE.length > 0 && README_SOURCE[0] !== '_';
-    const body = hasReadme ? renderMarkdown(README_SOURCE) : '<p>README 未内嵌（请用 build.py 打包后使用）。</p>';
+    const body = hasReadme ? renderMarkdown(README_SOURCE) : '<p>' + T('footer.readmeMissing') + '</p>';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'readmeOverlay';
     overlay.innerHTML =
-      '<div class="modal modal-wide readme-modal" role="dialog" aria-modal="true" aria-label="README">' +
-      '<div class="readme-modal-head"><h3>README</h3><span class="readme-version">v' + esc(resolveVersion()) + '</span>' +
+      '<div class="modal modal-wide readme-modal" role="dialog" aria-modal="true" aria-label="' + T('footer.readme') + '">' +
+      '<div class="readme-modal-head"><h3>' + T('footer.readme') + '</h3><span class="readme-version">v' + esc(resolveVersion()) + '</span>' +
       '<span class="spacer"></span><button class="btn btn-mini" data-close="1">✕</button></div>' +
       '<div class="readme-modal-body">' + body + '</div>' +
       '</div>';
@@ -129,12 +130,12 @@
     overlay.className = 'modal-overlay';
     overlay.id = 'easterEggOverlay';
     overlay.innerHTML =
-      '<div class="modal easter-egg" role="dialog" aria-modal="true" aria-label="超前版本彩蛋">' +
-      '<h3>🎉 领先一步</h3>' +
-      '<p class="modal-sub">你的本地版本 v' + esc(local) + ' 比 GitHub 官方 v' + esc(remote) + ' 更新。</p>' +
-      '<p class="easter-egg-text">这是测试者专属的超前版本——你正跑在发布计划前面，比官方还快一步。继续保持，这份领先只有你的小分队能拿到。</p>' +
+      '<div class="modal easter-egg" role="dialog" aria-modal="true" aria-label="' + T('footer.eggAria') + '">' +
+      '<h3>' + T('footer.eggTitle') + '</h3>' +
+      '<p class="modal-sub">' + esc(T('footer.eggSub', { local: local, remote: remote })) + '</p>' +
+      '<p class="easter-egg-text">' + T('footer.eggBody') + '</p>' +
       '<div class="modal-actions"><span class="spacer"></span>' +
-      '<button class="btn btn-primary" data-close="1">知道了</button></div>' +
+      '<button class="btn btn-primary" data-close="1">' + T('footer.eggOk') + '</button></div>' +
       '</div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => {
@@ -156,7 +157,7 @@
     const btn = document.getElementById('btnCheckUpdate');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = '检查中…';
+      btn.textContent = T('footer.checking');
     }
     try {
       let latest = null;
@@ -175,25 +176,25 @@
         }
       }
       if (!latest) {
-        toast('无法获取最新版本（网络或仓库限制）');
+        toast(T('footer.toastUnavailable'));
       } else if (resolveVersion() === 'dev') {
-        toast('GitHub 最新版本 v' + latest + '（当前为开发版）→ ' + LINKS.github);
+        toast(T('footer.toastDev', { latest: latest, link: LINKS.github }));
       } else {
         const cmp = compareVersions(latest, resolveVersion());
         if (cmp === 0) {
-          toast('已是最新版本 v' + resolveVersion() + ' 🎉');
+          toast(T('footer.toastLatest', { version: resolveVersion() }));
         } else if (cmp > 0) {
-          toast('发现新版本 v' + latest + '（当前 v' + resolveVersion() + '）→ ' + LINKS.github);
+          toast(T('footer.toastNew', { latest: latest, local: resolveVersion(), link: LINKS.github }));
         } else {
           showEasterEgg(resolveVersion(), latest); // 本地领先 GitHub：测试者彩蛋
         }
       }
     } catch (e) {
-      toast('检查更新失败：' + e.message);
+      toast(T('footer.toastError', { msg: e.message }));
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = '检查更新';
+        btn.textContent = T('footer.checkUpdate');
       }
     }
   }

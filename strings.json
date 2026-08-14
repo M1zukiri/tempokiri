@@ -1,0 +1,272 @@
+{
+  "_doc": "Tempokiri 界面文案唯一编辑源（v1.5.0 起）。修改本文件中的任意文本，重新运行 build.py 打包后，页面显示即更新；无需改动任何代码。分层 key 命名约定：app=全局，toolbar/wave/quick/seq/footer=index.html 静态元素，status/hint=main.js 状态与提示，modal=弹窗，settings=高级设置，export=导出弹窗，ui=序列卡片。动态文案支持 {name} 插值占位。README.md（长文档）与 VERSION（版本号）保持独立文件。",
+  "app": {
+    "title": "Tempokiri — 节奏感知的剪辑工具",
+    "brandName": "Tempokiri",
+    "brandTag": "节奏感知的音频/视频剪辑工作站"
+  },
+  "toolbar": {
+    "openFile": "打开文件",
+    "setBpm": "设置节拍",
+    "export": "导出"
+  },
+  "wave": {
+    "hint": "拖入音频或视频文件，或点击此处选择文件开始剪辑",
+    "play": "▶ 播放",
+    "stop": "⏹ 停止",
+    "pause": "⏸ 暂停",
+    "pauseSeq": "⏸ 暂停序列",
+    "playSeq": "▶ 播放拼接序列",
+    "addSelection": "＋ 添加选中区间",
+    "hintInline": "单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放"
+  },
+  "quick": {
+    "bpm": "BPM",
+    "bpmSeg": "BPM（第 {n} 段）",
+    "offset": "偏移"
+  },
+  "seq": {
+    "title": "拼接序列",
+    "manualAdd": "手动添加",
+    "empty": "尚未添加段落 —— 在波形上点击或拖拽选择小节（滚轮平移，Ctrl+滚轮缩放，Shift+拖拽平移）",
+    "edgeStart": "起",
+    "edgeEnd": "止",
+    "add": "添加",
+    "cancel": "取消",
+    "fadeIn": "淡入",
+    "fadeOut": "淡出",
+    "ms": "ms",
+    "up": "上移",
+    "down": "下移",
+    "del": "删除",
+    "range": "第 {start}–{end} 小节",
+    "info": "{count} 段 · 总时长 {total}",
+    "seamTitle": "拼接点 {time}"
+  },
+  "footer": {
+    "signature": "M1zukiri",
+    "readme": "README",
+    "readmeTitle": "打开 README 文档",
+    "advanced": "高级设置",
+    "advancedTitle": "高级设置（性能/音效/解码）",
+    "checkUpdate": "检查更新",
+    "checkUpdateTitle": "检查 GitHub 上是否有新版本",
+    "checking": "检查中…",
+    "toastDev": "GitHub 最新版本 v{latest}（当前为开发版）→ {link}",
+    "toastLatest": "已是最新版本 v{version} 🎉",
+    "toastNew": "发现新版本 v{latest}（当前 v{local}）→ {link}",
+    "toastUnavailable": "无法获取最新版本（网络或仓库限制）",
+    "toastError": "检查更新失败：{msg}",
+    "eggTitle": "🎉 领先一步",
+    "eggSub": "你的本地版本 v{local} 比 GitHub 官方 v{remote} 更新。",
+    "eggBody": "这是测试者专属的超前版本——你正跑在发布计划前面，比官方还快一步。继续保持，这份领先只有你的小分队能拿到。",
+    "readmeMissing": "README 未内嵌（请用 build.py 打包后使用）。",
+    "eggAria": "超前版本彩蛋",
+    "eggOk": "知道了"
+  },
+  "status": {
+    "appliedCached": "已应用上次节拍设置：{name}",
+    "videoReady": "视频就绪：{name}",
+    "ready": "就绪：{name}",
+    "decodeFailed": "解码失败",
+    "decodeFailedMsg": "解码失败：{msg}",
+    "bpmApplyFailed": "节拍设置失败：{msg}",
+    "trackDone": "音轨采集完成",
+    "needGrid": "请先设置节拍网格",
+    "selectedRange": "已选定：第 {start}–{end} 小节。点击「添加选中区间」加入列表。",
+    "addedRange": "已添加：第 {start}–{end} 小节（{from} – {to}）",
+    "cursorSet": "播放位置与标记点：{pos}（点「播放」从此处开始）",
+    "paused": "已暂停（播放位置保留，点击「播放」从断点继续）",
+    "pausedSeq": "序列已暂停（播放位置保留，点击「播放拼接序列」从断点继续）",
+    "playEnd": "播放结束",
+    "playFrom": "从 {pos} 开始播放",
+    "seqEmpty": "序列为空，请先在波形上选段",
+    "seqInvalid": "存在无效的序列项（标红），请修正后再播放",
+    "noTrack": "缺少音轨数据（视频需先采集音轨）",
+    "nothingToPlay": "无可播放内容",
+    "previewEnd": "试听结束",
+    "playingSeq": "正在播放拼接序列（已消除段间间隔）",
+    "nothingToExport": "序列为空，没有可导出的内容",
+    "rendering": "正在渲染拼接…",
+    "exportedWav": "导出完成：{name}.wav",
+    "exportedMp3": "导出完成：{name}.mp3",
+    "videoRendering": "视频合成中…{pct}%",
+    "videoExported": "视频导出完成：{name}.mp4",
+    "exportFailed": "导出失败：{msg}",
+    "manualAddFailed": "手动添加失败：起止需合法（小节/格或时间），且起点必须早于终点",
+    "manualAdded": "已手动添加：{from} – {to}",
+    "dragToStart": "拖入音频或视频文件开始",
+    "posDesc": "（第 {bar} 小节 {cell} 格）",
+    "majRendering": "bg.mp4 合成中…{pct}%",
+    "majDoneVideo": "Majdata 导出完成：bg.mp4 + track.mp3",
+    "majDoneAudio": "track.mp3 导出完成"
+  },
+  "hint": {
+    "extractSilent": "正在静音快速播放采集音轨…",
+    "extractFailedManual": "音轨提取失败：{msg}。可点击「设置节拍」手动输入 BPM。",
+    "extracting": "正在提取视频音轨…",
+    "extractSilentNoWc": "正在静音快速播放采集音轨（WebCodecs 不可用）…",
+    "extractRapid": "正在快速播放视频以采集音轨…",
+    "configureGrid": "点击「设置节拍」配置 BPM 与网格，之后即可在波形上选段。",
+    "decoding": "正在解码音频…"
+  },
+  "modal": {
+    "openNewTitle": "打开新文件",
+    "openNewBody1": "当前文件的工作区有内容（节拍设置、拼接序列、淡化）。",
+    "openNewBody2": "选择「保留」：新文件打开后，以后重新打开当前文件会恢复这份工作区；",
+    "openNewBody3": "选择「不保留」：清除当前文件的缓存记录，下次打开为空白。",
+    "cancel": "取消",
+    "discard": "不保留，清空",
+    "keep": "保留并切换"
+  },
+  "settings": {
+    "aria": "高级设置",
+    "title": "高级设置",
+    "sub": "参数改动即时生效并保存。鼠标聚焦任意输入框可查看作用与合法范围。",
+    "reset": "恢复默认",
+    "close": "关闭",
+    "custom": "自定义",
+    "helpInvalid": "超出合法范围",
+    "helpEffect": "作用",
+    "helpRange": "范围",
+    "helpRecommend": "推荐",
+    "theme": {
+      "label": "界面主题",
+      "desc": "全局配色方案，切换即时生效",
+      "presets": {
+        "aurora": "暗夜青蓝",
+        "nebula": "幽夜霓紫",
+        "paper": "纸墨贝色"
+      },
+      "helpEffect": "切换整站配色（含波形）并即时保存",
+      "helpRange": "三选一",
+      "helpRecommend": "暗夜青蓝"
+    },
+    "hop": {
+      "label": "检测精度",
+      "desc": "帧移（相邻分析窗步进），越小节拍定位越精细、分析越慢",
+      "presets": {
+        "1024": "快速",
+        "512": "标准",
+        "256": "高精度"
+      },
+      "unit": "毫秒",
+      "helpEffect": "帧移（相邻分析窗步进）越小节拍定位越精细但分析越慢",
+      "helpRange": "3–93 毫秒（对应 FFT 帧移 64–2048 采样点）",
+      "helpRecommend": "23 毫秒（标准）"
+    },
+    "sensitivity": {
+      "label": "识别灵敏度",
+      "desc": "数值越大越宽松，检出更多节拍候选",
+      "helpEffect": "数值越大越宽松，检出更多节拍候选",
+      "helpRange": "0–1",
+      "helpRecommend": "0.9"
+    },
+    "minBpm": {
+      "label": "BPM 范围（最小）",
+      "unit": "BPM",
+      "desc": "自动识别 BPM 搜索区间的下限",
+      "helpEffect": "自动识别 BPM 搜索区间，区间外真拍被忽略",
+      "helpRange": "1–600（且最小 ≤ 最大）",
+      "helpRecommend": "60"
+    },
+    "maxBpm": {
+      "label": "BPM 范围（最大）",
+      "unit": "BPM",
+      "desc": "自动识别 BPM 搜索区间的上限",
+      "helpEffect": "自动识别 BPM 搜索区间，区间外真拍被忽略",
+      "helpRange": "1–600（且最大 ≥ 最小）",
+      "helpRecommend": "200"
+    },
+    "videoExtract": {
+      "label": "音轨提取方式",
+      "desc": "视频音轨的提取方案",
+      "presets": {
+        "auto": "自动（优先 WebCodecs，失败降级）",
+        "webcodecs": "仅 WebCodecs（失败即报错）",
+        "capture": "仅实时采集"
+      },
+      "helpEffect": "视频音轨提取方案；WebCodecs 快而准，实时采集兼容性更好",
+      "helpRange": "三选一",
+      "helpRecommend": "自动"
+    },
+    "captureRate": {
+      "label": "采集倍速",
+      "desc": "实时采集时静音快放的倍速",
+      "unit": "倍",
+      "presets": {
+        "2": "2x",
+        "4": "4x",
+        "8": "8x"
+      },
+      "helpEffect": "实时采集静音快放倍速，越高提取越快，极速可能丢帧",
+      "helpRange": "1–16",
+      "helpRecommend": "4"
+    },
+    "followMs": {
+      "label": "视频跟随间隔",
+      "desc": "拼接播放时视频画面跟随音频的最小间隔",
+      "presets": {
+        "90": "流畅",
+        "160": "均衡",
+        "250": "省电"
+      },
+      "unit": "毫秒",
+      "helpEffect": "拼接播放时视频跟随音频 seek 的最小间隔，越小越跟手、越大越省电",
+      "helpRange": "1–5000 毫秒",
+      "helpRecommend": "90（流畅）"
+    },
+    "renderScale": {
+      "label": "渲染质量",
+      "desc": "波形渲染的设备像素比缩放系数",
+      "presets": {
+        "1": "高（原分辨率）",
+        "0.75": "中",
+        "0.5": "低"
+      },
+      "helpEffect": "波形渲染 DPR 缩放系数，越小越流畅（略糊）、越大越清晰（更耗性能）",
+      "helpRange": "0.1–4",
+      "helpRecommend": "1.0（高）"
+    }
+  },
+  "export": {
+    "aria": "导出",
+    "title": "导出",
+    "tabVideo": "视频导出",
+    "tabAudio": "音频导出",
+    "tabMajdata": "Majdata 导出",
+    "format": "格式",
+    "wav": "WAV（无损）",
+    "mp3": "MP3",
+    "bitDepth": "位深",
+    "depth16": "16-bit",
+    "depth24": "24-bit",
+    "depth32": "32-bit float",
+    "mp3Bitrate": "MP3 码率",
+    "custom": "自定义",
+    "kbps": "kbps",
+    "sampleRate": "采样率",
+    "followSource": "跟随源",
+    "normalize": "响度归一化（峰值）",
+    "peak": "目标峰值",
+    "crossfade": "交叉淡化",
+    "fileName": "文件名",
+    "videoBitrate": "视频码率",
+    "mbps": "Mbps",
+    "framerate": "帧率",
+    "fps": "fps",
+    "resolution": "分辨率",
+    "orig": "原始",
+    "res1080": "1080P",
+    "res720": "720P",
+    "res480": "480P",
+    "aacBitrate": "AAC 码率",
+    "majVideoBitrate": "bg.mp4 码率",
+    "majMp3Bitrate": "track.mp3 码率",
+    "majNoteVideo": "bg.mp4：无声，上限 1080P 60fps；track.mp3：44100Hz。输出文件固定名为 bg.mp4 与 track.mp3。",
+    "majNoteAudio": "当前为纯音频，仅导出 track.mp3（bg.mp4 请自备）。track.mp3：44100Hz。",
+    "statusEmptyName": "请填写文件名",
+    "cancel": "取消",
+    "ok": "导出"
+  }
+}

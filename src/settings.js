@@ -25,6 +25,7 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  const T = (typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k);
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -56,103 +57,103 @@
   const FIELD_DEFS = [
     {
       key: 'theme',
-      label: '界面主题',
-      desc: '全局配色方案，切换即时生效',
+      label: T('settings.theme.label'),
+      desc: T('settings.theme.desc'),
       control: 'select',
       presets: [
-        { label: '暗夜青蓝', value: 'aurora' },
-        { label: '幽夜霓紫', value: 'nebula' },
-        { label: '纸墨贝色', value: 'paper' },
+        { label: T('settings.theme.presets.aurora'), value: 'aurora' },
+        { label: T('settings.theme.presets.nebula'), value: 'nebula' },
+        { label: T('settings.theme.presets.paper'), value: 'paper' },
       ],
-      help: { effect: '切换整站配色（含波形）并即时保存', range: '三选一', recommend: '暗夜青蓝' },
+      help: { effect: T('settings.theme.helpEffect'), range: T('settings.theme.helpRange'), recommend: T('settings.theme.helpRecommend') },
     },
     {
       key: 'hop',
-      label: '检测精度',
-      desc: '帧移（相邻分析窗步进），越小节拍定位越精细、分析越慢',
+      label: T('settings.hop.label'),
+      desc: T('settings.hop.desc'),
       control: 'select+number',
       presets: [
-        { label: '快速', value: 1024 },
-        { label: '标准', value: 512 },
-        { label: '高精度', value: 256 },
+        { label: T('settings.hop.presets.1024'), value: 1024 },
+        { label: T('settings.hop.presets.512'), value: 512 },
+        { label: T('settings.hop.presets.256'), value: 256 },
       ],
-      number: { min: 3, max: 93, step: 0.1, unit: '毫秒', toStore: msToHop, fromStore: hopToMs },
-      help: { effect: '帧移（相邻分析窗步进）越小节拍定位越精细但分析越慢', range: '3–93 毫秒（对应 FFT 帧移 64–2048 采样点）', recommend: '23 毫秒（标准）' },
+      number: { min: 3, max: 93, step: 0.1, unit: T('settings.hop.unit'), toStore: msToHop, fromStore: hopToMs },
+      help: { effect: T('settings.hop.helpEffect'), range: T('settings.hop.helpRange'), recommend: T('settings.hop.helpRecommend') },
     },
     {
       key: 'sensitivity',
-      label: '识别灵敏度',
-      desc: '数值越大越宽松，检出更多节拍候选',
+      label: T('settings.sensitivity.label'),
+      desc: T('settings.sensitivity.desc'),
       control: 'slider+number',
       number: { min: 0, max: 1, step: 0.01, unit: '' },
-      help: { effect: '数值越大越宽松，检出更多节拍候选', range: '0–1', recommend: '0.9' },
+      help: { effect: T('settings.sensitivity.helpEffect'), range: T('settings.sensitivity.helpRange'), recommend: T('settings.sensitivity.helpRecommend') },
     },
     {
       key: 'minBpm',
-      label: 'BPM 范围（最小）',
-      desc: '自动识别 BPM 搜索区间的下限',
+      label: T('settings.minBpm.label'),
+      desc: T('settings.minBpm.desc'),
       control: 'number',
-      number: { min: 1, max: 600, step: 1, unit: 'BPM' },
-      help: { effect: '自动识别 BPM 搜索区间，区间外真拍被忽略', range: '1–600（且最小 ≤ 最大）', recommend: '60' },
+      number: { min: 1, max: 600, step: 1, unit: T('settings.minBpm.unit') },
+      help: { effect: T('settings.minBpm.helpEffect'), range: T('settings.minBpm.helpRange'), recommend: T('settings.minBpm.helpRecommend') },
     },
     {
       key: 'maxBpm',
-      label: 'BPM 范围（最大）',
-      desc: '自动识别 BPM 搜索区间的上限',
+      label: T('settings.maxBpm.label'),
+      desc: T('settings.maxBpm.desc'),
       control: 'number',
-      number: { min: 1, max: 600, step: 1, unit: 'BPM' },
-      help: { effect: '自动识别 BPM 搜索区间，区间外真拍被忽略', range: '1–600（且最大 ≥ 最小）', recommend: '200' },
+      number: { min: 1, max: 600, step: 1, unit: T('settings.maxBpm.unit') },
+      help: { effect: T('settings.maxBpm.helpEffect'), range: T('settings.maxBpm.helpRange'), recommend: T('settings.maxBpm.helpRecommend') },
     },
     {
       key: 'videoExtract',
-      label: '音轨提取方式',
-      desc: '视频音轨的提取方案',
+      label: T('settings.videoExtract.label'),
+      desc: T('settings.videoExtract.desc'),
       control: 'select',
       presets: [
-        { label: '自动（优先 WebCodecs，失败降级）', value: 'auto' },
-        { label: '仅 WebCodecs（失败即报错）', value: 'webcodecs' },
-        { label: '仅实时采集', value: 'capture' },
+        { label: T('settings.videoExtract.presets.auto'), value: 'auto' },
+        { label: T('settings.videoExtract.presets.webcodecs'), value: 'webcodecs' },
+        { label: T('settings.videoExtract.presets.capture'), value: 'capture' },
       ],
-      help: { effect: '视频音轨提取方案；WebCodecs 快而准，实时采集兼容性更好', range: '三选一', recommend: '自动' },
+      help: { effect: T('settings.videoExtract.helpEffect'), range: T('settings.videoExtract.helpRange'), recommend: T('settings.videoExtract.helpRecommend') },
     },
     {
       key: 'captureRate',
-      label: '采集倍速',
-      desc: '实时采集时静音快放的倍速',
+      label: T('settings.captureRate.label'),
+      desc: T('settings.captureRate.desc'),
       control: 'select+number',
       presets: [
-        { label: '2x', value: 2 },
-        { label: '4x', value: 4 },
-        { label: '8x', value: 8 },
+        { label: T('settings.captureRate.presets.2'), value: 2 },
+        { label: T('settings.captureRate.presets.4'), value: 4 },
+        { label: T('settings.captureRate.presets.8'), value: 8 },
       ],
-      number: { min: 1, max: 16, step: 1, unit: '倍' },
-      help: { effect: '实时采集静音快放倍速，越高提取越快，极速可能丢帧', range: '1–16', recommend: '4' },
+      number: { min: 1, max: 16, step: 1, unit: T('settings.captureRate.unit') },
+      help: { effect: T('settings.captureRate.helpEffect'), range: T('settings.captureRate.helpRange'), recommend: T('settings.captureRate.helpRecommend') },
     },
     {
       key: 'followMs',
-      label: '视频跟随间隔',
-      desc: '拼接播放时视频画面跟随音频的最小间隔',
+      label: T('settings.followMs.label'),
+      desc: T('settings.followMs.desc'),
       control: 'select+number',
       presets: [
-        { label: '流畅', value: 90 },
-        { label: '均衡', value: 160 },
-        { label: '省电', value: 250 },
+        { label: T('settings.followMs.presets.90'), value: 90 },
+        { label: T('settings.followMs.presets.160'), value: 160 },
+        { label: T('settings.followMs.presets.250'), value: 250 },
       ],
-      number: { min: 1, max: 5000, step: 10, unit: '毫秒' },
-      help: { effect: '拼接播放时视频跟随音频 seek 的最小间隔，越小越跟手、越大越省电', range: '1–5000 毫秒', recommend: '90（流畅）' },
+      number: { min: 1, max: 5000, step: 10, unit: T('settings.followMs.unit') },
+      help: { effect: T('settings.followMs.helpEffect'), range: T('settings.followMs.helpRange'), recommend: T('settings.followMs.helpRecommend') },
     },
     {
       key: 'renderScale',
-      label: '渲染质量',
-      desc: '波形渲染的设备像素比缩放系数',
+      label: T('settings.renderScale.label'),
+      desc: T('settings.renderScale.desc'),
       control: 'select+number',
       presets: [
-        { label: '高（原分辨率）', value: 1.0 },
-        { label: '中', value: 0.75 },
-        { label: '低', value: 0.5 },
+        { label: T('settings.renderScale.presets.1'), value: 1.0 },
+        { label: T('settings.renderScale.presets.0.75'), value: 0.75 },
+        { label: T('settings.renderScale.presets.0.5'), value: 0.5 },
       ],
       number: { min: 0.1, max: 4, step: 0.05, unit: '' },
-      help: { effect: '波形渲染 DPR 缩放系数，越小越流畅（略糊）、越大越清晰（更耗性能）', range: '0.1–4', recommend: '1.0（高）' },
+      help: { effect: T('settings.renderScale.helpEffect'), range: T('settings.renderScale.helpRange'), recommend: T('settings.renderScale.helpRecommend') },
     },
   ];
 
@@ -214,9 +215,9 @@
     overlay.className = 'modal-overlay';
     overlay.hidden = true;
     overlay.innerHTML =
-      '<div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="高级设置">' +
-      '<h3>高级设置</h3>' +
-      '<p class="modal-sub">参数改动即时生效并保存。鼠标聚焦任意输入框可查看作用与合法范围。</p>' +
+      '<div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="' + T('settings.aria') + '">' +
+      '<h3>' + T('settings.title') + '</h3>' +
+      '<p class="modal-sub">' + T('settings.sub') + '</p>' +
       '<div class="as-form">' +
       FIELD_DEFS.map((f) => {
         const id = 'as-' + f.key;
@@ -224,7 +225,7 @@
           f.control === 'select+number'
             ? '<select id="' + id + '-sel">' +
               f.presets.map((p) => '<option value="' + p.value + '">' + p.label + '</option>').join('') +
-              '<option value="custom">自定义</option></select>' +
+              '<option value="custom">' + T('settings.custom') + '</option></select>' +
               numField(f, id)
             : f.control === 'select'
               ? '<select id="' + id + '-sel">' +
@@ -245,8 +246,8 @@
       '</div>' +
       '<div class="modal-actions">' +
       '<span class="spacer"></span>' +
-      '<button id="asReset" class="btn">恢复默认</button>' +
-      '<button id="asClose" class="btn btn-primary">关闭</button>' +
+      '<button id="asReset" class="btn">' + T('settings.reset') + '</button>' +
+      '<button id="asClose" class="btn btn-primary">' + T('settings.close') + '</button>' +
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -306,7 +307,7 @@
           const ok = isFinite(v) && validateField(f.key, st) && crossOk(f, v);
           num.classList.toggle('invalid', !ok);
           if (!ok) {
-            showHelp(num, '<b>超出合法范围</b>' + f.help.range);
+            showHelp(num, '<b>' + T('settings.helpInvalid') + '</b>' + f.help.range);
             return;
           }
           hideHelp();
@@ -315,7 +316,7 @@
           saveField(f, st);
         });
         num.addEventListener('focus', () => {
-          showHelp(num, '<b>作用</b>' + f.help.effect + '<b>范围</b>' + f.help.range + '<b>推荐</b>' + f.help.recommend);
+          showHelp(num, '<b>' + T('settings.helpEffect') + '</b>' + f.help.effect + '<b>' + T('settings.helpRange') + '</b>' + f.help.range + '<b>' + T('settings.helpRecommend') + '</b>' + f.help.recommend);
         });
         num.addEventListener('blur', () => {
           hideHelp();

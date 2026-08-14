@@ -27,7 +27,7 @@
     Object.assign(global.MC, factory());
   }
 })(typeof self !== 'undefined' ? self : this, function () {
-  'use strict';
+  const T = (typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k);
 
   // 分辨率档位 → 输出宽/高上限（null = 不缩放；等比缩放仅降不升）
   const RESOLUTION_PRESETS = {
@@ -48,58 +48,58 @@
     overlay.className = 'modal-overlay';
     overlay.hidden = true;
     overlay.innerHTML = `
-      <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="导出">
-        <h3>导出</h3>
+      <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="${T('export.aria')}">
+        <h3>${T('export.title')}</h3>
         <div class="exp-tabs">
-          <button type="button" class="exp-tab" data-tab="video">视频导出</button>
-          <button type="button" class="exp-tab active" data-tab="audio">音频导出</button>
-          <button type="button" class="exp-tab" data-tab="majdata">Majdata 导出</button>
+          <button type="button" class="exp-tab" data-tab="video">${T('export.tabVideo')}</button>
+          <button type="button" class="exp-tab active" data-tab="audio">${T('export.tabAudio')}</button>
+          <button type="button" class="exp-tab" data-tab="majdata">${T('export.tabMajdata')}</button>
         </div>
 
         <div class="exp-panel" data-panel="audio">
           <div class="modal-form">
-            <label>格式
+            <label>${T('export.format')}
               <select id="aFormat">
-                <option value="wav">WAV（无损）</option>
-                <option value="mp3">MP3</option>
+                <option value="wav">${T('export.wav')}</option>
+                <option value="mp3">${T('export.mp3')}</option>
               </select>
             </label>
-            <label id="aBitDepthRow">位深
+            <label id="aBitDepthRow">${T('export.bitDepth')}
               <select id="aBitDepth">
-                <option value="16">16-bit</option>
-                <option value="24">24-bit</option>
-                <option value="32">32-bit float</option>
+                <option value="16">${T('export.depth16')}</option>
+                <option value="24">${T('export.depth24')}</option>
+                <option value="32">${T('export.depth32')}</option>
               </select>
             </label>
-            <label id="aMp3Row" hidden>MP3 码率
+            <label id="aMp3Row" hidden>${T('export.mp3Bitrate')}
               <select id="aMp3BitrateSel">
-                ${BITRATE_PRESETS.mp3.map((k) => '<option value="' + k + '"' + (k === 192 ? ' selected' : '') + '>' + k + ' kbps</option>').join('')}
-                <option value="custom">自定义</option>
+                ${BITRATE_PRESETS.mp3.map((k) => '<option value="' + k + '"' + (k === 192 ? ' selected' : '') + '>' + k + ' ' + T('export.kbps') + '</option>').join('')}
+                <option value="custom">${T('export.custom')}</option>
               </select>
-              <input id="aMp3BitrateNum" type="number" min="8" max="320" step="8" value="192" aria-label="MP3 码率" /> kbps
+              <input id="aMp3BitrateNum" type="number" min="8" max="320" step="8" value="192" aria-label="${T('export.mp3Bitrate')}" /> ${T('export.kbps')}
             </label>
-            <label>采样率
+            <label>${T('export.sampleRate')}
               <select id="aSampleRate">
-                <option value="src">跟随源</option>
+                <option value="src">${T('export.followSource')}</option>
                 <option value="44100">44100 Hz</option>
                 <option value="48000">48000 Hz</option>
                 <option value="22050">22050 Hz</option>
               </select>
             </label>
             <label class="exp-check">
-              <input id="aNormalize" type="checkbox" /> 响度归一化（峰值）
+              <input id="aNormalize" type="checkbox" /> ${T('export.normalize')}
             </label>
-            <label id="aPeakRow" hidden>目标峰值
+            <label id="aPeakRow" hidden>${T('export.peak')}
               <select id="aPeak">
                 <option value="-0.5">-0.5 dBFS</option>
                 <option value="-1" selected>-1 dBFS</option>
                 <option value="-3">-3 dBFS</option>
               </select>
             </label>
-            <label>交叉淡化
+            <label>${T('export.crossfade')}
               <input id="aCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
             </label>
-            <label>文件名
+            <label>${T('export.fileName')}
               <input id="aName" type="text" />
             </label>
           </div>
@@ -107,74 +107,74 @@
 
         <div class="exp-panel" data-panel="video" hidden>
           <div class="modal-form">
-            <label>视频码率
+            <label>${T('export.videoBitrate')}
               <select id="vBitrateSel">
-                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' Mbps</option>').join('')}
-                <option value="custom">自定义</option>
+                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
+                <option value="custom">${T('export.custom')}</option>
               </select>
-              <input id="vBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="视频码率" /> Mbps
+              <input id="vBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.videoBitrate')}" /> ${T('export.mbps')}
             </label>
-            <label>帧率
+            <label>${T('export.framerate')}
               <select id="vFramerate">
-                <option value="src" selected>跟随源</option>
-                <option value="24">24 fps</option>
-                <option value="30">30 fps</option>
-                <option value="60">60 fps</option>
+                <option value="src" selected>${T('export.followSource')}</option>
+                <option value="24">24 ${T('export.fps')}</option>
+                <option value="30">30 ${T('export.fps')}</option>
+                <option value="60">60 ${T('export.fps')}</option>
               </select>
             </label>
-            <label>分辨率
+            <label>${T('export.resolution')}
               <select id="vResolution">
-                <option value="orig" selected>原始</option>
-                <option value="1080p">1080P</option>
-                <option value="720p">720P</option>
-                <option value="480p">480P</option>
+                <option value="orig" selected>${T('export.orig')}</option>
+                <option value="1080p">${T('export.res1080')}</option>
+                <option value="720p">${T('export.res720')}</option>
+                <option value="480p">${T('export.res480')}</option>
               </select>
             </label>
-            <label>AAC 码率
+            <label>${T('export.aacBitrate')}
               <select id="vAudioBitrate">
-                <option value="96">96 kbps</option>
-                <option value="128" selected>128 kbps</option>
-                <option value="192">192 kbps</option>
-                <option value="256">256 kbps</option>
+                <option value="96">96 ${T('export.kbps')}</option>
+                <option value="128" selected>128 ${T('export.kbps')}</option>
+                <option value="192">192 ${T('export.kbps')}</option>
+                <option value="256">256 ${T('export.kbps')}</option>
               </select>
             </label>
-            <label>交叉淡化
+            <label>${T('export.crossfade')}
               <input id="vCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
             </label>
-            <label>文件名
+            <label>${T('export.fileName')}
               <input id="vName" type="text" />
             </label>
           </div>
         </div>
 
         <div class="exp-panel" data-panel="majdata" hidden>
-          <p id="mNote" class="modal-sub">bg.mp4：无声，上限 1080P 60fps；track.mp3：44100Hz。输出文件固定名为 bg.mp4 与 track.mp3。</p>
+          <p id="mNote" class="modal-sub">${T('export.majNoteVideo')}</p>
           <div class="modal-form">
-            <label id="mVideoRow">bg.mp4 码率
+            <label id="mVideoRow">${T('export.majVideoBitrate')}
               <select id="mVideoBitrateSel">
-                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' Mbps</option>').join('')}
-                <option value="custom">自定义</option>
+                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
+                <option value="custom">${T('export.custom')}</option>
               </select>
-              <input id="mVideoBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="bg.mp4 码率" /> Mbps
+              <input id="mVideoBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.majVideoBitrate')}" /> ${T('export.mbps')}
             </label>
-            <label>track.mp3 码率
+            <label>${T('export.majMp3Bitrate')}
               <select id="mMp3Bitrate">
-                <option value="160">160 kbps</option>
-                <option value="192">192 kbps</option>
-                <option value="320" selected>320 kbps</option>
+                <option value="160">160 ${T('export.kbps')}</option>
+                <option value="192">192 ${T('export.kbps')}</option>
+                <option value="320" selected>320 ${T('export.kbps')}</option>
               </select>
             </label>
             <label class="exp-check">
-              <input id="mNormalize" type="checkbox" /> 响度归一化（峰值）
+              <input id="mNormalize" type="checkbox" /> ${T('export.normalize')}
             </label>
-            <label id="mPeakRow" hidden>目标峰值
+            <label id="mPeakRow" hidden>${T('export.peak')}
               <select id="mPeak">
                 <option value="-0.5">-0.5 dBFS</option>
                 <option value="-1" selected>-1 dBFS</option>
                 <option value="-3">-3 dBFS</option>
               </select>
             </label>
-            <label>交叉淡化
+            <label>${T('export.crossfade')}
               <input id="mCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
             </label>
           </div>
@@ -183,8 +183,8 @@
         <div id="xStatus" class="modal-status" hidden></div>
         <div class="modal-actions">
           <span class="spacer"></span>
-          <button id="xCancel" class="btn">取消</button>
-          <button id="xOk" class="btn btn-primary">导出</button>
+          <button id="xCancel" class="btn">${T('export.cancel')}</button>
+          <button id="xOk" class="btn btn-primary">${T('export.ok')}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -270,8 +270,8 @@
     const isAudioOnly = opts.kind !== 'video';
     el('mVideoRow').hidden = isAudioOnly;
     el('mNote').textContent = isAudioOnly
-      ? '当前为纯音频，仅导出 track.mp3（bg.mp4 请自备）。track.mp3：44100Hz。'
-      : 'bg.mp4：无声，上限 1080P 60fps；track.mp3：44100Hz。输出文件固定名为 bg.mp4 与 track.mp3。';
+      ? T('export.majNoteAudio')
+      : T('export.majNoteVideo');
     // 默认 Tab：视频源可导出视频时进视频 Tab，否则音频 Tab
     switchTab(canVideoTab ? 'video' : 'audio');
     el('xStatus').hidden = true;
@@ -313,7 +313,7 @@
         const name = el(tab === 'audio' ? 'aName' : 'vName').value.trim();
         if (!name) {
           el('xStatus').hidden = false;
-          el('xStatus').textContent = '请填写文件名';
+          el('xStatus').textContent = T('export.statusEmptyName');
           return;
         }
       }

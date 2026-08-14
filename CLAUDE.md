@@ -3,6 +3,15 @@
 Tempokiri — 节奏感知的音频/视频剪辑工作站，以单 HTML 文件交付的浏览器端应用。
 原 CLI 版本（Python + librosa）已移除——工作站已完整覆盖其功能，产品唯一交付物即打包后的 `dist/tempokiri-workstation.html`。
 
+## 界面文案系统
+
+- **strings.json 是全部界面文案的唯一编辑源**（v1.5.0 起）：按钮/标题/提示/状态/弹窗/帮助气泡约 210 条，改文字只改这个文件，`python build.py` 后生效，不动代码
+- 分层 key（`toolbar.openFile`、`status.playFrom` 带 `{name}` 插值）；`src/i18n.js` 提供 `T(key, params)`（缺 key 返回 key 名便于发现）
+- 静态 HTML 元素用 `data-i18n="key"`（源码保留中文原文回退，运行时 `MC.i18n.applyStatic()` 填充）；动态文案直接 `T('key')`
+- **build.py 校验**：扫描 `T('key')` 调用与 `data-i18n` 引用，与 strings.json 差集——代码引用但文档缺失 → 构建中止；文档冗余 → 警告
+- 技术性 Error 消息（throw new Error）与 README.md/VERSION 不在此系统内
+- ⚠️ UMD 模块引用 T 的写法：`(typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k)`——**不要用 `global.MC`**（factory 无 global 形参，浏览器会 ReferenceError）
+- ⚠️ i18n.js 的 `lookup` 支持含点键（如 presets 的 `0.75`）：每步先尝试剩余路径整体匹配再逐段切分；strings.json 数字档位 key 可含点
 ## 结构速查
 
 ```
@@ -43,6 +52,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.5.0**：界面文案系统——strings.json 唯一编辑源（约 210 条文案），build.py 注入 + key 完整性校验（缺失中止/冗余警告）；src/i18n.js 提供 T(key, params) 插值与 data-i18n 静态填充；全模块（index.html/main/settings/exportModal/ui/footer）硬编码文案迁移完毕
 - **1.4.3**：修复检查更新逻辑——原 else 分支无条件提示「发现新版本」（GitHub 版本低于本地时误报）；新增 `compareVersions` 语义化三段比较（footer.js 导出，纯函数可单测），分支改为：GitHub > 本地 → 正常提示更新；相等 → 已是最新；GitHub < 本地 → 彩蛋弹窗「领先一步」（测试者超前版场景）
 - **1.4.2**：页脚重排——产品身份（标语 + 版本徽标）上移至顶部 brand 区（Tempokiri 渐变字 + tagline + 版本 pill + 律动条），页脚只留作者署名（♥ M1zukiri + 社交/工具按钮）
 - **1.4.1**：高级设置「界面主题」移至第一栏（FIELD_DEFS 首项）；品牌字改用 Georgia 衬线栈（.brand 的 Tempokiri 与页脚 M1zukiri，中文「工作站」保持无衬线）
