@@ -277,9 +277,9 @@ test('setTheme: 切换 canvas 主题色并回退未知主题（主题系统）',
   assert.equal(R.THEME.wave, '#22d3ee');
   R.setTheme('nebula');
   assert.equal(R.THEME.wave, '#a78bfa');
-  assert.equal(R.THEME.bg, '#0a0810');
+  assert.equal(R.THEME.bg, 'transparent');
   R.setTheme('paper');
-  assert.equal(R.THEME.bg, '#efeae2');
+  assert.equal(R.THEME.bg, 'transparent');
   assert.equal(R.THEME.wave, '#0f766e');
   R.setTheme('unknown-theme');
   assert.equal(R.THEME.wave, '#22d3ee', '未知主题应回退 aurora');
@@ -296,7 +296,7 @@ test('CANVAS_THEMES: 三套主题各含 12 个绘制字段（主题系统）', (
   }
   // aurora 与默认 THEME 完全一致（默认主题行为零变化）
   assert.deepEqual(R.CANVAS_THEMES.aurora, {
-    bg: '#0a0c10', gridBg: '#0e1117', wave: '#22d3ee', waveHigh: '#38e1f5',
+    bg: 'transparent', gridBg: 'transparent', wave: '#22d3ee', waveHigh: '#38e1f5',
     waveDim: 'rgba(34,211,238,0.45)', barLine: 'rgba(255,255,255,0.75)',
     beatLine: 'rgba(255,255,255,0.14)', selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee', playLine: '#f43f5e', axis: '#7d8794', barLabel: '#9aa4b2',

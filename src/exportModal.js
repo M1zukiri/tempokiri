@@ -196,7 +196,7 @@
     const style = document.createElement('style');
     style.textContent =
       '.exp-tabs{display:flex;gap:8px;margin-bottom:14px}' +
-      '.exp-tab{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);cursor:pointer;font-size:13px}' +
+      '.exp-tab{padding:6px 14px;border-radius:8px;border:1px solid var(--border-muted);background:var(--surface-raised);color:var(--text-secondary);cursor:pointer;font-size:13px}' +
       '.exp-tab.active{color:var(--accent);border-color:var(--accent)}' +
       '.exp-tab:disabled{opacity:.4;cursor:not-allowed}' +
       '.exp-check{flex-direction:row !important;gap:6px !important;cursor:pointer}';

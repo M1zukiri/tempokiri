@@ -137,8 +137,8 @@
   }
 
   const THEME = {
-    bg: '#0a0c10',
-    gridBg: '#0e1117',
+    bg: 'transparent',
+    gridBg: 'transparent',
     wave: '#22d3ee',
     waveHigh: '#38e1f5',
     waveDim: 'rgba(34,211,238,0.45)',
@@ -153,8 +153,8 @@
 
   const CANVAS_THEMES = {
     aurora: {
-      bg: '#0a0c10',
-      gridBg: '#0e1117',
+      bg: 'transparent',
+      gridBg: 'transparent',
       wave: '#22d3ee',
       waveHigh: '#38e1f5',
       waveDim: 'rgba(34,211,238,0.45)',
@@ -167,8 +167,8 @@
       barLabel: '#9aa4b2',
     },
     nebula: {
-      bg: '#0a0810',
-      gridBg: '#0e0a15',
+      bg: 'transparent',
+      gridBg: 'transparent',
       wave: '#a78bfa',
       waveHigh: '#c4b5fd',
       waveDim: 'rgba(167,139,250,0.45)',
@@ -181,8 +181,8 @@
       barLabel: '#a89fb5',
     },
     paper: {
-      bg: '#efeae2',
-      gridBg: '#f5f2ed',
+      bg: 'transparent',
+      gridBg: 'transparent',
       wave: '#0f766e',
       waveHigh: '#14a89b',
       waveDim: 'rgba(15,118,110,0.40)',

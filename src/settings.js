@@ -259,14 +259,14 @@
       '.as-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid rgba(128,128,128,.25);border-radius:8px}' +
       '.as-head{display:flex;flex-direction:column;gap:2px;min-width:0}' +
       '.as-label{font-weight:600}' +
-      '.as-desc{font-size:12px;color:var(--text-dim)}' +
+      '.as-desc{font-size:12px;color:var(--text-secondary)}' +
       '.as-ctrl{display:flex;align-items:center;gap:8px;position:relative}' +
       '.as-ctrl select{max-width:230px}' +
       '.as-ctrl input[type=number]{width:110px}' +
       '.as-ctrl input[type=range]{width:110px}' +
       '.as-ctrl input.invalid{border-color:#e05555;background:rgba(224,85,85,.12)}' +
-      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
-      '.help-pop b{display:block;color:var(--text);font-weight:600}';
+      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:var(--surface-overlay);border:1px solid var(--border-muted);color:var(--text-primary);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
+      '.help-pop b{display:block;color:var(--text-primary);font-weight:600}';
     document.head.appendChild(style);
 
     // 单例气泡挂到 body（overlay 之后，天然盖在弹窗上层）
