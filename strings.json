@@ -127,18 +127,16 @@
     "close": "关闭",
     "custom": "自定义",
     "helpInvalid": "超出合法范围",
-    "helpEffect": "作用",
     "helpRange": "范围",
     "helpRecommend": "推荐",
     "theme": {
       "label": "界面主题",
-      "desc": "全局配色方案，切换即时生效",
+      "desc": "全局配色方案（含波形），切换即时生效",
       "presets": {
         "aurora": "Aoi Aurora",
         "nebula": "Meltyland's Nightmare",
         "paper": "Kamikiri"
       },
-      "helpEffect": "切换工作站配色",
       "helpRange": "三选一",
       "helpRecommend": "Aoi Aurora"
     },
@@ -151,14 +149,12 @@
         "256": "高精度"
       },
       "unit": "毫秒",
-      "helpEffect": "相邻分析窗间的步进距离，间隔越小，节拍定位越精细、分析越慢",
       "helpRange": "3–93 毫秒（对应 FFT 帧移 64–2048 采样点）",
       "helpRecommend": "23 毫秒（标准）"
     },
     "sensitivity": {
       "label": "识别灵敏度",
       "desc": "数值越大越宽松，检出更多节拍候选",
-      "helpEffect": "数值越大越宽松，检出更多节拍候选",
       "helpRange": "0–1",
       "helpRecommend": "0.9"
     },
@@ -166,7 +162,6 @@
       "label": "BPM 范围（下限）",
       "unit": "BPM",
       "desc": "自动识别 BPM 搜索区间的下限",
-      "helpEffect": "自动识别 BPM 的搜索区间",
       "helpRange": "1–600（且最小 ≤ 最大）",
       "helpRecommend": "60"
     },
@@ -174,57 +169,52 @@
       "label": "BPM 范围（上限）",
       "unit": "BPM",
       "desc": "自动识别 BPM 搜索区间的上限",
-      "helpEffect": "自动识别 BPM 的搜索区间",
       "helpRange": "1–600（且最大 ≥ 最小）",
       "helpRecommend": "200"
     },
     "videoExtract": {
       "label": "音轨提取方式",
-      "desc": "视频音轨的提取方案",
+      "desc": "视频音轨的提取方案；WebCodecs 性能更高，实时采集兼容性更好",
       "presets": {
         "auto": "自动（优先 WebCodecs，失败降级）",
         "webcodecs": "仅 WebCodecs（失败即报错）",
         "capture": "仅实时采集"
       },
-      "helpEffect": "视频音轨提取方案；WebCodecs性能更高，实时采集兼容性更好",
       "helpRange": "三选一",
       "helpRecommend": "自动"
     },
     "captureRate": {
       "label": "采集倍速",
-      "desc": "实时采集时静音快放的倍速",
+      "desc": "实时采集时静音快放的倍速；越高提取越快，极速可能丢帧",
       "unit": "倍",
       "presets": {
         "2": "2x",
         "4": "4x",
         "8": "8x"
       },
-      "helpEffect": "实时采集静音快放倍速，越高提取越快，极速可能丢帧",
       "helpRange": "1–16",
       "helpRecommend": "4"
     },
     "followMs": {
       "label": "视频跟随间隔",
-      "desc": "拼接播放时视频画面跟随音频的最小间隔",
+      "desc": "拼接播放时视频画面跟随音频的最小间隔；越小越跟手、越大越省电",
       "presets": {
         "90": "流畅",
         "160": "均衡",
         "250": "省电"
       },
       "unit": "毫秒",
-      "helpEffect": "拼接播放时视频跟随音频的最小间隔，越小越跟手、越大越省电",
       "helpRange": "1–5000 毫秒",
       "helpRecommend": "90（流畅）"
     },
     "renderScale": {
       "label": "渲染质量",
-      "desc": "波形渲染的设备像素比缩放系数",
+      "desc": "波形渲染 DPR 缩放系数；越小越流畅（略糊）、越大越清晰（更耗性能）",
       "presets": {
         "1": "高（原分辨率）",
         "0.75": "中",
         "0.5": "低"
       },
-      "helpEffect": "波形渲染 DPR 缩放系数，越小越流畅（略糊）、越大越清晰（更耗性能）",
       "helpRange": "0.1–4",
       "helpRecommend": "1.0（高）"
     }

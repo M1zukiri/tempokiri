@@ -87,7 +87,7 @@ test('FIELD_DEFS 覆盖全部 10 个 store 键且 help 文案非空', () => {
     assert.ok(keys.includes(k), '缺少字段定义：' + k);
   }
   for (const f of s.FIELD_DEFS) {
-    assert.ok(f.help.effect && f.help.range && f.help.recommend, 'help 文案不完整：' + f.key);
+    assert.ok(f.help.range && f.help.recommend, 'help 文案不完整：' + f.key); // effect 已并入 desc（1.5.2 合并提示）
     if (f.number) {
       assert.ok(typeof f.number.min === 'number' && typeof f.number.max === 'number', '数字框范围缺失：' + f.key);
     }

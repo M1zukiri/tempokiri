@@ -65,7 +65,7 @@
         { label: T('settings.theme.presets.nebula'), value: 'nebula' },
         { label: T('settings.theme.presets.paper'), value: 'paper' },
       ],
-      help: { effect: T('settings.theme.helpEffect'), range: T('settings.theme.helpRange'), recommend: T('settings.theme.helpRecommend') },
+      help: { range: T('settings.theme.helpRange'), recommend: T('settings.theme.helpRecommend') },
     },
     {
       key: 'hop',
@@ -78,7 +78,7 @@
         { label: T('settings.hop.presets.256'), value: 256 },
       ],
       number: { min: 3, max: 93, step: 0.1, unit: T('settings.hop.unit'), toStore: msToHop, fromStore: hopToMs },
-      help: { effect: T('settings.hop.helpEffect'), range: T('settings.hop.helpRange'), recommend: T('settings.hop.helpRecommend') },
+      help: { range: T('settings.hop.helpRange'), recommend: T('settings.hop.helpRecommend') },
     },
     {
       key: 'sensitivity',
@@ -86,7 +86,7 @@
       desc: T('settings.sensitivity.desc'),
       control: 'slider+number',
       number: { min: 0, max: 1, step: 0.01, unit: '' },
-      help: { effect: T('settings.sensitivity.helpEffect'), range: T('settings.sensitivity.helpRange'), recommend: T('settings.sensitivity.helpRecommend') },
+      help: { range: T('settings.sensitivity.helpRange'), recommend: T('settings.sensitivity.helpRecommend') },
     },
     {
       key: 'minBpm',
@@ -94,7 +94,7 @@
       desc: T('settings.minBpm.desc'),
       control: 'number',
       number: { min: 1, max: 600, step: 1, unit: T('settings.minBpm.unit') },
-      help: { effect: T('settings.minBpm.helpEffect'), range: T('settings.minBpm.helpRange'), recommend: T('settings.minBpm.helpRecommend') },
+      help: { range: T('settings.minBpm.helpRange'), recommend: T('settings.minBpm.helpRecommend') },
     },
     {
       key: 'maxBpm',
@@ -102,7 +102,7 @@
       desc: T('settings.maxBpm.desc'),
       control: 'number',
       number: { min: 1, max: 600, step: 1, unit: T('settings.maxBpm.unit') },
-      help: { effect: T('settings.maxBpm.helpEffect'), range: T('settings.maxBpm.helpRange'), recommend: T('settings.maxBpm.helpRecommend') },
+      help: { range: T('settings.maxBpm.helpRange'), recommend: T('settings.maxBpm.helpRecommend') },
     },
     {
       key: 'videoExtract',
@@ -114,7 +114,7 @@
         { label: T('settings.videoExtract.presets.webcodecs'), value: 'webcodecs' },
         { label: T('settings.videoExtract.presets.capture'), value: 'capture' },
       ],
-      help: { effect: T('settings.videoExtract.helpEffect'), range: T('settings.videoExtract.helpRange'), recommend: T('settings.videoExtract.helpRecommend') },
+      help: { range: T('settings.videoExtract.helpRange'), recommend: T('settings.videoExtract.helpRecommend') },
     },
     {
       key: 'captureRate',
@@ -127,7 +127,7 @@
         { label: T('settings.captureRate.presets.8'), value: 8 },
       ],
       number: { min: 1, max: 16, step: 1, unit: T('settings.captureRate.unit') },
-      help: { effect: T('settings.captureRate.helpEffect'), range: T('settings.captureRate.helpRange'), recommend: T('settings.captureRate.helpRecommend') },
+      help: { range: T('settings.captureRate.helpRange'), recommend: T('settings.captureRate.helpRecommend') },
     },
     {
       key: 'followMs',
@@ -140,7 +140,7 @@
         { label: T('settings.followMs.presets.250'), value: 250 },
       ],
       number: { min: 1, max: 5000, step: 10, unit: T('settings.followMs.unit') },
-      help: { effect: T('settings.followMs.helpEffect'), range: T('settings.followMs.helpRange'), recommend: T('settings.followMs.helpRecommend') },
+      help: { range: T('settings.followMs.helpRange'), recommend: T('settings.followMs.helpRecommend') },
     },
     {
       key: 'renderScale',
@@ -153,7 +153,7 @@
         { label: T('settings.renderScale.presets.0.5'), value: 0.5 },
       ],
       number: { min: 0.1, max: 4, step: 0.05, unit: '' },
-      help: { effect: T('settings.renderScale.helpEffect'), range: T('settings.renderScale.helpRange'), recommend: T('settings.renderScale.helpRecommend') },
+      help: { range: T('settings.renderScale.helpRange'), recommend: T('settings.renderScale.helpRecommend') },
     },
   ];
 
@@ -259,14 +259,14 @@
       '.as-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid rgba(128,128,128,.25);border-radius:8px}' +
       '.as-head{display:flex;flex-direction:column;gap:2px;min-width:0}' +
       '.as-label{font-weight:600}' +
-      '.as-desc{font-size:12px;color:#999}' +
+      '.as-desc{font-size:12px;color:var(--text-dim)}' +
       '.as-ctrl{display:flex;align-items:center;gap:8px;position:relative}' +
       '.as-ctrl select{max-width:230px}' +
       '.as-ctrl input[type=number]{width:110px}' +
       '.as-ctrl input[type=range]{width:110px}' +
       '.as-ctrl input.invalid{border-color:#e05555;background:rgba(224,85,85,.12)}' +
-      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:#1e1e24;border:1px solid #444;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
-      '.help-pop b{display:block;color:#ddd;font-weight:600}';
+      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
+      '.help-pop b{display:block;color:var(--text);font-weight:600}';
     document.head.appendChild(style);
 
     // 单例气泡挂到 body（overlay 之后，天然盖在弹窗上层）
@@ -316,7 +316,7 @@
           saveField(f, st);
         });
         num.addEventListener('focus', () => {
-          showHelp(num, '<b>' + T('settings.helpEffect') + '</b>' + f.help.effect + '<b>' + T('settings.helpRange') + '</b>' + f.help.range + '<b>' + T('settings.helpRecommend') + '</b>' + f.help.recommend);
+          showHelp(num, '<b>' + T('settings.helpRange') + '</b>' + f.help.range + '<b>' + T('settings.helpRecommend') + '</b>' + f.help.recommend);
         });
         num.addEventListener('blur', () => {
           hideHelp();
