@@ -5,7 +5,7 @@ Tempokiri — 节奏感知的音频/视频剪辑工作站，以单 HTML 文件�
 
 ## 界面文案系统
 
-- **strings.json 是全部界面文案的唯一编辑源**（v1.5.0 起）：按钮/标题/提示/状态/弹窗/帮助气泡约 210 条，改文字只改这个文件，`python build.py` 后生效，不动代码
+- **strings.json 是全部界面文案的唯一编辑源**（v1.5.0 起）：按钮/标题/提示/状态/弹窗/帮助气泡约 200 条，改文字只改这个文件，`python build.py` 后生效，不动代码
 - 分层 key（`toolbar.openFile`、`status.playFrom` 带 `{name}` 插值）；`src/i18n.js` 提供 `T(key, params)`（缺 key 返回 key 名便于发现）
 - 静态 HTML 元素用 `data-i18n="key"`（源码保留中文原文回退，运行时 `MC.i18n.applyStatic()` 填充）；动态文案直接 `T('key')`
 - **build.py 校验**：扫描 `T('key')` 调用与 `data-i18n` 引用，与 strings.json 差集——代码引用但文档缺失 → 构建中止；文档冗余 → 警告
@@ -16,6 +16,7 @@ Tempokiri — 节奏感知的音频/视频剪辑工作站，以单 HTML 文件�
 
 ```
 index.html           主页面（开发期引用 src/*.js）
+strings.json         界面文案唯一编辑源（改文案只改此文件）
 src/*.js             浏览器模块，UMD 挂到 window.MC（MC.analyze、MC.buildGrid …）
 dist/                build.py 打包产物（gitignore）
 tests/               Node 单元测试（node --test）
@@ -27,7 +28,7 @@ VERSION              版本号单源（build.py 注入页脚）
 ```bash
 python -m http.server 8734            # 开发伺服（浏览器缓存 src/*.js 时用无痕/禁用缓存）
 python build.py                       # 打包 → dist/tempokiri-workstation.html
-node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
+node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer/settings/i18n）
 ```
 
 ## 关键约定
@@ -54,7 +55,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 - **1.5.2**：高级设置弹窗主题化——`.as-desc`/`.help-pop` 从硬编码色（#999/#1e1e24/#ddd）改为 CSS 变量，Kamikiri 浅色主题下可读；帮助气泡合并去重——effect 段并入常驻 desc（desc 吸收独有信息），气泡只显示「范围 + 推荐」，strings.json 删除 10 个 helpEffect key
 - **1.5.1**：文案修订（strings.json）——主题名改英文（Aoi Aurora / Meltyland's Nightmare / Kamikiri）、彩蛋与提示文案精简；测试断言改为与 strings.json 同源（改文案不再破坏测试）；README 补文案系统/主题说明
-- **1.5.0**：界面文案系统——strings.json 唯一编辑源（约 210 条文案），build.py 注入 + key 完整性校验（缺失中止/冗余警告）；src/i18n.js 提供 T(key, params) 插值与 data-i18n 静态填充；全模块（index.html/main/settings/exportModal/ui/footer）硬编码文案迁移完毕
+- **1.5.0**：界面文案系统——strings.json 唯一编辑源（约 200 条文案），build.py 注入 + key 完整性校验（缺失中止/冗余警告）；src/i18n.js 提供 T(key, params) 插值与 data-i18n 静态填充；全模块（index.html/main/settings/exportModal/ui/footer）硬编码文案迁移完毕
 - **1.4.3**：修复检查更新逻辑——原 else 分支无条件提示「发现新版本」（GitHub 版本低于本地时误报）；新增 `compareVersions` 语义化三段比较（footer.js 导出，纯函数可单测），分支改为：GitHub > 本地 → 正常提示更新；相等 → 已是最新；GitHub < 本地 → 彩蛋弹窗「领先一步」（测试者超前版场景）
 - **1.4.2**：页脚重排——产品身份（标语 + 版本徽标）上移至顶部 brand 区（Tempokiri 渐变字 + tagline + 版本 pill + 律动条），页脚只留作者署名（♥ M1zukiri + 社交/工具按钮）
 - **1.4.1**：高级设置「界面主题」移至第一栏（FIELD_DEFS 首项）；品牌字改用 Georgia 衬线栈（.brand 的 Tempokiri 与页脚 M1zukiri，中文「工作站」保持无衬线）

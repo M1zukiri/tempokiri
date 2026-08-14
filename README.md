@@ -56,7 +56,7 @@ python build.py
 
 ```
 ├── index.html          开发入口（深色 DJ 风格 UI，引用 src/*.js）
-├── strings.json        界面文案唯一编辑源（约 210 条，改文案只改此文件）
+├── strings.json        界面文案唯一编辑源（约 200 条，改文案只改此文件）
 ├── build.py            打包脚本 → dist/tempokiri-workstation.html 单文件
 │   ├── i18n.js         文案系统：T(key, params) 插值、data-i18n 静态填充
 │   ├── main.js         装配层：状态、文件处理、播放、导出流程

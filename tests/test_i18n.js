@@ -1,5 +1,7 @@
 /**
  * test_i18n.js — 文案系统单测（node --test）。
+ * 创建时间：2026-08-14 17:14:28
+ *
  * 覆盖：分层取值、{name} 插值、缺失回退、静态填充逻辑、strings.json 完整性。
  */
 const { test } = require('node:test');
