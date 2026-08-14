@@ -151,6 +151,55 @@
     barLabel: '#9aa4b2',
   };
 
+  const CANVAS_THEMES = {
+    aurora: {
+      bg: '#0a0c10',
+      gridBg: '#0e1117',
+      wave: '#22d3ee',
+      waveHigh: '#38e1f5',
+      waveDim: 'rgba(34,211,238,0.45)',
+      barLine: 'rgba(255,255,255,0.75)',
+      beatLine: 'rgba(255,255,255,0.14)',
+      selFill: 'rgba(34,211,238,0.22)',
+      selBorder: '#22d3ee',
+      playLine: '#f43f5e',
+      axis: '#7d8794',
+      barLabel: '#9aa4b2',
+    },
+    nebula: {
+      bg: '#0a0810',
+      gridBg: '#0e0a15',
+      wave: '#a78bfa',
+      waveHigh: '#c4b5fd',
+      waveDim: 'rgba(167,139,250,0.45)',
+      barLine: 'rgba(255,255,255,0.75)',
+      beatLine: 'rgba(255,255,255,0.14)',
+      selFill: 'rgba(167,139,250,0.22)',
+      selBorder: '#a78bfa',
+      playLine: '#f43f5e',
+      axis: '#8f87a0',
+      barLabel: '#a89fb5',
+    },
+    paper: {
+      bg: '#efeae2',
+      gridBg: '#f5f2ed',
+      wave: '#0f766e',
+      waveHigh: '#14a89b',
+      waveDim: 'rgba(15,118,110,0.40)',
+      barLine: 'rgba(42,37,34,0.75)',
+      beatLine: 'rgba(42,37,34,0.12)',
+      selFill: 'rgba(15,118,110,0.18)',
+      selBorder: '#0f766e',
+      playLine: '#d63a5a',
+      axis: '#7a7268',
+      barLabel: '#5c554d',
+    },
+  };
+
+  function setTheme(name) {
+    Object.assign(THEME, CANVAS_THEMES[name] || CANVAS_THEMES.aurora);
+  }
+
   /**
    * 绘制完整波形视图。
    * @param {HTMLCanvasElement} canvas
@@ -349,7 +398,6 @@
   /**
    * 播放线是否需要在像素位移 >= 1px 时重绘（跳过亚像素抖动，性能 A6）。
    * @param {number|null} prevX 上一次绘制位置（null = 首次）
-   * @param {number} newX 当前播放线像素位置
    */
   function playHeadMoved(prevX, newX) {
     return prevX == null || Math.abs(newX - prevX) >= 1;
@@ -398,5 +446,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, setRenderScale, THEME };
+  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawPlayHead, playHeadMoved, setRenderScale, setTheme, CANVAS_THEMES, THEME };
 });

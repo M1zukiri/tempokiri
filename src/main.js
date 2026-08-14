@@ -180,7 +180,17 @@
     const gs = store.loadGlobalSettings();
     followMs = gs.followMs;
     render.setRenderScale(gs.renderScale);
+    applyTheme(gs.theme);
     if (state.file) renderWave();
+  }
+
+  /** 应用界面主题：切 `data-theme` 属性 + 同步波形 canvas 色值。 */
+  function applyTheme(name) {
+    const n = (name === 'nebula' || name === 'paper') ? name : 'aurora';
+    document.documentElement.dataset.theme = n;
+    render.setTheme(n);
+    pulseColor = null; // 律动条颜色缓存失效，下次绘制重读新 accent
+    drawBrandPulse(PULSE_IDLE); // 立即用新主题重绘静态律动条（播放中由下一帧 tick 覆盖）
   }
 
   /** 序列中是否有非法项（用户输入非法或时间超出网格）。 */
@@ -640,6 +650,40 @@
   let mixPlaying = false; // 拼接播放（先拼接成连续 buffer 再一次性播放，消除段间调度间隔）
   let mixPos = 0; // 拼接时间轴断点（秒）；暂停保留、停止重置为 0
   let playingSeqId = null; // 拼接播放中当前段的序列卡片 id（用于高亮）；null = 无高亮
+  let playAnalyser = null; // 律动品牌标数据源（AnalyserNode，播放时采集时域振幅）
+  let pulseData = null; // analyser 时域采样缓冲
+  let pulseColor = null; // 律动条颜色缓存（主题切换时由 applyTheme 置空失效）
+
+  const PULSE_IDLE = [0.3, 0.7, 1, 0.8, 0.5, 0.9, 0.6, 0.3]; // 静止态正弦包络
+
+  /** 律动条颜色：读当前主题 accent（缓存；applyTheme 置空后下次重读）。 */
+  function pulseColorOf() {
+    if (!pulseColor) pulseColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22d3ee';
+    return pulseColor;
+  }
+
+  /** 绘制品牌律动条：amps 为长度 8 的 0..1 振幅数组。 */
+  function drawBrandPulse(amps) {
+    const c = document.getElementById('brandPulse');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = pulseColorOf();
+    for (let i = 0; i < 8; i++) {
+      const h = Math.max(2, Math.round(amps[i] * 16));
+      ctx.fillRect(i * 8, c.height - h, 5, h);
+    }
+  }
+
+  /** 确保律动分析节点存在（fftSize 128 → frequencyBinCount 64，供 8 柱 × 8 点采样）。 */
+  function ensureAnalyser() {
+    if (!playAnalyser) {
+      playAnalyser = playCtx.createAnalyser();
+      playAnalyser.fftSize = 128;
+      pulseData = new Uint8Array(playAnalyser.frequencyBinCount);
+    }
+    return playAnalyser;
+  }
 
   /** 暂停：停止播放但保留断点（playPos / mixPos），下次「播放」从断点继续。 */
   function pausePlay() {
@@ -685,6 +729,8 @@
   /** 停止：暂停并把播放位置重置（原曲回标记点、拼接回序列开头）。 */
   function stopPlay() {
     pausePlay();
+    playAnalyser = null; // 停止后释放分析节点（恢复播放时由 ensureAnalyser 重建）
+    drawBrandPulse(PULSE_IDLE); // 律动条恢复静态波形
     state.playPos = state.cursorPos != null ? state.cursorPos : 0;
     mixPos = 0;
     if (playingSeqId !== null) {
@@ -746,7 +792,8 @@
     if (!playCtx) playCtx = new (window.AudioContext || window.webkitAudioContext)();
     const src = playCtx.createBufferSource();
     src.buffer = state.audioBuffer;
-    src.connect(playCtx.destination);
+    src.connect(ensureAnalyser());
+    playAnalyser.connect(playCtx.destination);
     src.start(0, start, end - start);
     playSource = src;
     playStartCtxTime = playCtx.currentTime;
@@ -799,6 +846,19 @@
   let lastPlayHeadX = null;
   function tickProgress() {
     if (!playing) return;
+    if (playAnalyser) {
+      playAnalyser.getByteTimeDomainData(pulseData);
+      const amps = new Array(8);
+      for (let i = 0; i < 8; i++) {
+        let m = 0;
+        for (let j = 0; j < 8; j++) {
+          const v = Math.abs(pulseData[i * 8 + j] - 128) / 128;
+          if (v > m) m = v;
+        }
+        amps[i] = m;
+      }
+      drawBrandPulse(amps);
+    }
     tickFrame++;
     if (tickFrame % 2 === 0) {
       const t = currentPlayTime();
@@ -888,7 +948,8 @@
     }
     const src = playCtx.createBufferSource();
     src.buffer = buf;
-    src.connect(playCtx.destination);
+    src.connect(ensureAnalyser());
+    playAnalyser.connect(playCtx.destination);
     const startOffset = Math.min(mixPos, buf.length / state.sampleRate);
     src.start(0, startOffset);
     playSource = src;
@@ -1228,6 +1289,7 @@
     refreshAdvancedSettings();
     document.addEventListener('tempokiri:settings-changed', refreshAdvancedSettings);
 
+    drawBrandPulse(PULSE_IDLE); // 品牌律动条初始静态波形
     status('拖入音频或视频文件开始');
   }
 

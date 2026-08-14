@@ -270,3 +270,35 @@ test('playHeadMoved: 播放线像素阈值（性能 A6）', () => {
   assert.equal(R.playHeadMoved(100, 99), true, '位移 -1px 重绘');
   assert.equal(R.playHeadMoved(100, 150), true, '大位移重绘');
 });
+
+test('setTheme: 切换 canvas 主题色并回退未知主题（主题系统）', () => {
+  // 先记录 aurora 基准（默认态），测完恢复避免污染其他用例
+  R.setTheme('aurora');
+  assert.equal(R.THEME.wave, '#22d3ee');
+  R.setTheme('nebula');
+  assert.equal(R.THEME.wave, '#a78bfa');
+  assert.equal(R.THEME.bg, '#0a0810');
+  R.setTheme('paper');
+  assert.equal(R.THEME.bg, '#efeae2');
+  assert.equal(R.THEME.wave, '#0f766e');
+  R.setTheme('unknown-theme');
+  assert.equal(R.THEME.wave, '#22d3ee', '未知主题应回退 aurora');
+  R.setTheme('aurora'); // 恢复默认，避免污染后续用例
+});
+
+test('CANVAS_THEMES: 三套主题各含 12 个绘制字段（主题系统）', () => {
+  const fields = ['bg', 'gridBg', 'wave', 'waveHigh', 'waveDim', 'barLine', 'beatLine', 'selFill', 'selBorder', 'playLine', 'axis', 'barLabel'];
+  for (const name of ['aurora', 'nebula', 'paper']) {
+    assert.ok(R.CANVAS_THEMES[name], '缺少主题：' + name);
+    for (const f of fields) {
+      assert.ok(R.CANVAS_THEMES[name][f], `${name}.${f} 缺失`);
+    }
+  }
+  // aurora 与默认 THEME 完全一致（默认主题行为零变化）
+  assert.deepEqual(R.CANVAS_THEMES.aurora, {
+    bg: '#0a0c10', gridBg: '#0e1117', wave: '#22d3ee', waveHigh: '#38e1f5',
+    waveDim: 'rgba(34,211,238,0.45)', barLine: 'rgba(255,255,255,0.75)',
+    beatLine: 'rgba(255,255,255,0.14)', selFill: 'rgba(34,211,238,0.22)',
+    selBorder: '#22d3ee', playLine: '#f43f5e', axis: '#7d8794', barLabel: '#9aa4b2',
+  });
+});

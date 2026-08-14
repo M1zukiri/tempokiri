@@ -90,6 +90,7 @@
     captureRate: 4,         // captureStream 采集倍速（1–16）
     followMs: 90,           // 视频跟随 seek 节流间隔（毫秒）
     renderScale: 1.0,       // 波形渲染 DPR 系数（0.1–4）
+    theme: 'aurora',        // 界面主题：'aurora' | 'nebula' | 'paper'
   };
 
   /** 读取全局高级设置（缺省合并）。 */

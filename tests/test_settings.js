@@ -64,10 +64,10 @@ test('validateField 各键非法值', () => {
   assert.equal(s.validateField('unknownKey', 1), false);
 });
 
-test('DEFAULT_VALUES 与 store.js 默认一致（9 键）', () => {
+test('DEFAULT_VALUES 与 store.js 默认一致（10 键）', () => {
   const d = s.DEFAULT_VALUES;
   assert.deepEqual(Object.keys(d).sort(), [
-    'captureRate', 'crossfadeMs', 'followMs', 'hop', 'maxBpm', 'minBpm', 'renderScale', 'sensitivity', 'videoExtract',
+    'captureRate', 'crossfadeMs', 'followMs', 'hop', 'maxBpm', 'minBpm', 'renderScale', 'sensitivity', 'theme', 'videoExtract',
   ]);
   assert.equal(d.hop, 512);
   assert.equal(d.videoExtract, 'auto');
@@ -78,11 +78,12 @@ test('DEFAULT_VALUES 与 store.js 默认一致（9 键）', () => {
   assert.equal(d.sensitivity, 0.9);
   assert.equal(d.minBpm, 60);
   assert.equal(d.maxBpm, 200);
+  assert.equal(d.theme, 'aurora');
 });
 
-test('FIELD_DEFS 覆盖全部 9 个 store 键且 help 文案非空', () => {
+test('FIELD_DEFS 覆盖全部 10 个 store 键且 help 文案非空', () => {
   const keys = s.FIELD_DEFS.map((f) => f.key);
-  for (const k of ['hop', 'sensitivity', 'minBpm', 'maxBpm', 'videoExtract', 'captureRate', 'followMs', 'renderScale']) {
+  for (const k of ['hop', 'sensitivity', 'minBpm', 'maxBpm', 'videoExtract', 'captureRate', 'followMs', 'renderScale', 'theme']) {
     assert.ok(keys.includes(k), '缺少字段定义：' + k);
   }
   for (const f of s.FIELD_DEFS) {
@@ -91,4 +92,20 @@ test('FIELD_DEFS 覆盖全部 9 个 store 键且 help 文案非空', () => {
       assert.ok(typeof f.number.min === 'number' && typeof f.number.max === 'number', '数字框范围缺失：' + f.key);
     }
   }
+});
+
+test('主题字段：validateField 枚举校验与 FIELD_DEFS 定义（主题系统）', () => {
+  assert.equal(s.validateField('theme', 'aurora'), true);
+  assert.equal(s.validateField('theme', 'nebula'), true);
+  assert.equal(s.validateField('theme', 'paper'), true);
+  assert.equal(s.validateField('theme', 'x'), false);
+  assert.equal(s.validateField('theme', ''), false);
+  assert.equal(s.validateField('theme', 1), false);
+  const f = s.FIELD_DEFS.find((x) => x.key === 'theme');
+  assert.ok(f, 'FIELD_DEFS 缺少 theme 字段');
+  assert.equal(f.control, 'select');
+  assert.deepEqual(f.presets.map((p) => p.value), ['aurora', 'nebula', 'paper']);
+  assert.equal(f.presets[0].label, '暗夜青蓝');
+  assert.equal(f.presets[1].label, '幽夜霓紫');
+  assert.equal(f.presets[2].label, '纸墨贝色');
 });

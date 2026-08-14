@@ -34,7 +34,7 @@
   // —— 纯函数：灵敏度（0..1，越大越宽松）-> 识别 delta 阈值 ——
   function sensitivityToDelta(s) { return 1.6 - 0.9 * clamp(s, 0, 1); }
 
-  // —— 默认值常量（与 store.js DEFAULT_GLOBAL 的 9 个键完全一致）——
+  // —— 默认值常量（与 store.js DEFAULT_GLOBAL 的 10 个键完全一致）——
   const DEFAULT_VALUES = {
     crossfadeMs: 30,
     sensitivity: 0.9,
@@ -45,6 +45,7 @@
     captureRate: 4,
     followMs: 90,
     renderScale: 1.0,
+    theme: 'aurora',
   };
 
   // —— 7 项设置元数据（help 文案即弹窗气泡逐字内容）——
@@ -141,6 +142,18 @@
       number: { min: 0.1, max: 4, step: 0.05, unit: '' },
       help: { effect: '波形渲染 DPR 缩放系数，越小越流畅（略糊）、越大越清晰（更耗性能）', range: '0.1–4', recommend: '1.0（高）' },
     },
+    {
+      key: 'theme',
+      label: '界面主题',
+      desc: '全局配色方案，切换即时生效',
+      control: 'select',
+      presets: [
+        { label: '暗夜青蓝', value: 'aurora' },
+        { label: '幽夜霓紫', value: 'nebula' },
+        { label: '纸墨贝色', value: 'paper' },
+      ],
+      help: { effect: '切换整站配色（含波形）并即时保存', range: '三选一', recommend: '暗夜青蓝' },
+    },
   ];
 
   // —— 纯函数：单项校验（min/maxBpm 的交叉校验在 UI 层做）——
@@ -153,10 +166,10 @@
     followMs: [1, 5000],
     renderScale: [0.1, 4],
   };
-  const EXTRACT_SET = { auto: 1, webcodecs: 1, capture: 1 };
+  const EXTRACT_SET = { auto: 1, webcodecs: 1, capture: 1, aurora: 1, nebula: 1, paper: 1 };
 
   function validateField(key, value) {
-    if (key === 'videoExtract') return !!EXTRACT_SET[value];
+    if (key === 'videoExtract' || key === 'theme') return !!EXTRACT_SET[value];
     const r = RANGE[key];
     if (!r || typeof value !== 'number' || !isFinite(value)) return false;
     if (key === 'hop') return Number.isInteger(value) && value >= r[0] && value <= r[1];

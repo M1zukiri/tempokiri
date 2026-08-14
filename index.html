@@ -13,7 +13,48 @@
     --text: #d7dde8;
     --text-dim: #7d8794;
     --accent: #22d3ee;
+    --accent-2: #a78bfa;
+    --accent-fg: #04222b;
+    --wave-bg: #12151b;
+    --input-bg: rgba(0,0,0,0.35);
+    --chip-bg: rgba(255,255,255,0.06);
+    --scroll-thumb: #2a3345;
+    --scroll-thumb-hover: #3a4560;
     --danger: #f43f5e;
+  }
+  [data-theme="nebula"] {
+    --bg: #0e0a14;
+    --panel: #17121f;
+    --panel-2: #1d1726;
+    --border: #2a2138;
+    --text: #e2dcee;
+    --text-dim: #8f87a0;
+    --accent: #a78bfa;
+    --accent-2: #22d3ee;
+    --accent-fg: #221238;
+    --wave-bg: #14101c;
+    --input-bg: rgba(0,0,0,0.35);
+    --chip-bg: rgba(255,255,255,0.06);
+    --scroll-thumb: #3a2f4d;
+    --scroll-thumb-hover: #4a3d5e;
+    --danger: #f43f5e;
+  }
+  [data-theme="paper"] {
+    --bg: #f5f2ed;
+    --panel: #fbfaf7;
+    --panel-2: #efeae3;
+    --border: #d8d2c8;
+    --text: #2a2522;
+    --text-dim: #7a7268;
+    --accent: #0f766e;
+    --accent-2: #6d4fae;
+    --accent-fg: #ffffff;
+    --wave-bg: #f0ece4;
+    --input-bg: rgba(0,0,0,0.05);
+    --chip-bg: rgba(0,0,0,0.05);
+    --scroll-thumb: #cfc8bb;
+    --scroll-thumb-hover: #b8b0a0;
+    --danger: #d63a5a;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -33,14 +74,21 @@
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
   }
-  .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.4px; margin-right: 8px; }
-  .brand em { color: var(--accent); font-style: normal; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: 1px; margin-right: 8px; }
+  .brand em {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-style: normal;
+  }
+  #brandPulse { height: 20px; width: 64px; opacity: 0.85; }
   .spacer { flex: 1; }
   .btn {
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 6px 14px;
     font-size: 13px;
     cursor: pointer;
@@ -48,19 +96,19 @@
   }
   .btn:hover:not(:disabled) { border-color: var(--accent); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-primary { background: var(--accent); color: #04222b; font-weight: 600; border-color: var(--accent); }
-  .btn-primary:hover:not(:disabled) { background: #4adcf2; }
+  .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-color: var(--accent); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.12); }
 
   #stage { position: relative; margin: 10px 14px; }
   #waveWrap {
     position: relative;
     height: 260px;
-    background: #12151b;
+    background: var(--wave-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow: hidden;
   }
-  #waveWrap.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(34,211,238,0.25); }
+  #waveWrap.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
   #wave { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
   #playHead { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
   #waveHint[hidden] { display: none; }
@@ -128,13 +176,13 @@
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
   }
   .seq-card:hover {
-    border-color: rgba(34,211,238,0.45);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     box-shadow: 0 4px 16px rgba(0,0,0,0.35);
     transform: translateY(-1px);
   }
   .seq-card.playing {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 18px rgba(34,211,238,0.18);
+    box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 18px color-mix(in srgb, var(--accent) 18%, transparent);
   }
   .seq-card.playing::before {
     content: '';
@@ -147,12 +195,12 @@
   .seq-num {
     width: 22px; height: 22px;
     border-radius: 50%;
-    background: var(--accent); color: #04222b;
+    background: var(--accent); color: var(--accent-fg);
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; font-size: 12px;
   }
   .seq-range { font-weight: 600; }
-  .seq-time { color: var(--text-dim); font-size: 12px; }
+  .seq-time { color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
   .fade { display: flex; align-items: center; gap: 4px; color: var(--text-dim); font-size: 12px; }
   .fade input {
     width: 64px;
@@ -230,7 +278,7 @@
   .q-btns { display: flex; gap: 3px; }
   .q-neg .btn-mini { border-color: rgba(244,63,94,0.35); }
   .q-neg .btn-mini:hover { border-color: var(--danger); color: var(--danger); }
-  .q-pos .btn-mini { border-color: rgba(34,211,238,0.35); }
+  .q-pos .btn-mini { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
   .q-pos .btn-mini:hover { border-color: var(--accent); color: var(--accent); }
   .q-btns .btn-mini { width: auto; height: 22px; padding: 0 6px; font-size: 11px; min-width: 36px; }
   .controlbar {
@@ -263,35 +311,35 @@
   .seq-card { cursor: grab; user-select: none; }
   .seq-card:active { cursor: grabbing; }
   .unit-input { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
-  .unit-mode-btn { font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); background: rgba(255,255,255,0.06); color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .unit-mode-btn { font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); background: var(--chip-bg); color: var(--muted); cursor: pointer; white-space: nowrap; }
   .unit-mode-btn:hover { color: var(--text); border-color: var(--accent); }
   .unit-fields { display: inline-flex; gap: 3px; }
   .unit-fields.unit-invalid input { border-color: #e5484d; background: rgba(229,72,77,0.14); }
-  .unit-fields input { width: 58px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 5px; background: rgba(0,0,0,0.35); color: var(--text); font-size: 12px; }
+  .unit-fields input { width: 58px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--input-bg); color: var(--text); font-size: 12px; }
   .unit-ref:has(+ .unit-invalid), .unit-invalid + .unit-ref { color: #e5484d; }
   .seq-edges { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .edge-label { font-size: 11px; color: var(--muted); }
   .seq-card.invalid { border-color: #e5484d; box-shadow: 0 0 0 1px #e5484d inset; }
-  .manual-form { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px dashed var(--border); border-radius: 10px; background: rgba(255,255,255,0.03); flex-wrap: wrap; }
+  .manual-form { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px dashed var(--border); border-radius: 10px; background: var(--chip-bg); flex-wrap: wrap; }
   .manual-form[hidden] { display: none; }
   .modal-actions { display: flex; align-items: center; gap: 8px; }
   /* 输入聚焦发光 */
   .unit-fields input:focus, .fade input:focus, .modal-form input:focus, .modal-form select:focus, .seg-table input:focus, .seg-table select:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(34,211,238,0.18);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
   }
   /* 按钮按压反馈 */
   .btn:active:not(:disabled), .btn-mini:active, .unit-mode-btn:active { transform: translateY(1px); }
-  .btn-primary { box-shadow: 0 2px 10px rgba(34,211,238,0.22); }
+  .btn-primary { box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
   /* 细滚动条 */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 5px; border: 2px solid var(--bg); }
-  ::-webkit-scrollbar-thumb:hover { background: #3a4560; }
-  body { scrollbar-width: thin; scrollbar-color: #2a3345 var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+  body { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--bg); }
   /* 空状态引导（波形区 hint 已有；序列空态增强） */
-  .empty { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; }
+  .empty { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; padding: 10px 14px; background: var(--chip-bg); border: 1px dashed var(--border); border-radius: 8px; }
   .empty::before { content: 'ℹ'; color: var(--accent); font-size: 14px; }
   /* 拼接序列进度条 */
   .seq-progress {
@@ -300,7 +348,7 @@
     gap: 10px;
     padding: 8px 10px;
     margin-bottom: 10px;
-    background: rgba(255,255,255,0.03);
+    background: var(--chip-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
   }
@@ -320,7 +368,7 @@
     position: absolute;
     left: 0; top: 0; bottom: 0;
     width: 0%;
-    background: linear-gradient(90deg, rgba(34,211,238,0.35), var(--accent));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 35%, transparent), var(--accent));
     border-radius: 6px 0 0 6px;
     pointer-events: none;
   }
@@ -368,7 +416,7 @@
     margin: 14px;
     margin-top: 6px;
     padding: 12px 16px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--chip-bg) 40%, transparent), var(--chip-bg));
     border: 1px solid var(--border);
     border-radius: 12px;
     position: relative;
@@ -400,7 +448,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 18px rgba(34,211,238,0.25);
+    text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 25%, transparent);
   }
   .footer-tag {
     color: var(--text-dim);
@@ -409,7 +457,7 @@
   .footer-version {
     font-size: 11px;
     color: var(--text-dim);
-    background: rgba(255,255,255,0.06);
+    background: var(--chip-bg);
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 1px 8px;
@@ -451,7 +499,7 @@
   #btnReadme:hover, #btnCheckUpdate:hover, #btnAdvanced:hover {
     border-color: var(--accent);
     color: var(--accent);
-    box-shadow: 0 0 12px rgba(34,211,238,0.3);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
   }
   .footer-toast {
     position: absolute;
@@ -480,30 +528,31 @@
   }
   .readme-modal-body h2 { font-size: 17px; margin: 14px 0 6px; color: var(--accent); }
   .readme-modal-body h3 { font-size: 15px; margin: 12px 0 6px; }
-  .readme-modal-body h4 { font-size: 13px; margin: 10px 0 4px; }
   .readme-modal-body p { margin: 6px 0; }
   .readme-modal-body ul, .readme-modal-body ol { margin: 6px 0; padding-left: 22px; }
   .readme-modal-body li { margin: 3px 0; }
   .readme-modal-body code {
-    background: rgba(255,255,255,0.08);
+    background: var(--chip-bg);
     border-radius: 4px;
     padding: 1px 5px;
     font-size: 12px;
     font-family: ui-monospace, Consolas, monospace;
   }
   .readme-modal-body pre {
-    background: rgba(0,0,0,0.35);
+    background: var(--input-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 12px;
     overflow-x: auto;
   }
   .readme-modal-body pre code { background: none; padding: 0; }
+  /* 键盘焦点轮廓（可访问性，鼠标点击不显示） */
+  .btn:focus-visible, .btn-mini:focus-visible, .unit-mode-btn:focus-visible, .footer-btn:focus-visible, .exp-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 <body>
   <header class="toolbar">
-    <div class="brand">Tempokiri <em>工作站</em></div>
+    <div class="brand">Tempokiri <em>工作站</em><canvas id="brandPulse" width="64" height="20" aria-hidden="true"></canvas></div>
     <input id="fileInput" type="file" accept="audio/*,video/*" hidden />
     <button id="btnOpenFile" class="btn">打开文件</button>
     <button id="btnSettings" class="btn" disabled>设置节拍</button>

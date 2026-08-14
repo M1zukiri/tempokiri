@@ -67,3 +67,16 @@ test('文件设置：往返一致', () => {
   S.clearSettings(file);
   assert.equal(S.loadSettings(file), null);
 });
+
+test('全局设置：主题默认 aurora 且可保存切换（主题系统）', () => {
+  mem.clear();
+  const g = S.loadGlobalSettings();
+  assert.equal(g.theme, 'aurora', '默认主题应为 aurora');
+  S.saveGlobalSettings({ theme: 'nebula' });
+  assert.equal(S.loadGlobalSettings().theme, 'nebula');
+  S.saveGlobalSettings({ theme: 'paper' });
+  assert.equal(S.loadGlobalSettings().theme, 'paper');
+  // 非法主题值不在此层过滤（validateField 负责），保存即原样
+  S.saveGlobalSettings({ theme: 'x' });
+  assert.equal(S.loadGlobalSettings().theme, 'x');
+});
