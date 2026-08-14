@@ -75,12 +75,16 @@
     flex-wrap: wrap;
   }
   .brand { display: flex; align-items: center; gap: 8px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 16px; letter-spacing: 1px; margin-right: 8px; }
-  .brand em {
+  .brand-name {
     background: linear-gradient(90deg, var(--accent), var(--accent-2));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    font-style: normal;
+  }
+  .brand-tag {
+    color: var(--text-dim);
+    font-size: 12px;
+    white-space: nowrap;
     font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   #brandPulse { height: 20px; width: 64px; opacity: 0.85; }
@@ -452,10 +456,6 @@
     -webkit-text-fill-color: transparent;
     text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 25%, transparent);
   }
-  .footer-tag {
-    color: var(--text-dim);
-    font-size: 12px;
-  }
   .footer-version {
     font-size: 11px;
     color: var(--text-dim);
@@ -554,7 +554,7 @@
 </head>
 <body>
   <header class="toolbar">
-    <div class="brand">Tempokiri <em>工作站</em><canvas id="brandPulse" width="64" height="20" aria-hidden="true"></canvas></div>
+    <div class="brand"><span class="brand-name">Tempokiri</span><span class="brand-tag">节奏感知的音频/视频剪辑工作站</span><span class="footer-version">v<span data-version>__VERSION__</span></span><canvas id="brandPulse" width="64" height="20" aria-hidden="true"></canvas></div>
     <input id="fileInput" type="file" accept="audio/*,video/*" hidden />
     <button id="btnOpenFile" class="btn">打开文件</button>
     <button id="btnSettings" class="btn" disabled>设置节拍</button>
@@ -644,8 +644,6 @@
     <div class="footer-sign">
       <span class="footer-heart">♥</span>
       <span class="footer-name">M1zukiri</span>
-      <span class="footer-tag">节奏感知的音频/视频剪辑工作站</span>
-      <span class="footer-version">v<span data-version>__VERSION__</span></span>
     </div>
     <div class="footer-actions">
       <button class="footer-btn footer-bili" data-href="https://space.bilibili.com/80733922" title="Bilibili 主页">
