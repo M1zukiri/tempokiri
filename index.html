@@ -74,13 +74,14 @@
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
   }
-  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: 1px; margin-right: 8px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 16px; letter-spacing: 1px; margin-right: 8px; }
   .brand em {
     background: linear-gradient(90deg, var(--accent), var(--accent-2));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     font-style: normal;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   #brandPulse { height: 20px; width: 64px; opacity: 0.85; }
   .spacer { flex: 1; }
@@ -441,9 +442,10 @@
     48% { transform: scale(1); }
   }
   .footer-name {
+    font-family: Georgia, 'Times New Roman', serif;
     font-weight: 800;
-    font-size: 16px;
-    letter-spacing: 1.5px;
+    font-size: 17px;
+    letter-spacing: 2px;
     background: linear-gradient(90deg, var(--accent), #a78bfa, var(--danger));
     -webkit-background-clip: text;
     background-clip: text;

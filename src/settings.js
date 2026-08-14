@@ -55,6 +55,18 @@
   // 数字框显示毫秒、store 存采样点；其余项无换算，省略两键）
   const FIELD_DEFS = [
     {
+      key: 'theme',
+      label: '界面主题',
+      desc: '全局配色方案，切换即时生效',
+      control: 'select',
+      presets: [
+        { label: '暗夜青蓝', value: 'aurora' },
+        { label: '幽夜霓紫', value: 'nebula' },
+        { label: '纸墨贝色', value: 'paper' },
+      ],
+      help: { effect: '切换整站配色（含波形）并即时保存', range: '三选一', recommend: '暗夜青蓝' },
+    },
+    {
       key: 'hop',
       label: '检测精度',
       desc: '帧移（相邻分析窗步进），越小节拍定位越精细、分析越慢',
@@ -141,18 +153,6 @@
       ],
       number: { min: 0.1, max: 4, step: 0.05, unit: '' },
       help: { effect: '波形渲染 DPR 缩放系数，越小越流畅（略糊）、越大越清晰（更耗性能）', range: '0.1–4', recommend: '1.0（高）' },
-    },
-    {
-      key: 'theme',
-      label: '界面主题',
-      desc: '全局配色方案，切换即时生效',
-      control: 'select',
-      presets: [
-        { label: '暗夜青蓝', value: 'aurora' },
-        { label: '幽夜霓紫', value: 'nebula' },
-        { label: '纸墨贝色', value: 'paper' },
-      ],
-      help: { effect: '切换整站配色（含波形）并即时保存', range: '三选一', recommend: '暗夜青蓝' },
     },
   ];
 
