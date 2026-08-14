@@ -52,6 +52,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.5.1**：文案修订（strings.json）——主题名改英文（Aoi Aurora / Meltyland's Nightmare / Kamikiri）、彩蛋与提示文案精简；测试断言改为与 strings.json 同源（改文案不再破坏测试）；README 补文案系统/主题说明
 - **1.5.0**：界面文案系统——strings.json 唯一编辑源（约 210 条文案），build.py 注入 + key 完整性校验（缺失中止/冗余警告）；src/i18n.js 提供 T(key, params) 插值与 data-i18n 静态填充；全模块（index.html/main/settings/exportModal/ui/footer）硬编码文案迁移完毕
 - **1.4.3**：修复检查更新逻辑——原 else 分支无条件提示「发现新版本」（GitHub 版本低于本地时误报）；新增 `compareVersions` 语义化三段比较（footer.js 导出，纯函数可单测），分支改为：GitHub > 本地 → 正常提示更新；相等 → 已是最新；GitHub < 本地 → 彩蛋弹窗「领先一步」（测试者超前版场景）
 - **1.4.2**：页脚重排——产品身份（标语 + 版本徽标）上移至顶部 brand 区（Tempokiri 渐变字 + tagline + 版本 pill + 律动条），页脚只留作者署名（♥ M1zukiri + 社交/工具按钮）

@@ -55,12 +55,12 @@
     "toastDev": "GitHub 最新版本 v{latest}（当前为开发版）→ {link}",
     "toastLatest": "已是最新版本 v{version} 🎉",
     "toastNew": "发现新版本 v{latest}（当前 v{local}）→ {link}",
-    "toastUnavailable": "无法获取最新版本（网络或仓库限制）",
+    "toastUnavailable": "无法获取最新版本，请检查网络连接。",
     "toastError": "检查更新失败：{msg}",
     "eggTitle": "🎉 领先一步",
     "eggSub": "你的本地版本 v{local} 比 GitHub 官方 v{remote} 更新。",
-    "eggBody": "这是测试者专属的超前版本——你正跑在发布计划前面，比官方还快一步。继续保持，这份领先只有你的小分队能拿到。",
-    "readmeMissing": "README 未内嵌（请用 build.py 打包后使用）。",
+    "eggBody": "🤖你正在使用内测版本。如遇到功能或体验问题，请联系开发者。",
+    "readmeMissing": "README 未内嵌。",
     "eggAria": "超前版本彩蛋",
     "eggOk": "知道了"
   },
@@ -81,7 +81,7 @@
     "playEnd": "播放结束",
     "playFrom": "从 {pos} 开始播放",
     "seqEmpty": "序列为空，请先在波形上选段",
-    "seqInvalid": "存在无效的序列项（标红），请修正后再播放",
+    "seqInvalid": "存在无效的序列项，请修正后再播放",
     "noTrack": "缺少音轨数据（视频需先采集音轨）",
     "nothingToPlay": "无可播放内容",
     "previewEnd": "试听结束",
@@ -93,7 +93,7 @@
     "videoRendering": "视频合成中…{pct}%",
     "videoExported": "视频导出完成：{name}.mp4",
     "exportFailed": "导出失败：{msg}",
-    "manualAddFailed": "手动添加失败：起止需合法（小节/格或时间），且起点必须早于终点",
+    "manualAddFailed": "手动添加失败。请检查起终点时间",
     "manualAdded": "已手动添加：{from} – {to}",
     "dragToStart": "拖入音频或视频文件开始",
     "posDesc": "（第 {bar} 小节 {cell} 格）",
@@ -102,10 +102,10 @@
     "majDoneAudio": "track.mp3 导出完成"
   },
   "hint": {
-    "extractSilent": "正在静音快速播放采集音轨…",
+    "extractSilent": "正在静音快速播放采集音轨...",
     "extractFailedManual": "音轨提取失败：{msg}。可点击「设置节拍」手动输入 BPM。",
     "extracting": "正在提取视频音轨…",
-    "extractSilentNoWc": "正在静音快速播放采集音轨（WebCodecs 不可用）…",
+    "extractSilentNoWc": "正在静音快速播放采集音轨...",
     "extractRapid": "正在快速播放视频以采集音轨…",
     "configureGrid": "点击「设置节拍」配置 BPM 与网格，之后即可在波形上选段。",
     "decoding": "正在解码音频…"
@@ -134,24 +134,24 @@
       "label": "界面主题",
       "desc": "全局配色方案，切换即时生效",
       "presets": {
-        "aurora": "暗夜青蓝",
-        "nebula": "幽夜霓紫",
-        "paper": "纸墨贝色"
+        "aurora": "Aoi Aurora",
+        "nebula": "Meltyland's Nightmare",
+        "paper": "Kamikiri"
       },
-      "helpEffect": "切换整站配色（含波形）并即时保存",
+      "helpEffect": "切换工作站配色",
       "helpRange": "三选一",
-      "helpRecommend": "暗夜青蓝"
+      "helpRecommend": "Aoi Aurora"
     },
     "hop": {
-      "label": "检测精度",
-      "desc": "帧移（相邻分析窗步进），越小节拍定位越精细、分析越慢",
+      "label": "检测帧间隔",
+      "desc": "相邻分析窗间的步进距离，间隔越小，节拍定位越精细、分析越慢",
       "presets": {
         "1024": "快速",
         "512": "标准",
         "256": "高精度"
       },
       "unit": "毫秒",
-      "helpEffect": "帧移（相邻分析窗步进）越小节拍定位越精细但分析越慢",
+      "helpEffect": "相邻分析窗间的步进距离，间隔越小，节拍定位越精细、分析越慢",
       "helpRange": "3–93 毫秒（对应 FFT 帧移 64–2048 采样点）",
       "helpRecommend": "23 毫秒（标准）"
     },
@@ -163,18 +163,18 @@
       "helpRecommend": "0.9"
     },
     "minBpm": {
-      "label": "BPM 范围（最小）",
+      "label": "BPM 范围（下限）",
       "unit": "BPM",
       "desc": "自动识别 BPM 搜索区间的下限",
-      "helpEffect": "自动识别 BPM 搜索区间，区间外真拍被忽略",
+      "helpEffect": "自动识别 BPM 的搜索区间",
       "helpRange": "1–600（且最小 ≤ 最大）",
       "helpRecommend": "60"
     },
     "maxBpm": {
-      "label": "BPM 范围（最大）",
+      "label": "BPM 范围（上限）",
       "unit": "BPM",
       "desc": "自动识别 BPM 搜索区间的上限",
-      "helpEffect": "自动识别 BPM 搜索区间，区间外真拍被忽略",
+      "helpEffect": "自动识别 BPM 的搜索区间",
       "helpRange": "1–600（且最大 ≥ 最小）",
       "helpRecommend": "200"
     },
@@ -186,7 +186,7 @@
         "webcodecs": "仅 WebCodecs（失败即报错）",
         "capture": "仅实时采集"
       },
-      "helpEffect": "视频音轨提取方案；WebCodecs 快而准，实时采集兼容性更好",
+      "helpEffect": "视频音轨提取方案；WebCodecs性能更高，实时采集兼容性更好",
       "helpRange": "三选一",
       "helpRecommend": "自动"
     },
@@ -212,7 +212,7 @@
         "250": "省电"
       },
       "unit": "毫秒",
-      "helpEffect": "拼接播放时视频跟随音频 seek 的最小间隔，越小越跟手、越大越省电",
+      "helpEffect": "拼接播放时视频跟随音频的最小间隔，越小越跟手、越大越省电",
       "helpRange": "1–5000 毫秒",
       "helpRecommend": "90（流畅）"
     },

@@ -20,6 +20,8 @@ BPM = 120 → 每拍 = 60/120 = 0.5 秒 → 每小节（4拍）= 2 秒
 - **多段拼接**：等功率余弦交叉淡化（默认 30ms，可调）；**拼接进度条**——总时长、seam 金黄竖线标记、点击/拖动即定位试听、已播放青色渐变；播放线按段映射回原曲位置
 - **试听**：播放/暂停/停止（断点保留）、拼接序列先拼成连续音频再一次性播放（消除段间间隔）
 - **导出**：WAV / MP3 / MP4/MOV 视频（WebCodecs 合成，关键帧边界 flush 零丢帧）
+- **三套配色主题**：暗夜青蓝（默认）/ 幽夜霓紫 / 纸墨贝色，高级设置即时切换并持久化；顶部品牌标随播放律动
+- **界面文案可定制**：全部按钮/提示/状态/弹窗文字集中在 `strings.json`，修改后 `python build.py` 即生效，无需改代码
 - **页脚**：渐变霓虹签名、Bilibili/GitHub 链接、README 内嵌弹窗（离线可读）、检查更新；高级设置（交叉淡化、BPM 范围）持久化 localStorage
 - **性能**：波形帧合并、批量 path 单次 stroke、拼接 seek 缓存（`getMixBuffer`）与播放段切换只切高亮——长音频拖拽/缩放/seek 流畅
 
@@ -54,8 +56,9 @@ python build.py
 
 ```
 ├── index.html          开发入口（深色 DJ 风格 UI，引用 src/*.js）
+├── strings.json        界面文案唯一编辑源（约 210 条，改文案只改此文件）
 ├── build.py            打包脚本 → dist/tempokiri-workstation.html 单文件
-├── src/                浏览器模块（UMD 挂到 window.MC，可 Node 测试）
+│   ├── i18n.js         文案系统：T(key, params) 插值、data-i18n 静态填充
 │   ├── main.js         装配层：状态、文件处理、播放、导出流程
 │   ├── analysis.js     核心算法：FFT / 频谱通量 / BPM / 偏移 / 网格
 │   ├── render.js       波形与网格渲染
@@ -64,7 +67,7 @@ python build.py
 │   ├── audio.js        音频解码/视频音轨提取
 │   ├── ui.js           序列列表渲染、播放态高亮
 │   └── modal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / unitInput.js / log.js
-├── tests/              Node 单元测试（analysis/export/sequence/audio/render/ui/store/footer）
+├── tests/              Node 单元测试（analysis/export/sequence/audio/render/ui/store/footer/i18n/settings）
 ├── lib/                lame.min.js（MP3）、mp4box.global.js（demux）、mp4-muxer.js（合成）
 ├── examples/           测试素材（合成音频/视频）与生成脚本
 ├── docs/               设计文档

@@ -105,7 +105,9 @@ test('主题字段：validateField 枚举校验与 FIELD_DEFS 定义（主题系
   assert.ok(f, 'FIELD_DEFS 缺少 theme 字段');
   assert.equal(f.control, 'select');
   assert.deepEqual(f.presets.map((p) => p.value), ['aurora', 'nebula', 'paper']);
-  assert.equal(f.presets[0].label, '暗夜青蓝');
-  assert.equal(f.presets[1].label, '幽夜霓紫');
-  assert.equal(f.presets[2].label, '纸墨贝色');
+  // 断言与 strings.json 同源（改文案不破坏测试）
+  const dict = require('../strings.json');
+  assert.equal(f.presets[0].label, dict.settings.theme.presets.aurora);
+  assert.equal(f.presets[1].label, dict.settings.theme.presets.nebula);
+  assert.equal(f.presets[2].label, dict.settings.theme.presets.paper);
 });
