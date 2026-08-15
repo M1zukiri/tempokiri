@@ -66,14 +66,27 @@
         try {
           const frames = audioData.numberOfFrames;
           const channels = audioData.numberOfChannels;
-          // 逐平面拷贝：AudioDecoder 输出 f32-planar，copyTo 必须显式指定
-          // planeIndex（不支持一次拷贝全部平面），dest 每平面恰好 frames 长。
-          // 平面布局 planar[ch * frames + i] 与下方汇总循环的按平面索引
-          // 混合一致；不能把平面数据当交错布局读，否则立体声每个 chunk
-          // 后半段读到 0（产生周期性“有声→静音”锯齿音）
-          const planar = new Float32Array(frames * channels);
-          for (let ch = 0; ch < channels; ch++) {
-            audioData.copyTo(planar.subarray(ch * frames), { planeIndex: ch });
+          // 解码输出有两种布局：f32-planar（多平面，逐平面拷贝）与 f32
+          // （交错，单平面）。交错格式对 copyTo 传 planeIndex>0 会抛
+          // Invalid planeIndex（Chrome 对部分 AAC 源输出交错格式），必须
+          // 按 format 分支；统一转换为 planar[ch * frames + i] 平面布局，
+          // 与下方汇总循环的按平面索引混合一致（不能把平面数据当交错
+          // 布局读，否则立体声每个 chunk 后半段读到 0）
+          let planar;
+          const fmt = audioData.format;
+          if (fmt === 'f32-planar') {
+            planar = new Float32Array(frames * channels);
+            for (let ch = 0; ch < channels; ch++) {
+              audioData.copyTo(planar.subarray(ch * frames), { planeIndex: ch });
+            }
+          } else if (fmt === 'f32') {
+            const inter = new Float32Array(frames * channels);
+            // copyTo 的 options 参数必填（缺省会抛 AudioDataCopyToOptions 类型错误）；
+            // f32 交错格式为单平面，planeIndex 0 合法，dest 长度 = frames*channels
+            audioData.copyTo(inter, { planeIndex: 0 });
+            planar = interleavedToPlanar(inter, frames, channels);
+          } else {
+            throw new Error('不支持的解码输出格式：' + fmt);
           }
           pcmChunks.push({ data: planar, channels, rate: audioData.sampleRate });
         } catch (e) {
@@ -118,6 +131,23 @@
       sampleRate: rate,
       duration,
     };
+  }
+
+  /**
+   * 将交错布局 PCM（interleaved[f * channels + ch]）重排为平面布局
+   * （planar[ch * frames + f]）。用于 AudioDecoder 输出 f32 交错格式时
+   * 与 mixPlanarChunks 的平面约定对齐。
+   * @param {Float32Array} inter 交错样本
+   * @param {number} frames 每声道样本数
+   * @param {number} channels 声道数
+   * @returns {Float32Array}
+   */
+  function interleavedToPlanar(inter, frames, channels) {
+    const planar = new Float32Array(frames * channels);
+    for (let ch = 0; ch < channels; ch++) {
+      for (let f = 0; f < frames; f++) planar[ch * frames + f] = inter[f * channels + ch];
+    }
+    return planar;
   }
 
   /**
@@ -429,5 +459,5 @@
       duration: duration || mono.length / sampleRate,
     };
   }
-  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks, readWavSampleRate };
+  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks, interleavedToPlanar, readWavSampleRate };
 });

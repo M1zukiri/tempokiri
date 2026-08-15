@@ -777,6 +777,7 @@
       playingSeqId = null;
       renderAll();
     }
+    status(T('status.stopped')); // 手动停止后状态栏如实显示（自然结束路径随后覆盖）
   }
 
   /** 时间点描述：秒 + （有网格时）对应的小节/格。 */

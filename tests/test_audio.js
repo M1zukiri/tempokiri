@@ -77,3 +77,42 @@ test('readWavSampleRate: 非 WAV/非法输入返回 null', () => {
   assert.equal(A.readWavSampleRate(new ArrayBuffer(44)), null, '全零无 RIFF 标记');
   assert.equal(A.readWavSampleRate(new Uint8Array(64).buffer), null, '无 RIFF/WAVE 标记');
 });
+
+test('interleavedToPlanar: 立体声交错重排为平面布局', () => {
+  const frames = 8;
+  // 交错：inter[f*2+0] = 左声道（0.5 正弦），inter[f*2+1] = 右声道（-0.5 正弦）
+  const inter = new Float32Array(frames * 2);
+  for (let f = 0; f < frames; f++) {
+    inter[f * 2] = 0.5 * Math.sin(2 * Math.PI * f / frames);
+    inter[f * 2 + 1] = -0.5 * Math.sin(2 * Math.PI * f / frames);
+  }
+  const planar = A.interleavedToPlanar(inter, frames, 2);
+  assert.equal(planar.length, frames * 2);
+  for (let f = 0; f < frames; f++) {
+    assert.ok(Math.abs(planar[f] - inter[f * 2]) < 1e-6, `左平面样本 ${f}`);
+    assert.ok(Math.abs(planar[frames + f] - inter[f * 2 + 1]) < 1e-6, `右平面样本 ${f}`);
+  }
+});
+
+test('interleavedToPlanar: 单声道交错原样复制', () => {
+  const inter = new Float32Array([1, -1, 0.5, 0.25]);
+  const planar = A.interleavedToPlanar(inter, 4, 1);
+  for (let i = 0; i < inter.length; i++) assert.ok(Math.abs(planar[i] - inter[i]) < 1e-6);
+});
+
+test('interleavedToPlanar + mixPlanarChunks: 交错源转平面后混 mono 正确', () => {
+  const frames = 1024;
+  const inter = new Float32Array(frames * 2);
+  for (let f = 0; f < frames; f++) {
+    inter[f * 2] = 0.5 * Math.sin(2 * Math.PI * f / frames);
+    inter[f * 2 + 1] = -0.5 * Math.sin(2 * Math.PI * f / frames);
+  }
+  const planar = A.interleavedToPlanar(inter, frames, 2);
+  const mono = A.mixPlanarChunks([{ data: planar, channels: 2 }]);
+  assert.equal(mono.length, frames);
+  // 左右平均后任何位置都不应为 0（bug 版把平面当交错读会产生半段静音）
+  for (let f = 0; f < frames; f++) {
+    const expect = (inter[f * 2] + inter[f * 2 + 1]) / 2;
+    assert.ok(Math.abs(mono[f] - expect) < 1e-6, `样本 ${f}`);
+  }
+});
