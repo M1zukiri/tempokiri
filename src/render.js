@@ -283,7 +283,7 @@
       const dxPhys = Math.round(dxPx * dpr);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(waveCache, dxPhys, 0);
+      ctx.drawImage(waveCache, -dxPhys, 0);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const x0 = dxPx > 0 ? cssW - dxPx : 0;
       const x1 = dxPx > 0 ? cssW : -dxPx;

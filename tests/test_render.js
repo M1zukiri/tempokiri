@@ -25,6 +25,7 @@ function mockCtx() {
     moveXs: [],
     lineXs: [],
     drawImageCalls: 0,
+    drawImageDxs: [],
     fillTexts: 0,
     shadowGlowUsed: false,
     _shadowBlur: 0,
@@ -39,7 +40,7 @@ function mockCtx() {
     setLineDash() {},
     fillRect() {},
     setTransform() {},
-    drawImage() { this.drawImageCalls++; calls.push('drawImage'); },
+    drawImage(img, dx) { this.drawImageCalls++; this.drawImageDxs.push(dx); calls.push('drawImage'); },
     beginPath() { this.beginPathCount++; calls.push('beginPath'); },
     moveTo(x) { this.moveTos++; this.moveXs.push(x); calls.push('moveTo'); },
     lineTo(x) { this.lineXs.push(x); calls.push('lineTo'); },
@@ -358,6 +359,8 @@ test('draw: 纯平移走增量路径，波形只重绘露出条带（P0·T3）',
     R.draw(canvas, { start: 0.1, end: 10.1 }, data); // 纯平移 → 增量
     const dxPx = Math.round(0.1 * 800 / 10); // 8px
     const x0 = 800 - dxPx; // 792
+    assert.equal(ctx.drawImageDxs.length, 1, '增量路径主 canvas 应恰好一次 blit');
+    assert.equal(ctx.drawImageDxs[0], -dxPx, `blit 应向左偏移 -${dxPx}px（时间前进波形左移）`);
     assert.ok(ctx.moveXs.length < 100, `增量波形 moveTo 应远小于全量，实际 ${ctx.moveXs.length}`);
     for (const x of ctx.moveXs) {
       assert.ok(x >= x0 && x < 800, `增量 moveTo x=${x} 应在条带 [${x0},800)`);
