@@ -29,6 +29,7 @@
     view: null,
     dragRange: null,
     playTime: null,
+    meta: null, // 当前文件元数据（解析值 + 编辑值合并结果）
   };
 
   // ---------- DOM ----------
@@ -254,6 +255,7 @@
     state.file = file;
     state.kind = audio.classifyFile(file);
     state.pcm = state.rawMono = state.audioBuffer = null;
+    state.meta = null;
     state.grid = null;
     state.segments = [{ bpm: null, beatsPerBar: 4, beatUnit: 4 }];
     state.offset = 0;
@@ -360,7 +362,24 @@
         status(T('status.decodeFailed'));
       }
     }
+    await loadMetaForFile();
     renderAll();
+  }
+
+  /**
+   * 解析当前文件元数据并与 per-file 编辑值合并（解析失败静默为空）。
+   * 封面不持久化，每次导入重新解析。
+   */
+  async function loadMetaForFile() {
+    let parsed = {};
+    try {
+      parsed = MC.parseMetadata(await state.file.arrayBuffer(), audio.extOf(state.file.name));
+    } catch (e) {
+      parsed = {};
+    }
+    const edited = store.loadMetadata(state.file) || {};
+    state.meta = MC.mergeMeta(parsed, edited);
+    MC.metaModal.setData({ fileName: state.file.name, meta: state.meta });
   }
 
   /** 返回是否命中缓存并应用。 */
@@ -1051,11 +1070,13 @@
           if (opts.normalize) mix = exp.peakNormalize(mix, opts.peakDb);
           const name = opts.fileName;
           if (opts.format === 'wav') {
-            const buf = exp.encodeWav(mix, sr, opts.bitDepth);
+            let buf = exp.encodeWav(mix, sr, opts.bitDepth);
+            buf = MC.attachToWav(buf, state.meta || {});
             exp.downloadBlob(buf, name + '.wav', 'audio/wav');
             status(T('status.exportedWav', { name: name }));
           } else {
-            const buf = exp.encodeMp3(mix, sr, opts.mp3Bitrate);
+            let buf = exp.encodeMp3(mix, sr, opts.mp3Bitrate);
+            buf = MC.attachToMp3(buf, state.meta || {});
             exp.downloadBlob(buf, name + '.mp3', 'audio/mpeg');
             status(T('status.exportedMp3', { name: name }));
           }
@@ -1095,7 +1116,7 @@
           }
           let tMix = analysis.resample(mix, state.sampleRate, 44100);
           if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
-          const buf = exp.encodeMp3(tMix, 44100, opts.mp3Bitrate);
+          const buf = MC.attachToMp3(exp.encodeMp3(tMix, 44100, opts.mp3Bitrate), state.meta || {});
           exp.downloadBlob(buf, 'track.mp3', 'audio/mpeg');
           status(state.kind === 'video' ? T('status.majDoneVideo') : T('status.majDoneAudio'));
         }
@@ -1337,6 +1358,7 @@
         MC.close && MC.close();
         MC.closeExport && MC.closeExport();
         MC.settings && MC.settings.closeAdvanced && MC.settings.closeAdvanced();
+        MC.metaModal && MC.metaModal.close && MC.metaModal.close();
         manualForm.hidden = true;
         const footOverlay = document.getElementById('readmeOverlay') || document.getElementById('easterEggOverlay');
         if (footOverlay) footOverlay.remove();
@@ -1353,6 +1375,15 @@
       }
     });
 
+    MC.metaModal.init({
+      onEdit: (meta) => {
+        state.meta = meta;
+        if (state.file) {
+          const { cover, ...fields } = meta; // cover 只读，不持久化
+          store.saveMetadata(state.file, fields);
+        }
+      },
+    });
     refreshAdvancedSettings();
     document.addEventListener('tempokiri:settings-changed', refreshAdvancedSettings);
 

@@ -50,6 +50,8 @@
     "readmeTitle": "打开 README 文档",
     "advanced": "高级设置",
     "advancedTitle": "高级设置（性能/音效/解码）",
+    "meta": "元数据",
+    "metaTitle": "元数据（导入时自动读取，导出时自动附加）",
     "checkUpdate": "检查更新",
     "checkUpdateTitle": "检查 GitHub 上是否有新版本",
     "checking": "检查中…",
@@ -268,5 +270,22 @@
     "aacBitrateHint": "当前采样率下该 AAC 码率不受支持，请选择更低码率。",
     "cancel": "取消",
     "ok": "导出"
+  },
+  "metadata": {
+    "aria": "元数据",
+    "title": "元数据",
+    "sub": "导入文件时自动读取元数据，导出音频时自动附加。修改即时保存，重新打开同一文件可恢复。",
+    "fileLabel": "来源文件",
+    "coverLabel": "封面",
+    "noCover": "无封面",
+    "close": "关闭",
+    "labels": {
+      "title": "标题",
+      "artist": "艺术家",
+      "album": "专辑",
+      "composer": "作曲家",
+      "year": "年份",
+      "genre": "流派"
+    }
   }
 }

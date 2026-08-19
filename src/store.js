@@ -57,7 +57,9 @@
    */
   function saveSettings(file, settings) {
     const all = readAll();
-    all[fingerprint(file)] = settings;
+    const key = fingerprint(file);
+    // 合并语义：保留既有键（如 metadata），避免节拍保存覆盖元数据编辑
+    all[key] = { ...(all[key] || {}), ...settings };
     writeAll(all);
   }
 
@@ -77,6 +79,21 @@
     const all = readAll();
     delete all[fingerprint(file)];
     writeAll(all);
+  }
+
+  /**
+   * 保存元数据编辑值（6 文本字段对象；经合并语义，节拍/序列键保留）。
+   * @param {File} file
+   * @param {object} meta 仅含 title/artist/album/composer/year/genre 的字符串对象
+   */
+  function saveMetadata(file, meta) {
+    saveSettings(file, { metadata: meta });
+  }
+
+  /** 读取元数据编辑值（无则返回 null）。 */
+  function loadMetadata(file) {
+    const s = loadSettings(file);
+    return (s && s.metadata) || null;
   }
 
   const GLOBAL_KEY = 'tempokiri.remix.global.v1';
@@ -117,5 +134,5 @@
     }
   }
 
-  return { KEY, fingerprint, saveSettings, loadSettings, clearSettings, GLOBAL_KEY, loadGlobalSettings, saveGlobalSettings };
+  return { KEY, fingerprint, saveSettings, loadSettings, clearSettings, saveMetadata, loadMetadata, GLOBAL_KEY, loadGlobalSettings, saveGlobalSettings };
 });

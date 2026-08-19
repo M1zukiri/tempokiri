@@ -213,6 +213,8 @@
     if (btnUpdate) btnUpdate.addEventListener('click', checkUpdate);
     const btnAdvanced = document.getElementById('btnAdvanced');
     if (btnAdvanced) btnAdvanced.addEventListener('click', () => MC.settings.openAdvanced());
+    const btnMeta = document.getElementById('btnMeta');
+    if (btnMeta) btnMeta.addEventListener('click', () => MC.metaModal.open());
     // 版本徽标：build.py 已把 '__VERSION__' 替换；src 模式下回退显示 dev
     const badge = document.querySelector('[data-version]');
     if (badge) badge.textContent = resolveVersion();

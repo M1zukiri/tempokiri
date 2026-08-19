@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.7.0**：元数据菜单——页脚新增「元数据」入口（`src/metaModal.js`），导入文件自动解析元数据（MP3 ID3v2.2-2.4/ID3v1、FLAC/OGG Vorbis Comment、MP4 moov/udta/meta/ilst、WAV LIST/INFO，`src/metadata.js` 纯函数模块），6 文本字段可编辑并持久化到 per-file 缓存（store 合并语义保留 metadata 键）、封面只读展示；导出音频自动附加（WAV LIST/INFO UTF-8、MP3 ID3v2.3 含 APIC），空元数据零开销返回原 buffer。验证：新增 14 单测全绿（手写字节 fixture 往返回读），全量 132/132 通过
 - **1.6.4**：选区「延伸到末尾」浮标——选中区间后波形容器右上角出现 `selToEnd` chip（`wave.toEnd` 文案），点击将选区右端延伸到网格最后一个小节（`grid.bars` 末尾，保证可入列语义）；复用 `status.selectedRange` 与 `renderWave`，无新增逻辑文案；入列/切文件自动隐藏
 - **1.6.3**：视频音轨提取修复交错格式崩溃（Blocker B1）——AudioDecoder 对部分 AAC 源（test_video.mp4）输出 `f32` 交错布局，原代码无条件按 `f32-planar` 逐平面 `copyTo(planeIndex)` 导致 `Invalid planeIndex`、该视频工作流完全不可用；现按 `audioData.format` 分支：`f32-planar` 逐平面拷贝、`f32` 单次拷贝后经新增导出纯函数 `interleavedToPlanar` 重排为平面布局（补 3 个单测），其余格式抛可读错误；顺带修复停止后状态栏残留（N1，`stopPlay` 补 `status.stopped`「已停止」文案）
 - **1.6.2**：修复滚轮平移波形反向/消失（P0 增量渲染 blit 方向错误）——纯平移时旧帧离屏缓存 blit 偏移符号写反（`+dxPhys` → `-dxPhys`），波形与时间轴刻度/播放线逐帧错位累积直至消失；补 T3 断言（mockCtx 记录 `drawImage` 偏移，增量路径必须向左 blit），防止回归
