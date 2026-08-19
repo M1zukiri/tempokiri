@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.6.4**：选区「延伸到末尾」浮标——选中区间后波形容器右上角出现 `selToEnd` chip（`wave.toEnd` 文案），点击将选区右端延伸到网格最后一个小节（`grid.bars` 末尾，保证可入列语义）；复用 `status.selectedRange` 与 `renderWave`，无新增逻辑文案；入列/切文件自动隐藏
 - **1.6.3**：视频音轨提取修复交错格式崩溃（Blocker B1）——AudioDecoder 对部分 AAC 源（test_video.mp4）输出 `f32` 交错布局，原代码无条件按 `f32-planar` 逐平面 `copyTo(planeIndex)` 导致 `Invalid planeIndex`、该视频工作流完全不可用；现按 `audioData.format` 分支：`f32-planar` 逐平面拷贝、`f32` 单次拷贝后经新增导出纯函数 `interleavedToPlanar` 重排为平面布局（补 3 个单测），其余格式抛可读错误；顺带修复停止后状态栏残留（N1，`stopPlay` 补 `status.stopped`「已停止」文案）
 - **1.6.2**：修复滚轮平移波形反向/消失（P0 增量渲染 blit 方向错误）——纯平移时旧帧离屏缓存 blit 偏移符号写反（`+dxPhys` → `-dxPhys`），波形与时间轴刻度/播放线逐帧错位累积直至消失；补 T3 断言（mockCtx 记录 `drawImage` 偏移，增量路径必须向左 blit），防止回归
 - **1.6.1**：运行时性能优化（optimization-plan-4）——P0 波形平移增量渲染（draw 拆出 drawRange 按 x 区间裁剪 + 离屏缓存 blit，纯平移只重绘露出条带；波形循环累加器化、渐变按 waveH 缓存；顺带修复 v1.6.0 透明背景下全量绘制无 clearRect 导致的重影残留）；P1 tickProgress rAF 生命周期（停止后链终止不再空转）+ analyser→destination 连接释放；P2 spectralFlux 幅度计算（Math.hypot→sqrt + 双缓冲消除每帧 Float64Array.from 分配）；P3 estimateBpm scoreAt 双指针单调扫描（抽 scoreNear 导出可测）；P5 切文件释放旧视频 Blob URL + 清空 mixCache；P4a 序列输入局部更新（setRange 合法路径不再整列表重建）+ saveWorkspace 防抖。验证：115/115 单测全绿、analyze 全链路 639→414ms（<450ms 达标）

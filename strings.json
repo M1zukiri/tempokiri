@@ -18,6 +18,7 @@
     "pauseSeq": "⏸ 暂停序列",
     "playSeq": "▶ 播放拼接序列",
     "addSelection": "＋ 添加选中区间",
+    "toEnd": "⤳ 延伸到末尾",
     "hintInline": "单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放"
   },
   "quick": {

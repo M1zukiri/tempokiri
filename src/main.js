@@ -53,6 +53,7 @@
   const qOffsetVal = $('qOffsetVal');
   const controlBar = $('controlBar');
   const btnAddSelection = $('btnAddSelection');
+  const selToEnd = $('selToEnd');
   const btnExport = $('btnExport');
   const fileInput = $('fileInput');
   const btnManualAdd = $('btnManualAdd');
@@ -259,6 +260,7 @@
     state.cursorPos = null;
     state.playPos = null;
     state.pendingSelection = null;
+    selToEnd.hidden = true;
     state.sequence = [];
     mixCache = null; // 清空拼接缓存，避免旧拼接 buffer 悬挂到下次播放
     state.peaks = null;
@@ -631,6 +633,7 @@
     const r = seq.snapRange(state.grid, t0, t1);
     state.pendingSelection = r;
     btnAddSelection.disabled = false;
+    selToEnd.hidden = false;
     renderWave();
     status(T('status.selectedRange', { start: r.startBar, end: r.endBar }));
   }
@@ -643,6 +646,7 @@
       state.sequence.push(item);
       saveWorkspace();
       state.pendingSelection = null;
+      selToEnd.hidden = true;
       btnAddSelection.disabled = true;
       renderAll();
       status(T('status.addedRange', { start: r.startBar, end: r.endBar, from: ui.fmtTime(item.startTime), to: ui.fmtTime(item.endTime) }));
@@ -1166,6 +1170,14 @@
       updateQuickBar();
     });
     btnAddSelection.addEventListener('click', addPendingSelection);
+    selToEnd.addEventListener('click', () => {
+      const g = state.grid, p = state.pendingSelection;
+      const last = g && g.bars && g.bars[g.bars.length - 1];
+      if (!p || !last) return;
+      state.pendingSelection = { startBar: p.startBar, endBar: last.barNumber };
+      renderWave();
+      status(T('status.selectedRange', { start: p.startBar, end: last.barNumber }));
+    });
     btnExport.addEventListener('click', openExportDialog);
     btnManualAdd.addEventListener('click', toggleManualForm);
     btnManualOk.addEventListener('click', manualAdd);

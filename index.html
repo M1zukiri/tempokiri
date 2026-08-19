@@ -215,6 +215,21 @@
     overflow: hidden;
   }
   #captureFill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+  #selToEnd {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-base);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  #selToEnd:hover { border-color: var(--accent); color: var(--accent); }
+  #selToEnd[hidden] { display: none; }
 
   #waveRow { display: flex; gap: 14px; align-items: stretch; }
   #videoWrap {
@@ -664,6 +679,7 @@
         <canvas id="playHead"></canvas>
         <div id="waveHint" data-i18n="wave.hint">拖入音频或视频文件，或点击此处选择文件开始剪辑</div>
         <div id="captureBar" hidden><div id="captureFill"></div></div>
+        <button id="selToEnd" class="sel-chip" hidden data-i18n="wave.toEnd">⤳ 延伸到末尾</button>
       </div>
     </div>
     <div id="controlBar" class="controlbar" hidden>
