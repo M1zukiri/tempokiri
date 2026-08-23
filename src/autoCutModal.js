@@ -188,7 +188,7 @@
     }
   }
 
-  /** 无方案状态：清空表格并显示提示。 */
+  /** 无方案状态：清空表格、隐藏剪切点表并显示提示（导入按钮禁用）。 */
   function showEmpty() {
     document.getElementById('acSummary').textContent = T('autoCut.none');
     document.getElementById('acCutsBody').innerHTML = '';
@@ -197,16 +197,20 @@
     const segs = document.getElementById('acSegsBody');
     segs.innerHTML = '<tr><td class="ac-note" colspan="4">' + T('autoCut.none') + '</td></tr>';
     document.getElementById('acSegsTitle').textContent = T('autoCut.segTitle', { n: 0 });
+    document.getElementById('acImport').disabled = true;
   }
 
   /** 渲染方案（参数 UI 不重建；renderSummary=true 时更新范围/摘要行）。 */
   function render(withRange) {
     if (!overlay) buildDom();
     if (withRange) {
-      document.getElementById('acRange').textContent = plan && plan.rangeFull
-        ? T('autoCut.rangeFull')
-        : T('autoCut.range', { from: fmtTime(plan.searchStart), to: fmtTime(plan.searchEnd) });
+      document.getElementById('acRange').textContent = plan
+        ? (plan.rangeFull
+          ? T('autoCut.rangeFull')
+          : T('autoCut.range', { from: fmtTime(plan.searchStart), to: fmtTime(plan.searchEnd) }))
+        : '';
     }
+    document.getElementById('acImport').disabled = false;
     const cuts = (plan && plan.cuts) || [];
     const segments = (plan && plan.segments) || [];
 
@@ -278,6 +282,8 @@
     params = (opts && opts.params) ? Object.assign({}, opts.params) : { minSegSec: 3, alignGrid: true };
     syncParamsUI();
     render(true);
+    // 无段方案：显示"未找到合适的剪辑位置"提示（保留参数行供调参重试）
+    if (!p || !p.segments || !p.segments.length) showEmpty();
     overlay.hidden = false;
   }
 

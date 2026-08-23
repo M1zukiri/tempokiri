@@ -540,7 +540,7 @@
     quickBar.hidden = false;
     const seg = currentSegment();
     qBpmLabel.textContent = seg ? T('quick.bpmSeg', { n: seg.index + 1 }) : T('quick.bpm');
-    qBpmVal.textContent = seg && seg.bpm != null ? seg.bpm.toFixed(1) : '--';
+    qBpmVal.textContent = seg && seg.bpm != null ? String(+seg.bpm.toFixed(2)) : '--';
     qOffsetVal.textContent = (state.offset != null ? state.offset : 0).toFixed(3);
   }
 
@@ -701,7 +701,22 @@
     status(T('autoCut.scanning'));
     await new Promise((r) => setTimeout(r, 0)); // 让步一帧，让状态栏提示可见
     const result = analyzeAutoCutPlan({ minSegSec: 3, alignGrid: true });
-    if (!result) return;
+    if (!result) {
+      // 无方案：仍打开弹窗（showEmpty 展示提示），保留参数行供用户调参重试
+      const range = autoCutRange();
+      MC.autoCutModal.open(
+        { cuts: [], segments: [], searchStart: range.start, searchEnd: range.end, rangeFull: !state.grid },
+        {
+          params: { minSegSec: 3, alignGrid: true },
+          onImport: (p) => importAutoCutPlan(p),
+          onAnalyze: (params) => analyzeAutoCutPlan(params),
+          onPreview: previewAutoCutRange,
+          onCancel: clearAutoCutMarks,
+          getGrid: () => state.grid,
+        }
+      );
+      return;
+    }
     MC.autoCutModal.open(result, {
       params: { minSegSec: 3, alignGrid: true },
       onImport: (p) => importAutoCutPlan(p),
@@ -721,7 +736,7 @@
     pausePlay(); // 清理旧播放/残留
     const onEnd = () => {
       stopPlay();
-      status(T('status.playEnd'));
+      status(T('status.previewEnd'));
     };
     status(T('autoCut.previewing', { from: ui.fmtTime(start), to: ui.fmtTime(end) }));
     if (state.kind === 'video' && videoEl.src) {
@@ -803,7 +818,7 @@
     btnAddSelection.disabled = false;
     selToEnd.hidden = false;
     renderWave();
-    status(T('status.selectedRange', { start: r.startBar, end: r.endBar }));
+    status(r.startBar === r.endBar ? T('status.selectedRangeOne', { bar: r.startBar }) : T('status.selectedRange', { start: r.startBar, end: r.endBar }));
   }
 
   function addPendingSelection() {
@@ -858,6 +873,7 @@
   let mixPlaying = false; // 拼接播放（先拼接成连续 buffer 再一次性播放，消除段间调度间隔）
   let mixPos = 0; // 拼接时间轴断点（秒）；暂停保留、停止重置为 0
   let playingSeqId = null; // 拼接播放中当前段的序列卡片 id（用于高亮）；null = 无高亮
+  let lastSeqPlay = false; // 空格恢复的播放来源：true=拼接序列（暂停断点续），false=原曲
   let playAnalyser = null; // 律动品牌标数据源（AnalyserNode，播放时采集时域振幅）
   let pulseData = null; // analyser 时域采样缓冲
   let pulseColor = null; // 律动条颜色缓存（主题切换时由 applyTheme 置空失效）
@@ -949,6 +965,7 @@
       playingSeqId = null;
       renderAll();
     }
+    lastSeqPlay = false;
     status(T('status.stopped')); // 手动停止后状态栏如实显示（自然结束路径随后覆盖）
   }
 
@@ -983,6 +1000,7 @@
     pausePlay(); // 清理残留但不重置播放位置
     const t = state.playPos != null ? state.playPos : state.cursorPos != null ? state.cursorPos : 0;
     playing = true;
+    lastSeqPlay = false;
     btnPlay.textContent = T('wave.pause');
     if (state.kind === 'video' && videoEl.src) {
       playVideoSegment(t, state.duration, () => {
@@ -1175,10 +1193,11 @@
       if (mixPlaying) {
         stopPlay();
         btnPlaySeq.textContent = T('wave.playSeq');
-        status(T('status.previewEnd'));
+        status(T('status.playEnd'));
       }
     };
     tickProgress();
+    lastSeqPlay = true;
     status(T('status.playingSeq'));
   }
 
@@ -1332,7 +1351,7 @@
       } else if (btn.dataset.q === 'bpm') {
         const seg = currentSegment();
         if (!seg) return;
-        const bpm = Math.round((seg.bpm + delta) * 10) / 10;
+        const bpm = Math.round((seg.bpm + delta) * 100) / 100; // 步进精度与 ±0.01 按钮一致
         if (bpm < 40 || bpm > 300) return;
         state.segments[seg.index].bpm = bpm;
       }
@@ -1347,7 +1366,7 @@
       if (!p || !last) return;
       state.pendingSelection = { startBar: p.startBar, endBar: last.barNumber };
       renderWave();
-      status(T('status.selectedRange', { start: p.startBar, end: last.barNumber }));
+      status(p.startBar === last.barNumber ? T('status.selectedRangeOne', { bar: p.startBar }) : T('status.selectedRange', { start: p.startBar, end: last.barNumber }));
     });
     btnExport.addEventListener('click', openExportDialog);
     btnManualAdd.addEventListener('click', toggleManualForm);
@@ -1496,8 +1515,11 @@
       if (e.code === 'Space') {
         e.preventDefault();
         if (mixPlaying || playing) {
+          const wasSeq = mixPlaying;
           pausePlay();
-          status(T('status.paused'));
+          status(wasSeq ? T('status.pausedSeq') : T('status.paused'));
+        } else if (lastSeqPlay && state.sequence.length) {
+          playSequence(); // 恢复拼接播放（从暂停断点继续）
         } else {
           playOriginal();
         }

@@ -113,6 +113,7 @@
     "bpmApplyFailed": "节拍设置失败：{msg}",
     "trackDone": "音轨采集完成",
     "needGrid": "请先设置节拍网格",
+    "selectedRangeOne": "已选定：第 {bar} 小节。点击「添加选中区间」加入列表。",
     "selectedRange": "已选定：第 {start}–{end} 小节。点击「添加选中区间」加入列表。",
     "addedRange": "已添加：第 {start}–{end} 小节（{from} – {to}）",
     "cursorSet": "播放位置与标记点：{pos}（点「播放」从此处开始）",
