@@ -28,7 +28,7 @@ VERSION              版本号单源（build.py 注入页脚）
 ```bash
 python -m http.server 8734            # 开发伺服（浏览器缓存 src/*.js 时用无痕/禁用缓存）
 python build.py                       # 打包 → dist/tempokiri-workstation.html
-node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer/settings/i18n）
+node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/render/ui/store/footer/settings/i18n/metadata/videoExport/autoCut）
 ```
 
 ## 关键约定
@@ -79,5 +79,5 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 深入文档
 
-- 设计文档：`docs/superpowers/specs/`（工作站设计 + 优化计划，含 CLI→工作站的升级背景）
+- 设计文档：`docs/superpowers/specs/`（工作站设计、优化计划、自动剪辑设计 2026-08-19-auto-cut-design.md）
 - 产品文档（内嵌页脚弹窗）：`README.md`

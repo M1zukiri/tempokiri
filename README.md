@@ -63,13 +63,14 @@ python build.py
 │   ├── main.js         装配层：状态、文件处理、播放、导出流程
 │   ├── analysis.js     核心算法：FFT / 频谱通量 / BPM / 偏移 / 网格
 │   ├── autoCut.js      自动剪辑：能量包络 / 谷检测 / 无痕剪切点定位 / 分段方案
+│   ├── autoCutModal.js 自动剪辑方案弹窗（参数 / 试听 / 摘要 / 一键导入）
 │   ├── render.js       波形与网格渲染
 │   ├── sequence.js     序列项、小节换算、拼接元数据
 │   ├── export.js       拼接渲染 + WAV/MP3 编码
 │   ├── audio.js        音频解码/视频音轨提取
 │   ├── ui.js           序列列表渲染、播放态高亮
-│   └── modal.js / autoCutModal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / unitInput.js / log.js
-├── tests/              Node 单元测试（analysis/export/sequence/audio/render/ui/store/footer/i18n/settings）
+│   └── modal.js / exportModal.js / videoExport.js / store.js / footer.js / interact.js / unitInput.js / metaModal.js / metadata.js / settings.js
+├── tests/              Node 单元测试（analysis/export/sequence/audio/render/ui/store/footer/i18n/settings/metadata/videoExport/autoCut）
 ├── lib/                lame.min.js（MP3）、mp4box.global.js（demux）、mp4-muxer.js（合成）
 ├── examples/           测试素材（合成音频/视频）与生成脚本
 ├── docs/               设计文档
