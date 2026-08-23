@@ -8,6 +8,7 @@
   "toolbar": {
     "openFile": "打开文件",
     "setBpm": "设置节拍",
+    "autoCut": "✂ 自动剪辑",
     "export": "导出"
   },
   "wave": {
@@ -43,6 +44,36 @@
     "range": "第 {start}–{end} 小节",
     "info": "{count} 段 · 总时长 {total}",
     "seamTitle": "拼接点 {time}"
+  },
+  "autoCut": {
+    "title": "自动剪辑方案",
+    "sub": "算法在能量低谷与网格线上寻找「无痕」剪切点——剪切处信号连续、节奏对齐，拼接不产生咔嗒声。",
+    "range": "分析范围：{from} – {to}",
+    "rangeFull": "分析范围：全曲",
+    "cutTitle": "可无痕剪辑的位置（{n}）",
+    "segTitle": "分段方案（{n} 段）",
+    "colIdx": "#",
+    "colTime": "位置",
+    "colBar": "小节",
+    "colReason": "依据",
+    "colScore": "质量",
+    "colRange": "时间范围",
+    "colDur": "时长",
+    "barAt": "第 {bar} 小节 {cell} 格",
+    "reasonBar": "对齐小节线",
+    "reasonBeat": "对齐拍线",
+    "reasonValley": "能量低谷",
+    "score": "{score}/100",
+    "import": "一键导入到拼接序列",
+    "cancel": "取消",
+    "replaceTitle": "替换现有序列？",
+    "replaceBody": "自动剪辑方案将替换当前的 {n} 个序列段。",
+    "replaceOk": "替换",
+    "scanning": "正在分析可无痕剪辑的位置…",
+    "done": "分析完成：找到 {n} 个剪辑点，共 {m} 段",
+    "imported": "已导入 {n} 段剪辑方案",
+    "none": "未找到合适的剪辑位置",
+    "noTrack": "缺少音轨数据，无法分析"
   },
   "footer": {
     "signature": "M1zukiri",

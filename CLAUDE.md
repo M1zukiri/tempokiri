@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.8.0**：自动剪辑——工具栏新增「✂ 自动剪辑」（`src/autoCut.js` 纯算法 + `src/autoCutModal.js` 方案弹窗）：积分图 RMS 能量包络（O(n)）→ 谷检测（平台 span + 两侧峰谷深，5% 显著性阈值滤伪谷）→ 谷内最小差分定位（信号连续/过零，无痕）→ 可选吸附网格线（小节线 > 拍线，半径 120ms）→ 分段方案（相邻剪切点间隔默认 = 最小段长 3s，过短段循环合并；无保留剪切点返回空方案）；方案弹窗展示剪切点（时间/小节/依据/质量分）与分段表，一键导入拼接序列（现有序列非空先确认替换），剪切点以橙色实线 + 顶部菱形标记在波形（三主题 cutLine 色）；分析范围 = 网格覆盖范围（有网格时）或全曲；视频未提取音轨时先采集。验证：新增 10 单测（包络/谷/定位/对齐/方案/碎切合并/范围），全量 142/142 通过；无头 Edge 冒烟（`tools/smoke_autoCut.mjs`）：无网格/有网格两场景弹窗、导入、替换确认、波形标记、拼接播放全链路 OK
 - **1.7.0**：元数据菜单——页脚新增「元数据」入口（`src/metaModal.js`），导入文件自动解析元数据（MP3 ID3v2.2-2.4/ID3v1、FLAC/OGG Vorbis Comment、MP4 moov/udta/meta/ilst、WAV LIST/INFO，`src/metadata.js` 纯函数模块），6 文本字段可编辑并持久化到 per-file 缓存（store 合并语义保留 metadata 键）、封面只读展示；导出音频自动附加（WAV LIST/INFO UTF-8、MP3 ID3v2.3 含 APIC），空元数据零开销返回原 buffer。验证：新增 14 单测全绿（手写字节 fixture 往返回读），全量 132/132 通过
 - **1.6.4**：选区「延伸到末尾」浮标——选中区间后波形容器右上角出现 `selToEnd` chip（`wave.toEnd` 文案），点击将选区右端延伸到网格最后一个小节（`grid.bars` 末尾，保证可入列语义）；复用 `status.selectedRange` 与 `renderWave`，无新增逻辑文案；入列/切文件自动隐藏
 - **1.6.3**：视频音轨提取修复交错格式崩溃（Blocker B1）——AudioDecoder 对部分 AAC 源（test_video.mp4）输出 `f32` 交错布局，原代码无条件按 `f32-planar` 逐平面 `copyTo(planeIndex)` 导致 `Invalid planeIndex`、该视频工作流完全不可用；现按 `audioData.format` 分支：`f32-planar` 逐平面拷贝、`f32` 单次拷贝后经新增导出纯函数 `interleavedToPlanar` 重排为平面布局（补 3 个单测），其余格式抛可读错误；顺带修复停止后状态栏残留（N1，`stopPlay` 补 `status.stopped`「已停止」文案）

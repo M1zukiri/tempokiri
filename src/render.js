@@ -147,6 +147,7 @@
     selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee',
     playLine: '#f43f5e',
+    cutLine: '#fb923c',
     axis: '#7d8794',
     barLabel: '#9aa4b2',
   };
@@ -163,6 +164,7 @@
       selFill: 'rgba(34,211,238,0.22)',
       selBorder: '#22d3ee',
       playLine: '#f43f5e',
+      cutLine: '#fb923c',
       axis: '#7d8794',
       barLabel: '#9aa4b2',
     },
@@ -177,6 +179,7 @@
       selFill: 'rgba(167,139,250,0.22)',
       selBorder: '#a78bfa',
       playLine: '#f43f5e',
+      cutLine: '#f0abfc',
       axis: '#8f87a0',
       barLabel: '#a89fb5',
     },
@@ -191,6 +194,7 @@
       selFill: 'rgba(15,118,110,0.18)',
       selBorder: '#0f766e',
       playLine: '#d63a5a',
+      cutLine: '#c2410c',
       axis: '#7a7268',
       barLabel: '#5c554d',
     },
@@ -209,7 +213,7 @@
   /** 波形数据版本签名：引用比较关键字段（避免 JSON.stringify 大数组开销）。 */
   function buildSig(data) {
     return [data.peaks, data.grid, data.sequence, data.dragRange,
-            data.pendingSelection, data.cursorPos, themeStamp];
+            data.pendingSelection, data.cursorPos, data.cutPoints, themeStamp];
   }
   function sigEq(a, b) {
     if (!a || !b || a.length !== b.length) return false;
@@ -447,6 +451,32 @@
           ctx.strokeRect(ix0, 0, ix1 - ix0, waveH);
           ctx.setLineDash([]);
         }
+      }
+    }
+
+    // 自动剪辑剪切点标记（橙色实线 + 顶部菱形，x 交集裁剪）
+    if (data.cutPoints && data.cutPoints.length) {
+      ctx.strokeStyle = THEME.cutLine;
+      ctx.fillStyle = THEME.cutLine;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const t of data.cutPoints) {
+        const x = timeToX(t, view, cssW);
+        if (x < x0 || x > x1) continue;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, waveH);
+      }
+      ctx.stroke();
+      for (const t of data.cutPoints) {
+        const x = timeToX(t, view, cssW);
+        if (x < x0 || x > x1) continue;
+        // 顶部小菱形
+        ctx.beginPath();
+        ctx.moveTo(x, 2);
+        ctx.lineTo(x - 4, 9);
+        ctx.lineTo(x + 4, 9);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 

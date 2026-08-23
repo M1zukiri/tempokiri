@@ -292,8 +292,8 @@ test('setTheme: 切换 canvas 主题色并回退未知主题（主题系统）',
   R.setTheme('aurora'); // 恢复默认，避免污染后续用例
 });
 
-test('CANVAS_THEMES: 三套主题各含 12 个绘制字段（主题系统）', () => {
-  const fields = ['bg', 'gridBg', 'wave', 'waveHigh', 'waveDim', 'barLine', 'beatLine', 'selFill', 'selBorder', 'playLine', 'axis', 'barLabel'];
+test('CANVAS_THEMES: 三套主题各含 13 个绘制字段（主题系统）', () => {
+  const fields = ['bg', 'gridBg', 'wave', 'waveHigh', 'waveDim', 'barLine', 'beatLine', 'selFill', 'selBorder', 'playLine', 'cutLine', 'axis', 'barLabel'];
   for (const name of ['aurora', 'nebula', 'paper']) {
     assert.ok(R.CANVAS_THEMES[name], '缺少主题：' + name);
     for (const f of fields) {
@@ -305,7 +305,7 @@ test('CANVAS_THEMES: 三套主题各含 12 个绘制字段（主题系统）', (
     bg: 'transparent', gridBg: 'transparent', wave: '#22d3ee', waveHigh: '#38e1f5',
     waveDim: 'rgba(34,211,238,0.45)', barLine: 'rgba(255,255,255,0.75)',
     beatLine: 'rgba(255,255,255,0.14)', selFill: 'rgba(34,211,238,0.22)',
-    selBorder: '#22d3ee', playLine: '#f43f5e', axis: '#7d8794', barLabel: '#9aa4b2',
+    selBorder: '#22d3ee', playLine: '#f43f5e', cutLine: '#fb923c', axis: '#7d8794', barLabel: '#9aa4b2',
   });
 });
 

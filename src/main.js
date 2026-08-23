@@ -29,6 +29,7 @@
     view: null,
     dragRange: null,
     playTime: null,
+    cutPoints: null, // 自动剪辑剪切点标记（秒数组；弹窗打开期间显示在波形上）
     meta: null, // 当前文件元数据（解析值 + 编辑值合并结果）
   };
 
@@ -45,6 +46,7 @@
   const seqInfo = $('seqInfo');
   const btnOpenFile = $('btnOpenFile');
   const btnSettings = $('btnSettings');
+  const btnAutoCut = $('btnAutoCut');
   const btnPlay = $('btnPlay');
   const btnPlaySeq = $('btnPlaySeq');
   const btnStop = $('btnStop');
@@ -114,6 +116,7 @@
         sequence: state.sequence,
         playTime: state.playTime,
         cursorPos: state.cursorPos,
+        cutPoints: state.cutPoints,
       });
       // 播放线绘制在叠加层；全量重绘后同步当前播放线（非播放时 state.playTime 为 null → 清空）
       render.drawPlayHead(playHeadCanvas, state.view, state.playTime);
@@ -267,7 +270,9 @@
     mixCache = null; // 清空拼接缓存，避免旧拼接 buffer 悬挂到下次播放
     state.peaks = null;
     state.playTime = null;
+    state.cutPoints = null;
     btnSettings.disabled = false;
+    btnAutoCut.disabled = false;
     btnPlay.disabled = false;
     btnPlaySeq.disabled = false;
     btnStop.disabled = false;
@@ -644,6 +649,112 @@
         });
     });
   }
+  // ---------- 自动剪辑 ----------
+  /** 自动剪辑分析范围：网格覆盖范围（有网格时）或全曲。 */
+  function autoCutRange() {
+    if (state.grid && state.grid.bars && state.grid.bars.length) {
+      return {
+        start: Math.max(0, state.grid.bars[0].startTime),
+        end: state.grid.bars[state.grid.bars.length - 1].endTime,
+      };
+    }
+    return { start: 0, end: state.duration };
+  }
+
+  /** 运行自动剪辑：分析无痕剪切点并打开方案弹窗。 */
+  async function runAutoCut() {
+    if (state.kind === 'video' && !state.pcm) {
+      status(T('hint.extractRapid'));
+      await captureVideoPcm();
+    }
+    if (!state.pcm) {
+      status(T('autoCut.noTrack'));
+      return;
+    }
+    status(T('autoCut.scanning'));
+    await new Promise((r) => setTimeout(r, 0)); // 让步一帧，让状态栏提示可见
+    const range = autoCutRange();
+    const plan = MC.autoCut.buildPlan(state.pcm, {
+      sr: analysis.DEFAULT_ANALYSIS_SR,
+      grid: state.grid,
+      duration: state.duration,
+      searchStart: range.start,
+      searchEnd: range.end,
+    });
+    if (!plan.segments.length) {
+      status(T('autoCut.none'));
+      return;
+    }
+    state.cutPoints = plan.cuts.map((c) => c.time);
+    renderWave();
+    MC.autoCutModal.open(Object.assign({}, plan, {
+      searchStart: range.start,
+      searchEnd: range.end,
+      rangeFull: !state.grid,
+    }), {
+      onImport: (p) => importAutoCutPlan(p),
+      onCancel: clearAutoCutMarks,
+      getGrid: () => state.grid,
+    });
+    status(T('autoCut.done', { n: plan.cuts.length, m: plan.segments.length }));
+  }
+
+  /** 清除波形上的剪切点标记（弹窗取消/关闭时）。 */
+  function clearAutoCutMarks() {
+    state.cutPoints = null;
+    renderWave();
+  }
+
+  /** 将剪辑方案导入拼接序列（现有序列非空时先确认替换）。 */
+  async function importAutoCutPlan(plan) {
+    if (state.sequence.length) {
+      const ok = await confirmReplaceSequence();
+      if (!ok) return; // 取消：保持现状，弹窗不关闭
+    }
+    state.sequence = plan.segments.map((s) => ({
+      id: seq.newId(),
+      startBar: null,
+      endBar: null,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      fadeInMs: 0,
+      fadeOutMs: 0,
+      invalid: false,
+    }));
+    MC.autoCutModal.close(); // 关闭触发 onCancel → clearAutoCutMarks
+    saveWorkspace();
+    renderAll();
+    status(T('autoCut.imported', { n: state.sequence.length }));
+  }
+
+  /** 替换现有序列前的确认弹窗。返回 true=替换 / false=取消。 */
+  function confirmReplaceSequence() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true">
+          <h3>${T('autoCut.replaceTitle')}</h3>
+          <p class="modal-sub">${T('autoCut.replaceBody', { n: state.sequence.length })}</p>
+          <div class="modal-actions">
+            <span class="spacer"></span>
+            <button class="btn" data-act="cancel">${T('modal.cancel')}</button>
+            <button class="btn btn-primary" data-act="ok">${T('autoCut.replaceOk')}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const done = (v) => {
+        overlay.remove();
+        resolve(v);
+      };
+      overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => done(false));
+      overlay.querySelector('[data-act="ok"]').addEventListener('click', () => done(true));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) done(false);
+      });
+    });
+  }
+
   function onSelectRange(t0, t1) {
     if (!state.grid) {
       status(T('status.needGrid'));
@@ -1166,6 +1277,7 @@
 
     btnOpenFile.addEventListener('click', () => fileInput.click());
     btnSettings.addEventListener('click', openSettings);
+    btnAutoCut.addEventListener('click', runAutoCut);
     btnPlay.addEventListener('click', playOriginal);
     btnPlaySeq.addEventListener('click', () => {
       if (playing && btnPlaySeq.textContent.includes('⏸')) pausePlay(); // 暂停：保留拼接断点
@@ -1359,6 +1471,7 @@
         MC.closeExport && MC.closeExport();
         MC.settings && MC.settings.closeAdvanced && MC.settings.closeAdvanced();
         MC.metaModal && MC.metaModal.close && MC.metaModal.close();
+        MC.autoCutModal && MC.autoCutModal.close && MC.autoCutModal.close();
         manualForm.hidden = true;
         const footOverlay = document.getElementById('readmeOverlay') || document.getElementById('easterEggOverlay');
         if (footOverlay) footOverlay.remove();
