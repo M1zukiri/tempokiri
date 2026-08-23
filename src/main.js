@@ -661,6 +661,33 @@
     return { start: 0, end: state.duration };
   }
 
+  /** 按参数分析自动剪辑方案（同步；更新剪切点标记与状态栏）。返回带展示字段的方案或 null。 */
+  function analyzeAutoCutPlan(params) {
+    const range = autoCutRange();
+    const plan = MC.autoCut.buildPlan(state.pcm, {
+      sr: analysis.DEFAULT_ANALYSIS_SR,
+      grid: params.alignGrid ? state.grid : null,
+      duration: state.duration,
+      searchStart: range.start,
+      searchEnd: range.end,
+      minSegSec: params.minSegSec,
+    });
+    if (!plan.segments.length) {
+      state.cutPoints = null;
+      renderWave();
+      status(T('autoCut.none'));
+      return null;
+    }
+    state.cutPoints = plan.cuts.map((c) => c.time);
+    renderWave();
+    status(T('autoCut.done', { n: plan.cuts.length, m: plan.segments.length }));
+    return Object.assign({}, plan, {
+      searchStart: range.start,
+      searchEnd: range.end,
+      rangeFull: !state.grid,
+    });
+  }
+
   /** 运行自动剪辑：分析无痕剪切点并打开方案弹窗。 */
   async function runAutoCut() {
     if (state.kind === 'video' && !state.pcm) {
@@ -673,30 +700,41 @@
     }
     status(T('autoCut.scanning'));
     await new Promise((r) => setTimeout(r, 0)); // 让步一帧，让状态栏提示可见
-    const range = autoCutRange();
-    const plan = MC.autoCut.buildPlan(state.pcm, {
-      sr: analysis.DEFAULT_ANALYSIS_SR,
-      grid: state.grid,
-      duration: state.duration,
-      searchStart: range.start,
-      searchEnd: range.end,
-    });
-    if (!plan.segments.length) {
-      status(T('autoCut.none'));
-      return;
-    }
-    state.cutPoints = plan.cuts.map((c) => c.time);
-    renderWave();
-    MC.autoCutModal.open(Object.assign({}, plan, {
-      searchStart: range.start,
-      searchEnd: range.end,
-      rangeFull: !state.grid,
-    }), {
+    const result = analyzeAutoCutPlan({ minSegSec: 3, alignGrid: true });
+    if (!result) return;
+    MC.autoCutModal.open(result, {
+      params: { minSegSec: 3, alignGrid: true },
       onImport: (p) => importAutoCutPlan(p),
+      onAnalyze: (params) => analyzeAutoCutPlan(params),
+      onPreview: previewAutoCutRange,
       onCancel: clearAutoCutMarks,
       getGrid: () => state.grid,
     });
-    status(T('autoCut.done', { n: plan.cuts.length, m: plan.segments.length }));
+  }
+
+  /** 试听方案区间：播放原曲 [start, end]（弹窗「▶」按钮；先停当前播放）。 */
+  function previewAutoCutRange(start, end) {
+    const d = state.duration || 0;
+    start = Math.max(0, Math.min(start, d));
+    end = Math.min(Math.max(start + 0.001, end), d);
+    if (end - start <= 0.01) return;
+    pausePlay(); // 清理旧播放/残留
+    const onEnd = () => {
+      stopPlay();
+      status(T('status.playEnd'));
+    };
+    status(T('autoCut.previewing', { from: ui.fmtTime(start), to: ui.fmtTime(end) }));
+    if (state.kind === 'video' && videoEl.src) {
+      playing = true;
+      btnPlay.textContent = T('wave.pause');
+      playVideoSegment(start, end, onEnd);
+    } else if (state.audioBuffer) {
+      playing = true;
+      btnPlay.textContent = T('wave.pause');
+      playAudioSegment(start, end, onEnd);
+    } else {
+      status(T('autoCut.noTrack'));
+    }
   }
 
   /** 清除波形上的剪切点标记（弹窗取消/关闭时）。 */

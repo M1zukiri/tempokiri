@@ -129,3 +129,36 @@ test('buildPlan: 无剪切点返回空方案', () => {
   assert.equal(plan.cuts.length, 0);
   assert.equal(plan.segments.length, 0);
 });
+
+test('scoreCut: 三因子加权（能量 50 + 连续 30 + 网格 20）', () => {
+  // 最深谷 + 完美连续 + 网格对齐 = 100
+  assert.equal(AC.scoreCut(1, 1, 0, 'bar'), 100);
+  // 深度减半：能量 25 + 连续 30 + 网格 20 = 75
+  assert.equal(AC.scoreCut(0.5, 1, 0, 'beat'), 75);
+  // cost=0.5（差分大）：连续分 30/(1+0.5*8)=6 → 无网格 50+6=56
+  assert.equal(AC.scoreCut(1, 1, 0.5, 'valley'), 56);
+  // 同 cost 下网格对齐固定 +20
+  assert.equal(AC.scoreCut(1, 1, 0.5, 'bar'), 76);
+  // 域下限：连续分趋 0 时至少 1
+  assert.equal(AC.scoreCut(0, 1, 100, 'valley'), 1);
+});
+
+test('buildPlan: 最少段长分档影响方案粒度', () => {
+  const pcm = makeAlternating();
+  // 谷 2.25/4.75 → 段 2.25/2.5/2.25s：minSeg 1.5 全保留（3 段）
+  const fine = AC.buildPlan(pcm, { sr: SR, minSegSec: 1.5 });
+  assert.equal(fine.segments.length, 3);
+  // minSeg 2.5：第一段 2.25s 过短 → 循环合并至无方案
+  const coarse = AC.buildPlan(pcm, { sr: SR, minSegSec: 2.5 });
+  assert.equal(coarse.segments.length, 0);
+  assert.equal(coarse.cuts.length, 0);
+});
+
+test('buildPlan: 对齐网格开关（grid 传 null 即关闭）', () => {
+  const pcm = makeAlternating();
+  const gridHit = A.buildSimpleGrid(120, 4, 2.25, 7); // 小节起点正好落在静音谷中心
+  const on = AC.buildPlan(pcm, { sr: SR, grid: gridHit, minSegSec: 1.5 });
+  assert.equal(on.cuts[0].reason, 'bar', '对齐开启时应吸附小节线');
+  const off = AC.buildPlan(pcm, { sr: SR, grid: null, minSegSec: 1.5 });
+  assert.ok(off.cuts.every((c) => c.reason === 'valley'), '对齐关闭时不应吸附网格线');
+});

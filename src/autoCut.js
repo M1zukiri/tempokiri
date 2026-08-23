@@ -159,11 +159,29 @@
   }
 
   /**
+   * 剪切点质量评分（0-100）：三因子加权——能量分（谷深占比 50）+ 连续分
+   * （定位成本 30，成本 0 时满分、随差分/幅度增大衰减）+ 网格分（对齐网格
+   * 线 +20）。分离成纯函数便于单测与调参。
+   * @param {number} depth 谷深（能量包络）
+   * @param {number} maxDepth 全部候选谷的最深值（能量分归一化基准）
+   * @param {number} cost 定位成本（locateCutPoint 返回；越小越连续）
+   * @param {string} reason 'bar'|'beat'|'valley'
+   * @returns {number} 0-100 整数（下限 1，保证展示有意义）
+   */
+  function scoreCut(depth, maxDepth, cost, reason) {
+    const energy = 50 * (maxDepth > 0 ? depth / maxDepth : 0);
+    // cost 量纲为幅度（-1..1 差分典型 0~0.25）：8 为经验归一化系数
+    const smooth = 30 / (1 + (cost || 0) * 8);
+    const grid = (reason === 'bar' || reason === 'beat') ? 20 : 0;
+    return Math.max(1, Math.min(100, Math.round(energy + smooth + grid)));
+  }
+
+  /**
    * 查找无痕剪切点（按谷深贪心 + 最小间隔过滤）。
    * @param {Float32Array|ArrayLike<number>} pcm 分析用 mono PCM（22050）
    * @param {object} [opts]
    * @param {number} [opts.sr=22050]
-   * @param {object} [opts.grid] 节拍网格（用于对齐；无网格跳过）
+   * @param {object} [opts.grid] 节拍网格（用于对齐；无网格/传 null 跳过）
    * @param {number} [opts.minGapSec=2] 相邻剪切点最小间隔（秒）
    * @param {number} [opts.maxCuts=14] 剪切点数量上限
    * @param {number} [opts.alignRadius=0.12] 网格吸附半径（秒）
@@ -189,7 +207,7 @@
       const aligned = gridAlign(time, opts.grid, alignRadius);
       if (aligned) { time = aligned.time; reason = aligned.reason; }
       if (picked.some((p) => Math.abs(p.time - time) < minGapSec)) continue;
-      const score = Math.max(1, Math.min(100, Math.round(20 + 80 * (v.depth / maxDepth))));
+      const score = scoreCut(v.depth, maxDepth, pt.cost, reason);
       picked.push({ time: Math.round(time * 1000) / 1000, score, reason });
     }
     return picked.sort((a, b) => a.time - b.time);
@@ -256,6 +274,7 @@
     valleyCenter,
     locateCutPoint,
     gridAlign,
+    scoreCut,
     findCutPoints,
     buildPlan,
   };

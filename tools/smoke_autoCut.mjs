@@ -116,6 +116,29 @@ async function main() {
     const cutMarks = typeof MC !== 'undefined' && MC ? (document.querySelector('#wave') && true) : false;
     return { cuts, segs, range: document.getElementById('acRange').textContent, status: document.getElementById('statusBar').textContent };
   })()`);
+  // 参数行 / 摘要 / 试听按钮（1.9.0 新交互）
+  results.a.params = await evalJs(`(() => {
+    const minsegs = [...document.querySelectorAll('.ac-minseg')].map(el => el.textContent);
+    const alignWrap = document.getElementById('acAlignWrap');
+    return {
+      minsegs,
+      alignVisible: !!(alignWrap && !alignWrap.hidden),
+      listens: document.querySelectorAll('.ac-listen').length,
+      summary: document.getElementById('acSummary').textContent,
+    };
+  })()`);
+  // 切到 5s 档位 → 即时重分析（16s 音频：3 段 → 2 段）
+  await evalJs("[...document.querySelectorAll('.ac-minseg')].find(b => b.dataset.sec === '5').click()");
+  await waitFor("document.getElementById('acSegsBody').children.length === 2", 8000, '5s 档重分析');
+  results.a.segsAt5s = await evalJs("document.getElementById('acSegsBody').children.length");
+  // 试听：点第一个 ▶，播放原曲区间不应报错
+  await evalJs("document.querySelector('.ac-listen').click()");
+  await sleep(600);
+  results.a.listenStatus = await evalJs("document.getElementById('statusBar').textContent");
+  await evalJs("document.getElementById('btnStop').click()");
+  // 恢复 3s 档
+  await evalJs("[...document.querySelectorAll('.ac-minseg')].find(b => b.dataset.sec === '3').click()");
+  await waitFor("document.getElementById('acSegsBody').children.length === 3", 8000, '恢复 3s 档');
   await shot('shot_autocut_plan.png');
 
   // 一键导入（序列为空 → 直接导入）
@@ -162,6 +185,9 @@ async function main() {
     const rows = [...document.querySelectorAll('#acCutsBody tr')].map(tr => [...tr.children].map(td => td.textContent));
     return { cuts: rows, segs: document.getElementById('acSegsBody').children.length, range: document.getElementById('acRange').textContent };
   })()`);
+  // 有网格时：对齐开关可见 + 试听按钮存在
+  results.b.alignVisible = await evalJs("!!document.getElementById('acAlignWrap') && !document.getElementById('acAlignWrap').hidden");
+  results.b.listensB = await evalJs("document.querySelectorAll('.ac-listen').length");
   await shot('shot_autocut_grid.png');
 
   // 先加一段手动序列，验证「替换确认」弹窗
