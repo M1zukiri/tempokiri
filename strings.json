@@ -67,7 +67,7 @@
     "reasonBeat": "对齐拍线",
     "reasonValley": "能量低谷",
     "score": "{score}/100",
-    "listenCut": "试听剪切点前后",
+    "listenCut": "试听剪切点：前后各 {span}",
     "listenSeg": "试听该段",
     "previewing": "试听中：{from} – {to}",
     "import": "一键导入到拼接序列",
@@ -79,7 +79,11 @@
     "done": "分析完成：找到 {n} 个剪辑点，共 {m} 段",
     "imported": "已导入 {n} 段剪辑方案",
     "none": "未找到合适的剪辑位置",
-    "noTrack": "缺少音轨数据，无法分析"
+    "noTrack": "缺少音轨数据，无法分析",
+    "candTitle": "可用终点",
+    "useEnd": "采用",
+    "resetPlan": "恢复默认方案",
+    "lenBars": "{bars} 小节"
   },
   "footer": {
     "signature": "M1zukiri",

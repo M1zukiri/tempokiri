@@ -671,6 +671,7 @@
       searchStart: range.start,
       searchEnd: range.end,
       minSegSec: params.minSegSec,
+      anchor: params.anchor || undefined,
     });
     if (!plan.segments.length) {
       state.cutPoints = null;
@@ -685,6 +686,7 @@
       searchStart: range.start,
       searchEnd: range.end,
       rangeFull: !state.grid,
+      anchored: !!params.anchor,
     });
   }
 

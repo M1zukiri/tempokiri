@@ -130,15 +130,17 @@ test('buildPlan: 无剪切点返回空方案', () => {
   assert.equal(plan.segments.length, 0);
 });
 
-test('scoreCut: 三因子加权（能量 50 + 连续 30 + 网格 20）', () => {
+test('scoreCut: 三因子加权（节奏 40 + 能量 40 + 连续 20）', () => {
   // 最深谷 + 完美连续 + 网格对齐 = 100
   assert.equal(AC.scoreCut(1, 1, 0, 'bar'), 100);
-  // 深度减半：能量 25 + 连续 30 + 网格 20 = 75
-  assert.equal(AC.scoreCut(0.5, 1, 0, 'beat'), 75);
-  // cost=0.5（差分大）：连续分 30/(1+0.5*8)=6 → 无网格 50+6=56
-  assert.equal(AC.scoreCut(1, 1, 0.5, 'valley'), 56);
-  // 同 cost 下网格对齐固定 +20
-  assert.equal(AC.scoreCut(1, 1, 0.5, 'bar'), 76);
+  // 深度减半：能量 20 + 连续 20 + 节奏 40 = 80
+  assert.equal(AC.scoreCut(0.5, 1, 0, 'beat'), 80);
+  // cost=0.5（差分大）：连续分 20/(1+0.5*8)=4 → 未对齐 40+4=44
+  assert.equal(AC.scoreCut(1, 1, 0.5, 'valley'), 44);
+  // 同 cost 下节奏对齐 +40
+  assert.equal(AC.scoreCut(1, 1, 0.5, 'bar'), 84);
+  // 无网格（valley）上限语义：完美连续也只有 60（节奏分 0）
+  assert.equal(AC.scoreCut(1, 1, 0, 'valley'), 60);
   // 域下限：连续分趋 0 时至少 1
   assert.equal(AC.scoreCut(0, 1, 100, 'valley'), 1);
 });
@@ -161,4 +163,34 @@ test('buildPlan: 对齐网格开关（grid 传 null 即关闭）', () => {
   assert.equal(on.cuts[0].reason, 'bar', '对齐开启时应吸附小节线');
   const off = AC.buildPlan(pcm, { sr: SR, grid: null, minSegSec: 1.5 });
   assert.ok(off.cuts.every((c) => c.reason === 'valley'), '对齐关闭时不应吸附网格线');
+});
+
+test('buildPlan: candidates 含被默认方案过滤的切点（可用终点池）', () => {
+  // 交替信号两个谷（2.25/4.75，间距 2.5s）：minSeg 3 时默认方案为空（2.5 < 3 且首段 2.25 < 3），
+  // 但候选池（间距 ≥2s）两个点都可见——弹窗"可用终点"仍有选择余地
+  const pcm = makeAlternating();
+  const plan = AC.buildPlan(pcm, { sr: SR, minSegSec: 3 });
+  assert.equal(plan.segments.length, 0, '默认方案应为空');
+  assert.equal(plan.candidates.length, 2, '候选池应保留两个显著切点');
+  assert.ok(Math.abs(plan.candidates[0].time - 2.25) < 0.35);
+  assert.ok(Math.abs(plan.candidates[1].time - 4.75) < 0.35);
+});
+
+test('buildPlan: 锚定一段后其余部分重新生成（固定点豁免合并）', () => {
+  // 10s 交替信号：谷 ≈2.25/4.75/7.25（末端静音无右峰不计）；锚定段取候选池真实点
+  const pcm = makeAlternating(10);
+  const base = AC.buildPlan(pcm, { sr: SR, minSegSec: 3 });
+  const s = base.candidates[0].time; // ≈2.252
+  const e = base.candidates[1].time; // ≈4.748
+  const plan = AC.buildPlan(pcm, { sr: SR, minSegSec: 3, anchor: { start: s, end: e } });
+  // 锚定段在方案中（固定点豁免：即使首段 2.25s < minSeg 也不删除）
+  const seg1 = plan.segments.find((x) => Math.abs(x.startTime - s) < 1e-6);
+  assert.ok(seg1, '锚定段应出现在方案中');
+  assert.ok(Math.abs(seg1.endTime - e) < 1e-6, '锚定段终点应保留');
+  // 锚定后的切点（7.25 距锚点 ≈2.5s < 3 → 被合并），末段回边界
+  const last = plan.segments[plan.segments.length - 1];
+  assert.ok(Math.abs(last.endTime - 10) < 1e-9);
+  // 锚定起止点均保留为方案切点（含分数/依据）
+  assert.ok(plan.cuts.some((c) => Math.abs(c.time - s) < 1e-6));
+  assert.ok(plan.cuts.some((c) => Math.abs(c.time - e) < 1e-6), '锚定终点应在方案切点中');
 });

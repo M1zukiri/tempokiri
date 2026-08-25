@@ -466,13 +466,13 @@ async function stageAutoCut() {
   await cdp.click('#mOk');
   await cdp.waitFor("document.getElementById('quickBar').hidden === false", 8000, '网格');
   await cdp.click('#btnAutoCut');
-  await cdp.waitFor("(() => { const el = document.getElementById('autoCutOverlay'); return el && !el.hidden && document.getElementById('acSegsBody').children.length > 0; })()", 15000, '方案弹窗');
+  await cdp.waitFor("(() => { const el = document.getElementById('autoCutOverlay'); return el && !el.hidden && document.querySelectorAll('#acSegsBody tr:not(.ac-cand-row)').length > 0; })()", 15000, '方案弹窗');
   await tryRec('有网格-方案摘要', () => cdp.evalJs("document.getElementById('acSummary').textContent"));
   await tryRec('有网格-对齐开关可见', () => cdp.evalJs("!!document.getElementById('acAlignWrap') && !document.getElementById('acAlignWrap').hidden"));
   await tryRec('有网格-剪切点依据', () => cdp.evalJs("JSON.stringify([...document.querySelectorAll('#acCutsBody tr')].slice(0, 5).map(tr => tr.innerText.replace(/\\s+/g, ' ').slice(0, 80)))"));
   await cdp.evalJs("document.getElementById('acAlign').click()");
   await sleep(2000);
-  await tryRec('关闭对齐-重分析', () => cdp.evalJs("JSON.stringify({segs: document.getElementById('acSegsBody').children.length, summary: document.getElementById('acSummary').textContent})"));
+  await tryRec('关闭对齐-重分析', () => cdp.evalJs("JSON.stringify({segs: document.querySelectorAll('#acSegsBody tr:not(.ac-cand-row)').length, summary: document.getElementById('acSummary').textContent})"));
   await cdp.screenshot(path.join(OUT, 'shot_autocut_align_off.png'));
   await cdp.evalJs("document.getElementById('acCancel').click()");
   await sleep(400);

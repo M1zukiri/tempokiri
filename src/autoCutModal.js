@@ -30,8 +30,11 @@
     valley: T('autoCut.reasonValley'),
   };
   // 字面量 T 调用：build.py 按引号字面量校验文案引用（变量拼接无法扫描）
-  const LISTEN_CUT_TITLE = T('autoCut.listenCut');
   const LISTEN_SEG_TITLE = T('autoCut.listenSeg');
+  const CAND_TITLE = T('autoCut.candTitle');
+  const USE_END = T('autoCut.useEnd');
+  const RESET_PLAN = T('autoCut.resetPlan');
+  const LEN_BARS = T('autoCut.lenBars');
 
   let overlay = null;
   let plan = null;
@@ -60,6 +63,7 @@
       MINSEG_CHOICES.map((s) => '<button class="btn btn-mini ac-minseg" data-sec="' + s + '">' + s + 's</button>').join('') +
       '</span>' +
       '<label class="ac-align" id="acAlignWrap"><input type="checkbox" id="acAlign" />' + T('autoCut.alignGrid') + '</label>' +
+      '<button id="acReset" class="btn btn-mini" hidden>' + RESET_PLAN + '</button>' +
       '</div>' +
       '<p class="ac-summary" id="acSummary"></p>' +
       '<div class="ac-section" id="acCutsSection">' +
@@ -109,6 +113,8 @@
       '.ac-score.high{background:rgba(34,211,238,.18);color:var(--accent-fg,#22d3ee)}' +
       '.ac-score.mid{background:rgba(250,204,21,.16);color:#facc15}' +
       '.ac-score.low{background:rgba(148,163,184,.14);color:var(--text-secondary)}' +
+      '.ac-cand-row td{color:var(--text-secondary);font-size:11px;padding-left:26px}' +
+      '.ac-cand-row .ac-listen,.ac-cand-row .ac-use{margin-right:6px}' +
       '.ac-note{font-size:12px;color:var(--text-secondary);padding:8px 10px}';
     document.head.appendChild(style);
 
@@ -127,6 +133,10 @@
     // 对齐网格开关：有网格时显示；即时重分析
     document.getElementById('acAlign').addEventListener('change', (e) => {
       params.alignGrid = e.target.checked;
+      reanalyze();
+    });
+    // 恢复默认方案：清除锚定，重新生成
+    document.getElementById('acReset').addEventListener('click', () => {
       reanalyze();
     });
     overlay.addEventListener('click', (e) => {
@@ -166,6 +176,34 @@
     return b;
   }
 
+  /**
+   * 剪切点试听窗口：有网格 = 前后各 1.5 小节（可确认节奏对齐）；无网格回退前后各 2s。
+   * @param {number} time 剪切点时间（秒）
+   * @returns {{start:number, end:number, span:string}} 区间与描述文案
+   */
+  function listenWindow(time) {
+    const grid = getGrid ? getGrid() : null;
+    let half = 2, spanText = '2 秒';
+    if (grid && grid.bars && grid.bars.length > 1) {
+      const barDur = grid.bars[1].startTime - grid.bars[0].startTime;
+      if (barDur > 0.1) {
+        half = 1.5 * barDur;
+        spanText = '1.5 小节';
+      }
+    }
+    return { start: Math.max(0, time - half), end: time + half, span: spanText };
+  }
+
+  /** 段长展示：秒 +（有网格时）换算小节数。 */
+  function lenDesc(durSec) {
+    const grid = getGrid ? getGrid() : null;
+    if (grid && grid.bars && grid.bars.length > 1) {
+      const barDur = grid.bars[1].startTime - grid.bars[0].startTime;
+      if (barDur > 0.05) return fmtTime(durSec) + '（' + LEN_BARS.replace('{bars}', Math.round(durSec / barDur)) + '）';
+    }
+    return fmtTime(durSec);
+  }
+
   /** 同步参数 UI 选中态与网格开关可见性。 */
   function syncParamsUI() {
     document.querySelectorAll('#acMinsegs .ac-minseg').forEach((el) => {
@@ -177,9 +215,9 @@
     document.getElementById('acAlign').checked = params.alignGrid;
   }
 
-  /** 重新分析（参数变更即时调用）：onAnalyze 返回新方案并更新展示。 */
-  function reanalyze() {
-    const next = onAnalyze ? onAnalyze({ minSegSec: params.minSegSec, alignGrid: params.alignGrid }) : null;
+  /** 重新分析（参数/锚定变更即时调用）：onAnalyze 返回新方案并更新展示。 */
+  function reanalyze(extra) {
+    const next = onAnalyze ? onAnalyze(Object.assign({ minSegSec: params.minSegSec, alignGrid: params.alignGrid }, extra || {})) : null;
     if (next === null) {
       showEmpty();
     } else {
@@ -198,6 +236,7 @@
     segs.innerHTML = '<tr><td class="ac-note" colspan="4">' + T('autoCut.none') + '</td></tr>';
     document.getElementById('acSegsTitle').textContent = T('autoCut.segTitle', { n: 0 });
     document.getElementById('acImport').disabled = true;
+    document.getElementById('acReset').hidden = true;
   }
 
   /** 渲染方案（参数 UI 不重建；renderSummary=true 时更新范围/摘要行）。 */
@@ -211,8 +250,11 @@
         : '';
     }
     document.getElementById('acImport').disabled = false;
+    // 锚定状态：已采用候选终点时显示「恢复默认方案」
+    document.getElementById('acReset').hidden = !(plan && plan.anchored);
     const cuts = (plan && plan.cuts) || [];
     const segments = (plan && plan.segments) || [];
+    const candidates = (plan && plan.candidates) || [];
 
     // 摘要：拼接总时长 + 保留比例
     const segTotal = segments.reduce((s, x) => s + (x.endTime - x.startTime), 0);
@@ -235,7 +277,8 @@
           '<td>' + esc(REASON_LABEL[c.reason] || c.reason) + '</td>' +
           '<td><span class="ac-score ' + scoreClass(c.score) + '">' + T('autoCut.score', { score: c.score }) + '</span></td>' +
           '<td></td>';
-        tr.children[4].appendChild(listenBtn(Math.max(0, c.time - 1), c.time + 1, LISTEN_CUT_TITLE));
+        const w = listenWindow(c.time);
+        tr.children[4].appendChild(listenBtn(w.start, w.end, T('autoCut.listenCut', { span: w.span })));
         body.appendChild(tr);
       }
     }
@@ -252,10 +295,34 @@
       tr.innerHTML =
         '<td>' + (i + 1) + '</td>' +
         '<td>' + fmtTime(s.startTime) + ' – ' + fmtTime(s.endTime) + '</td>' +
-        '<td>' + fmtTime(s.endTime - s.startTime) + '</td>' +
+        '<td>' + lenDesc(s.endTime - s.startTime) + '</td>' +
         '<td></td>';
       tr.children[3].appendChild(listenBtn(s.startTime, s.endTime, LISTEN_SEG_TITLE));
       segBody.appendChild(tr);
+      // 候选终点子行：该段起点之后可用的显著切点（距起点 ≥ 最少段长；不含默认段终点自身）
+      const cands = candidates.filter((c) => c.time > s.endTime + 1e-6 && c.time - s.startTime >= params.minSegSec - 1e-6);
+      for (const c of cands) {
+        const sub = document.createElement('tr');
+        sub.className = 'ac-cand-row';
+        const ch = barDesc(c.time);
+        sub.innerHTML =
+          '<td></td>' +
+          '<td class="ac-cand-label">→ ' + fmtTime(c.time) + (ch ? '（' + esc(ch) + '）' : '') + '</td>' +
+          '<td>' + lenDesc(c.time - s.startTime) + '</td>' +
+          '<td></td>';
+        const ops = sub.children[3];
+        ops.appendChild(listenBtn(s.startTime, c.time, LISTEN_SEG_TITLE));
+        const use = document.createElement('button');
+        use.className = 'btn-mini ac-use';
+        use.textContent = USE_END;
+        use.title = USE_END + '：' + fmtTime(c.time);
+        use.addEventListener('click', (e) => {
+          e.stopPropagation();
+          reanalyze({ anchor: { start: s.startTime, end: c.time } });
+        });
+        ops.appendChild(use);
+        segBody.appendChild(sub);
+      }
     });
   }
 

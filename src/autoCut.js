@@ -159,9 +159,10 @@
   }
 
   /**
-   * 剪切点质量评分（0-100）：三因子加权——能量分（谷深占比 50）+ 连续分
-   * （定位成本 30，成本 0 时满分、随差分/幅度增大衰减）+ 网格分（对齐网格
-   * 线 +20）。分离成纯函数便于单测与调参。
+   * 剪切点质量评分（0-100）：三因子加权——节奏对齐 40（第一优先级：拼接后
+   * 律动不断是产品核心承诺，未对齐网格的切点节奏分 0）+ 能量分 40（谷深归一化，
+   * 乐句间隙显著性）+ 连续分 20（样本级连续性：locateCutPoint 硬约束 + 30ms
+   * 交叉淡化已双重兜底，只需轻量反映）。分离成纯函数便于单测与调参。
    * @param {number} depth 谷深（能量包络）
    * @param {number} maxDepth 全部候选谷的最深值（能量分归一化基准）
    * @param {number} cost 定位成本（locateCutPoint 返回；越小越连续）
@@ -169,11 +170,11 @@
    * @returns {number} 0-100 整数（下限 1，保证展示有意义）
    */
   function scoreCut(depth, maxDepth, cost, reason) {
-    const energy = 50 * (maxDepth > 0 ? depth / maxDepth : 0);
+    const energy = 40 * (maxDepth > 0 ? depth / maxDepth : 0);
     // cost 量纲为幅度（-1..1 差分典型 0~0.25）：8 为经验归一化系数
-    const smooth = 30 / (1 + (cost || 0) * 8);
-    const grid = (reason === 'bar' || reason === 'beat') ? 20 : 0;
-    return Math.max(1, Math.min(100, Math.round(energy + smooth + grid)));
+    const smooth = 20 / (1 + (cost || 0) * 8);
+    const rhythm = (reason === 'bar' || reason === 'beat') ? 40 : 0;
+    return Math.max(1, Math.min(100, Math.round(energy + smooth + rhythm)));
   }
 
   /**
@@ -223,9 +224,14 @@
    * @param {number} [opts.searchEnd] 分析范围终点（秒；默认 duration）
    * @param {number} [opts.minSegSec=3] 最短段长（秒），短于此的段并入相邻段
    * @param {object} [opts.grid] 节拍网格（对齐用）
-   * @returns {{cuts:Array, segments:Array}}
-   *   cuts: [{time, score, reason}] 保留的剪切点（升序）
+   * @param {{start:number, end:number}} [opts.anchor] 锚定一段（用户采用候选终点）：
+   *   该段起止固定（不参与过短段合并的删除），其后的部分按默认池重新生成
+   * @param {number} [opts.candidateGapSec=2] 候选池相邻点最小间隔（弹窗"可用终点"数据源）
+   * @returns {{cuts:Array, segments:Array, candidates:Array}}
+   *   cuts: [{time, score, reason}] 保留的剪切点（升序；默认/锚定后的方案切点）
    *   segments: [{startTime, endTime}] 分段方案（相邻段精确衔接）
+   *   candidates: [{time, score, reason}] 全部显著切点（升序，含被方案过滤/合并的点，
+   *     供弹窗展示"可用终点"并支持用户显式采用）
    */
   function buildPlan(pcm, opts = {}) {
     const sr = opts.sr || DEFAULT_ANALYSIS_SR;
@@ -233,19 +239,43 @@
     const duration = opts.duration != null ? opts.duration : pcm.length / sr;
     const start = opts.searchStart != null ? opts.searchStart : 0;
     const end = opts.searchEnd != null ? opts.searchEnd : duration;
-    // 相邻剪切点间隔默认与最小段长一致：保证切出的段至少满足最短段长
+    // 默认方案池：相邻剪切点间隔默认与最小段长一致，保证切出的段至少满足最短段长
     // （若 minGap < minSeg，贪心选出的密集剪切点会被段过滤全部合并 → 空方案）
     const all = findCutPoints(pcm, Object.assign({}, opts, {
       minGapSec: opts.minGapSec != null ? opts.minGapSec : minSegSec,
     }));
+    // 候选池：全部显著切点（宽松间隔），供弹窗展示"可用终点"（含被默认方案
+    // 合并/过滤掉的点，用户可显式采用——顺带消除"高分点被静默删除"的不透明）
+    const candAll = findCutPoints(pcm, Object.assign({}, opts, {
+      minGapSec: opts.candidateGapSec != null ? opts.candidateGapSec : 2,
+    }));
+    const candidates = candAll
+      .filter((c) => c.time > start + 1e-6 && c.time < end - 1e-6)
+      .map((c) => ({ time: c.time, score: c.score, reason: c.reason }));
     // 范围过滤：剪切点必须严格落在分析范围内（边界由首尾段本身承担）
     const cuts = all.filter((c) => c.time > start + 1e-6 && c.time < end - 1e-6);
-    // 过短段合并：删除使相邻任一段短于 minSegSec 的剪切点，循环至稳定
-    let pts = [start, ...cuts.map((c) => c.time), end];
+    // 锚定（可选）：该段起止固定（用户显式选择优先，不参与过短段删除）
+    const anchor = opts.anchor && opts.anchor.end != null ? {
+      start: opts.anchor.start, end: opts.anchor.end,
+    } : null;
+    const fixedMs = anchor ? new Set([Math.round(anchor.start * 1000), Math.round(anchor.end * 1000)]) : null;
+    // 过短段合并：删除使相邻任一段短于 minSegSec 的剪切点，循环至稳定（固定点豁免）
+    const cutTimes = cuts.map((c) => c.time);
+    let pts;
+    if (anchor) {
+      pts = [start,
+        ...cutTimes.filter((t) => t < anchor.start - 1e-6),
+        anchor.start, anchor.end,
+        ...cutTimes.filter((t) => t > anchor.end + 1e-6),
+        end];
+    } else {
+      pts = [start, ...cutTimes, end];
+    }
     let changed = true;
     while (changed && pts.length > 2) {
       changed = false;
       for (let i = 1; i < pts.length - 1; i++) {
+        if (fixedMs && fixedMs.has(Math.round(pts[i] * 1000))) continue;
         if (pts[i] - pts[i - 1] < minSegSec || pts[i + 1] - pts[i] < minSegSec) {
           pts.splice(i, 1);
           changed = true;
@@ -253,18 +283,25 @@
         }
       }
     }
-    if (pts.length < 2) return { cuts: [], segments: [] };
+    if (pts.length < 2) return { cuts: [], segments: [], candidates };
     const segments = [];
     for (let i = 0; i < pts.length - 1; i++) {
       const d = pts[i + 1] - pts[i];
       if (d < 1e-6) continue;
       segments.push({ startTime: pts[i], endTime: pts[i + 1] });
     }
-    const kept = new Set(pts.slice(1, -1).map((t) => Math.round(t * 1000)));
-    const finalCuts = cuts.filter((c) => kept.has(Math.round(c.time * 1000)));
+    // 方案切点 = pts 中间点：默认池命中者保留原值；锚定点从候选池补全（含分数/依据）
+    const candByMs = new Map(candidates.map((c) => [Math.round(c.time * 1000), c]));
+    const finalCuts = [];
+    for (const ms of pts.slice(1, -1).map((t) => Math.round(t * 1000))) {
+      const hit = cuts.find((c) => Math.round(c.time * 1000) === ms) || candByMs.get(ms);
+      if (hit) finalCuts.push({ time: hit.time, score: hit.score, reason: hit.reason });
+      else finalCuts.push({ time: ms / 1000, score: null, reason: 'valley' });
+    }
     // 无保留剪切点 = 没有剪辑方案（全曲一段的导入无意义）
-    if (!finalCuts.length) return { cuts: [], segments: [] };
-    return { cuts: finalCuts, segments };
+    if (!finalCuts.length) return { cuts: [], segments: [], candidates };
+    finalCuts.sort((a, b) => a.time - b.time);
+    return { cuts: finalCuts, segments, candidates };
   }
 
   return {
