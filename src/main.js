@@ -600,8 +600,11 @@
       return null;
     }
     status(T('hint.autoDone', { bpm: r.bpm.toFixed(1) }));
-    // 第 1 段返回段内偏移（相对段起点）；后续段只填 BPM（相位按前段衔接）
-    return segIndex === 0 ? { bpm: r.bpm, offset: r.offset } : { bpm: r.bpm };
+    // 第 1 段返回段内偏移（相对段起点）；后续段只填 BPM（相位按前段衔接）。
+    // cands：竞争层 BPM 候选（v1.11.0，识别弹窗展示「其他可能 BPM」）
+    const out = segIndex === 0 ? { bpm: r.bpm, offset: r.offset } : { bpm: r.bpm };
+    if (r.bpmCandidates && r.bpmCandidates.length) out.cands = r.bpmCandidates;
+    return out;
   }
 
   function analyzeWindow(startSec, endSec) {

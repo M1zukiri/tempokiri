@@ -46,6 +46,7 @@
           <button id="mAddSeg" class="btn btn-mini-wide">+ 添加段落</button>
         </div>
         <div id="mAutoStatus" class="modal-status" hidden></div>
+        <div id="autoCands" class="modal-status auto-cands" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" hidden></div>
         <div class="modal-actions">
           <span class="spacer"></span>
           <button id="mCancel" class="btn">取消</button>
@@ -157,6 +158,42 @@
     return (60 / bpm) * beats * (4 / unit);
   }
 
+  /**
+   * 竞争层 BPM 候选渲染（v1.11.0）：识别结果旁展示「其他可能 BPM」，点击即采用该值。
+   * @param {Array<{bpm:number, harm:null|string}>} cands
+   * @param {number} rowIndex 对应段落行
+   */
+  function renderCands(cands, rowIndex) {
+    const box = el('autoCands');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!cands || !cands.length) {
+      box.hidden = true;
+      return;
+    }
+    const harmLabel = { '2x': '2×', '0.5x': '½×', '3x': '3×', '0.33x': '⅓×' };
+    box.hidden = false;
+    const label = document.createElement('span');
+    label.className = 'auto-cand-label';
+    label.textContent = '其他可能 BPM：';
+    box.appendChild(label);    for (const c of cands) {
+      const b = document.createElement('button');
+      b.className = 'btn-mini auto-cand-bpm';
+      b.textContent = c.bpm + (c.harm && harmLabel[c.harm] ? '（' + harmLabel[c.harm] + '）' : '');
+      b.title = '采用 ' + c.bpm;
+      b.addEventListener('click', () => {
+        const rr = rows[rowIndex];
+        if (!rr) return;
+        rr.bpm = String(c.bpm); // 候选已按 0.1 精度（≤2 位上限）
+        // 切换候选 BPM 后网格分辨率同步为每小节拍数（与识别一致的默认）
+        if (rr.res == null || rr.res === '') rr.res = rr.beats;
+        renderRows();
+        el('mAutoStatus').textContent = '已切换为 BPM ' + c.bpm + '，确认后生效。';
+      });
+      box.appendChild(b);
+    }
+  }
+
   async function runAuto(i) {
     if (autoBusy || !autoCb) return;
     const r = rows[i];
@@ -181,8 +218,10 @@
         renderRows();
         status.textContent = '第 ' + (i + 1) + ' 段识别完成：BPM ' + result.bpm.toFixed(1) +
           (result.offset != null ? '，偏移 ' + Number(result.offset.toFixed(3)) + 's' : '') + '。确认后生效。';
+        renderCands(result.cands, i);
       } else {
         status.textContent = '未能识别出清晰节拍，请手动输入 BPM。';
+        renderCands(null, i);
       }
     } catch (e) {
       status.textContent = '识别失败：' + e.message;

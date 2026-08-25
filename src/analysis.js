@@ -226,10 +226,20 @@
    * @param {number} [opts.maxBpm=200]
    * @returns {number|null} BPM 或 null（onset 不足）
    */
-  function estimateBpm(onsets, opts = {}) {
+  /**
+   * BPM 主峰 + 竞争层候选评估（v1.11.0）：主峰选择逻辑与先前完全一致，
+   * 另收集自相关谱的局部峰作为「其他可能 BPM」候选（供 UI 展示与用户采用）。
+   * @param {number[]} onsets 秒
+   * @param {object} [opts]
+   * @param {number} [opts.minBpm=60]
+   * @param {number} [opts.maxBpm=200]
+   * @returns {{bpm:number|null, cands:Array<{bpm:number, score:number, rel:number, harm:null|string}>}}
+   *   cands 按分数降序最多 5 项；harm 为与主峰的整数倍关系（'2x'|'0.5x'|'3x'|'0.33x'）
+   */
+  function scanBpm(onsets, opts = {}) {
     const minBpm = opts.minBpm || 60;
     const maxBpm = opts.maxBpm || 200;
-    if (!onsets || onsets.length < 4) return null;
+    if (!onsets || onsets.length < 4) return { bpm: null, cands: [] };
     // 长曲目 onset 过多时均匀抽样，控制成本
     let sample = onsets;
     if (onsets.length > 600) {
@@ -237,7 +247,7 @@
       const step = onsets.length / 600;
       for (let i = 0; i < 600; i++) sample.push(onsets[Math.floor(i * step)]);
     }
-    // 自相关主导周期：滞后范围对应 BPM 60–200（约 0.3–1.0s）。
+    // 自相关主导周期：滞后范围对应 BPM minBpm–maxBpm（默认约 0.3–1.0s）。
     // 半拍/八分假峰（如 0.209s）天然落在范围外；倍速滞后（2×）配对 onset 数远少于真拍，
     // 除非 onset 严格等间隔（合成信号），此时主峰加权中心仍指向较快拍。
     // 相比纯 gridCost 最近线距离，对八分/十六分混合节奏更鲁棒：真拍滞后处配对 onset 最多。
@@ -246,22 +256,30 @@
     const sorted = Float64Array.from(sample).sort();
     // 双指针单调扫描（模块级 scoreNear，见下）：sample 有序，每 lag O(N)（原二分 O(N log N)）。
     const scoreAt = (lag) => scoreNear(sorted, sample, lag);
+    // 单次扫描：记录全谱 + 最高分（主峰选择与 v1.8+ 一致）
+    const lags = [];
+    const scores = [];
     let bestLag = null;
     let bestScore = -Infinity;
     for (let lag = lagMin; lag <= lagMax + 1e-9; lag += 0.002) {
-      const score = scoreAt(lag);
-      if (score > bestScore) { bestScore = score; bestLag = lag; }
+      const s = scoreAt(lag);
+      lags.push(lag);
+      scores.push(s);
+      if (s > bestScore) { bestScore = s; bestLag = lag; }
     }
-    if (bestLag === null || bestScore < sample.length * 0.04) return null;
+    if (bestLag === null || bestScore < sample.length * 0.04) return { bpm: null, cands: [] };
     // 主峰 ±0.04s 内按分数加权取中心（onset 检测抖动会使平台出现，中心最接近真实周期）
-    let sum = 0;
-    let wsum = 0;
-    for (let lag = Math.max(lagMin, bestLag - 0.04); lag <= Math.min(lagMax, bestLag + 0.04); lag += 0.002) {
-      const score = scoreAt(lag);
-      sum += lag * score;
-      wsum += score;
-    }
-    const center = sum / wsum;
+    const centerOf = (lag) => {
+      let sum = 0;
+      let wsum = 0;
+      for (let lag2 = Math.max(lagMin, lag - 0.04); lag2 <= Math.min(lagMax, lag + 0.04); lag2 += 0.002) {
+        const s = scoreAt(lag2);
+        sum += lag2 * s;
+        wsum += s;
+      }
+      return wsum > 0 ? sum / wsum : lag;
+    };
+    const center = centerOf(bestLag);
     let bpm = Math.round(60 / center);
     // 局部细化：估计值 ±3 BPM 内 0.1 步长，onset 到最近拍线距离平方和最小。
     // 自相关平台受 ±0.03s 配对窗口影响有 ±1 BPM 误差，细化可收敛到亚整数。
@@ -273,7 +291,63 @@
       if (c < bestCost) { bestCost = c; bestBpm = b; }
     }
     bpm = Math.round(bestBpm * 10) / 10;
-    return Math.min(maxBpm, Math.max(minBpm, bpm));
+    bpm = Math.min(maxBpm, Math.max(minBpm, bpm));
+
+    // 竞争层候选：局部峰（分数 ≥ 主峰 25% 且 BPM 距主峰 >2 才展示；每峰加权中心）
+    const harmOf = (b) => {
+      const r = b / bpm;
+      if (Math.abs(r - 2) <= 0.08) return '2x';
+      if (Math.abs(r - 0.5) <= 0.02) return '0.5x';
+      if (Math.abs(r - 3) <= 0.12) return '3x';
+      if (Math.abs(r - 1 / 3) <= 0.014) return '0.33x';
+      return null;
+    };
+    const cands = [];
+    const seenLags = [];
+    for (let i = 1; i < scores.length - 1; i++) {
+      if (scores[i] < scores[i - 1] || scores[i] < scores[i + 1]) continue; // 局部峰
+      if (scores[i] < bestScore * 0.25) continue;
+      const lag = lags[i];
+      if (seenLags.some((t) => Math.abs(t - lag) < 0.03)) continue;
+      const nearBpm = Math.round((60 / lag) * 10) / 10;
+      if (Math.abs(nearBpm - bpm) < 2) continue;
+      seenLags.push(lag);
+      const c = centerOf(lag);
+      const cb = Math.round((60 / c) * 10) / 10;
+      if (Math.abs(cb - bpm) < 2) continue;
+      cands.push({
+        bpm: cb,
+        score: Math.round(scores[i]),
+        rel: Math.round((scores[i] / bestScore) * 100) / 100,
+        harm: harmOf(cb),
+      });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    return { bpm, cands: cands.slice(0, 5) };
+  }
+
+  /**
+   * BPM 主估计（兼容旧接口，返回数值或 null）。
+   * @param {number[]} onsets 秒
+   * @param {object} [opts]
+   * @param {number} [opts.minBpm=60]
+   * @param {number} [opts.maxBpm=200]
+   * @returns {number|null} BPM 或 null（onset 不足）
+   */
+  function estimateBpm(onsets, opts = {}) {
+    return scanBpm(onsets, opts).bpm;
+  }
+
+  /**
+   * BPM 主估计 + 竞争层候选（v1.11.0 新增）。
+   * @param {number[]} onsets 秒
+   * @param {object} [opts]
+   * @param {number} [opts.minBpm=60]
+   * @param {number} [opts.maxBpm=200]
+   * @returns {{bpm:number|null, cands:Array}}
+   */
+  function estimateBpmCands(onsets, opts = {}) {
+    return scanBpm(onsets, opts);
   }
 
   /**
@@ -542,7 +616,8 @@
     // 注意：detectOnsets 必须以降采样后的采样率计算时间，
     // 用户传入的原始 sampleRate 必须被覆盖，否则 onset 时间减半、BPM 翻倍。
     const onsets = detectOnsets(flux, Object.assign({}, opts, { sampleRate: analysisSr }));
-    const bpm = estimateBpm(onsets, opts);
+    const scan = scanBpm(onsets, opts);
+    const bpm = scan.bpm;
     // offset = 首条网格线位置 = 第一个 onset（开头第一个可听见的瞬态）。
     // 用户按听感校准（心予報 mp3：0.46s ≈ 首个 onset 0.464s）时首线就是音乐实际
     // 开始处，无需相位换算；首个 onset 若为弱装饰音可在设置窗口手动微调。
@@ -550,7 +625,8 @@
     if (bpm && onsets.length) {
       offset = Math.round(onsets[0] * 1000) / 1000;
     }
-    return { bpm, offset, onsets, flux };
+    // bpmCandidates：竞争层 BPM 候选（v1.11.0，供 UI 展示「其他可能 BPM」）
+    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands };
   }
 
   return {
@@ -560,6 +636,7 @@
     spectralFlux,
     detectOnsets,
     estimateBpm,
+    estimateBpmCands,
     scoreNear,
     estimateOffset,
     buildGrid,

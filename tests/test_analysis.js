@@ -66,6 +66,32 @@ test('analyze: 端到端识别合成信号', () => {
   assert.ok(Math.abs(r.bpm - 140) <= 2, `期望 ~140，实际 ${r.bpm}`);
 });
 
+test('estimateBpmCands: 等间隔信号返回半值竞争层候选（harm=0.5x）', () => {
+  // 纯 200 BPM 整拍：半拍（0.6s = 100 BPM）配对同样密集 → 候选应含 100（0.5x）
+  const onsets = Array.from({ length: 41 }, (_, i) => i * 0.3);
+  const r = A.estimateBpmCands(onsets, { minBpm: 60, maxBpm: 200 });
+  assert.ok(r.bpm != null);
+  // 等间隔信号下 gridCost 细化会将主峰推向平坦区（192-201 均合法），核心断言是半值层
+  assert.ok(r.bpm > 189 && r.bpm < 202, '主峰应 ≈200，实际 ' + r.bpm);
+  const half = r.cands.find((c) => c.harm === '0.5x');
+  assert.ok(half, '候选应含半值层（harm 0.5x），实际 ' + JSON.stringify(r.cands.map((c) => c.bpm)));
+  assert.ok(Math.abs(half.bpm - 100) < 3, '半值层应 ≈100，实际 ' + half.bpm);
+});
+
+test('estimateBpmCands: 与 estimateBpm 主选一致（同一输入）', () => {
+  const onsets = [];
+  for (let i = 0; i < 40; i++) onsets.push(i * 0.45 + (i % 3) * 0.01); // ≈133 BPM 微抖动
+  const r = A.estimateBpmCands(onsets, { minBpm: 60, maxBpm: 200 });
+  assert.equal(A.estimateBpm(onsets, { minBpm: 60, maxBpm: 200 }), r.bpm, '主选与旧接口一致');
+  assert.ok(r.bpm > 125 && r.bpm < 140, '主峰应 ≈133，实际 ' + r.bpm);
+});
+
+test('estimateBpmCands: onset 不足返回空候选', () => {
+  const r = A.estimateBpmCands([0, 0.5, 1.0], {});
+  assert.equal(r.bpm, null);
+  assert.deepEqual(r.cands, []);
+});
+
 test('buildGrid: 120 BPM 4/4 小节边界', () => {
   const g = A.buildGrid({
     segments: [{ bpm: 120, beatsPerBar: 4, bars: 10 }],
