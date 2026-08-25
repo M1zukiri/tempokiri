@@ -68,7 +68,8 @@
 
   function rowToSeg(r, isLast) {
     const seg = {
-      bpm: parseFloat(r.bpm),
+      // BPM 显示与存储统一上限 2 位小数（parseFloat 透传会保留任意位数）
+      bpm: Math.round(parseFloat(r.bpm) * 100) / 100,
       beatsPerBar: parseInt(r.beats, 10),
       beatUnit: parseInt(r.unit, 10),
     };
@@ -102,7 +103,18 @@
         <td><button class="btn-mini seg-auto" title="自动识别该段">识别</button></td>
         <td><button class="btn-mini del seg-del" title="删除该段">✕</button></td>`;
       const refreshLen = () => r._unitInput && r._unitInput.refresh();
-      tr.querySelector('.seg-bpm').addEventListener('change', (e) => { r.bpm = e.target.value; refreshLen(); });
+      tr.querySelector('.seg-bpm').addEventListener('change', (e) => {
+        const v = parseFloat(e.target.value);
+        if (isFinite(v)) {
+          // 规范化：显示与存储统一到最多 2 位小数（非法输入保留原文，由 validate 报错）
+          const norm = Math.round(v * 100) / 100;
+          r.bpm = String(norm);
+          e.target.value = String(norm);
+        } else {
+          r.bpm = e.target.value;
+        }
+        refreshLen();
+      });
       tr.querySelector('.seg-beats').addEventListener('change', (e) => { r.beats = parseInt(e.target.value, 10); refreshLen(); });
       tr.querySelector('.seg-unit').addEventListener('change', (e) => { r.unit = parseInt(e.target.value, 10); refreshLen(); });
       tr.querySelector('.seg-res').addEventListener('change', (e) => { r.res = e.target.value; refreshLen(); });
