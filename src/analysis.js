@@ -280,17 +280,21 @@
       return wsum > 0 ? sum / wsum : lag;
     };
     const center = centerOf(bestLag);
-    let bpm = Math.round(60 / center);
-    // 局部细化：估计值 ±3 BPM 内 0.1 步长，onset 到最近拍线距离平方和最小。
-    // 自相关平台受 ±0.03s 配对窗口影响有 ±1 BPM 误差，细化可收敛到亚整数。
+    // 局部细化：估计值 ±max(3, bpm×4%) 内 0.1 步长，onset 到最近拍线距离平方和最小。
+    // 自相关平台受 ±0.03s 配对窗口影响有 ±1 BPM 误差，且主峰中心偏差可达 3~4%
+    // （如 194 vs 200），固定 ±3 窗口不足以回拉——按比例窗口（200±8）覆盖。
     const sample400 = sample.slice(0, 400);
-    let bestCost = gridCost(sample400, bpm);
-    let bestBpm = bpm;
-    for (let b = bpm - 3; b <= bpm + 3; b += 0.1) {
-      const c = gridCost(sample400, b);
-      if (c < bestCost) { bestCost = c; bestBpm = b; }
-    }
-    bpm = Math.round(bestBpm * 10) / 10;
+    const refine = (b) => {
+      const half = Math.max(3, Math.round(b * 0.04));
+      let bc = gridCost(sample400, b);
+      let best = b;
+      for (let x = b - half; x <= b + half + 1e-9; x += 0.1) {
+        const c = gridCost(sample400, x);
+        if (c < bc) { bc = c; best = x; }
+      }
+      return Math.round(best * 10) / 10;
+    };
+    let bpm = refine(Math.round(60 / center));
     bpm = Math.min(maxBpm, Math.max(minBpm, bpm));
 
     // 竞争层候选：局部峰（分数 ≥ 主峰 25% 且 BPM 距主峰 >2 才展示；每峰加权中心）
@@ -313,7 +317,7 @@
       if (Math.abs(nearBpm - bpm) < 2) continue;
       seenLags.push(lag);
       const c = centerOf(lag);
-      const cb = Math.round((60 / c) * 10) / 10;
+      const cb = refine(Math.round((60 / c) * 10) / 10); // 候选同样细化（±max(3, b×4%) 窗口）
       if (Math.abs(cb - bpm) < 2) continue;
       cands.push({
         bpm: cb,
