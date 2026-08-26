@@ -18,6 +18,9 @@
 
   const BEAT_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8];
   const UNIT_CHOICES = [2, 4, 8, 16];
+  // tap 搜索窗口（v1.12.2 定档：batch1 100 首扫描 ±10/12/15/20% → ±12% 最优：0.1 判定准确率 79.0%（±20% 75.0%）、严重错误 4（±20% 10））
+  const TAP_LO = 0.88;
+  const TAP_HI = 1.12;
 
   function buildModalDom() {
     const overlay = document.createElement('div');
@@ -164,7 +167,7 @@
           r.bpm = String(v);
           tr.querySelector('.seg-bpm').value = String(v);
           tapSpan.textContent = '已锁定 ' + v + ' BPM ✓';
-          statusText.textContent = '已锁定 ' + v + ' BPM。点「识别」将按 ±20% 范围搜索（' + Math.max(40, Math.round(v * 0.8)) + '–' + Math.min(300, Math.round(v * 1.2)) + '）。';
+          statusText.textContent = '已锁定 ' + v + ' BPM。点「识别」将按 ±12% 范围搜索（' + Math.max(40, Math.round(v * TAP_LO)) + '–' + Math.min(300, Math.round(v * TAP_HI)) + '）。';
           refreshLen();
         } else if (st.reset) {
           tapSpan.textContent = '停顿重拍：' + st.n + '/8';
@@ -249,9 +252,9 @@
     status.textContent = '正在分析第 ' + (i + 1) + ' 段…';
     autoBusy = true;
     try {
-      // tap 范围：仅本次识别生效（[×0.8, ×1.2] 包裹在 40–300 校验域内）
+      // tap 范围：仅本次识别生效（[×0.88, ×1.12]，包裹在 40–300 校验域内）
       const range = r.tapBpm != null
-        ? { minBpm: Math.max(40, Math.round(r.tapBpm * 0.8)), maxBpm: Math.min(300, Math.round(r.tapBpm * 1.2)) }
+        ? { minBpm: Math.max(40, Math.round(r.tapBpm * TAP_LO)), maxBpm: Math.min(300, Math.round(r.tapBpm * TAP_HI)) }
         : null;
       const result = await autoCb(i, rowToSeg(r, i === rows.length - 1), rows.map((x, j) => rowToSeg(x, j === rows.length - 1)), range);
       if (result && result.error) {
