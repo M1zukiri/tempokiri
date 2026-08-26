@@ -13,11 +13,17 @@ test('bpmFromIntervals: 8 拍（±30ms 抖动）估计正确', () => {
   assert.ok(Math.abs(bpm - 120) < 3, `期望 ~120，实际 ${bpm}`);
 });
 
-test('bpmFromIntervals: <250ms 双击被忽略', () => {
-  // 0.12s 双击 + 正常 0.5s 拍
-  const bpm = TT.bpmFromIntervals([0.12, 0.5, 0.5, 0.48, 0.5, 0.52, 0.5]);
+test('bpmFromIntervals: <100ms 双击被忽略', () => {
+  // 80ms 双击 + 正常 0.5s 拍
+  const bpm = TT.bpmFromIntervals([0.08, 0.5, 0.5, 0.48, 0.5, 0.52, 0.5]);
   assert.ok(bpm != null);
   assert.ok(Math.abs(bpm - 120) < 3, `期望 ~120，实际 ${bpm}`);
+});
+
+test('bpmFromIntervals: 300 BPM 快拍（0.2s 间隔）不被双击阈值吞掉', () => {
+  const bpm = TT.bpmFromIntervals([0.2, 0.21, 0.19, 0.2, 0.2, 0.21, 0.2]);
+  assert.ok(bpm != null);
+  assert.ok(Math.abs(bpm - 300) < 10, `期望 ~300，实际 ${bpm}`);
 });
 
 test('bpmFromIntervals: 野值被一致性滤波剔除', () => {
@@ -30,7 +36,7 @@ test('bpmFromIntervals: 野值被一致性滤波剔除', () => {
 test('bpmFromIntervals: 有效拍不足返回 null', () => {
   assert.equal(TT.bpmFromIntervals([]), null);
   assert.equal(TT.bpmFromIntervals([0.5, 0.5, 0.5]), null); // 3 拍不足
-  assert.equal(TT.bpmFromIntervals([0.12, 0.12, 0.12, 0.12]), null); // 全为双击
+  assert.equal(TT.bpmFromIntervals([0.08, 0.08, 0.08, 0.08]), null); // 全为双击
 });
 
 test('bpmFromIntervals: 240 BPM 快拍（0.25s 间隔）不被双击阈值吞掉', () => {
@@ -69,9 +75,21 @@ test('tapper: 双击不计数且不重置', () => {
   const t = TT.createTapper();
   let t0 = 10000;
   t.push(t0); // 第 1 拍
-  const r = t.push(t0 + 120); // 120ms 双击 → 忽略
+  const r = t.push(t0 + 80); // 80ms 双击 → 忽略
   assert.equal(r.n, 1, '双击不增加拍数');
-  t.push(t0 + 620); // 第 2 拍（从第 1 拍起 0.62s）
-  const r2 = t.push(t0 + 1120); // 第 3 拍
+  t.push(t0 + 580); // 第 2 拍（从第 1 拍起 0.58s）
+  const r2 = t.push(t0 + 1080); // 第 3 拍
   assert.equal(r2.n, 3);
+});
+
+test('tapper: 500 BPM 级快拍（120ms 间隔）可收集并锁定', () => {
+  const t = TT.createTapper();
+  let cur = null;
+  let t0 = 10000;
+  for (let i = 0; i < 8; i++) {
+    cur = t.push(t0);
+    t0 += 120 + (i % 2 ? 4 : -4);
+  }
+  assert.equal(cur.locked, true, '快拍 8 次应锁定');
+  assert.ok(Math.abs(cur.bpm - 500) < 12, `期望 ~500，实际 ${cur.bpm}`);
 });

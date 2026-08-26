@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const MIN_GAP = 0.15; // 双击忽略（秒）：低至 150ms 仍能拍 400 BPM 的快歌；人体双击 <130ms
+  const MIN_GAP = 0.1; // 双击忽略（秒）：低至 100ms 可拍 600 BPM 拍距；人体双击极限 ~80ms 仍防抖
   const RESET_GAP = 2.0; // 停顿重置（秒）
   const TARGET = 8; // 锁定拍数
   const CONSISTENCY = 0.15; // 一致性滤波半径（±15% 中位数）
