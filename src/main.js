@@ -562,7 +562,7 @@
    * @param {number} segIndex
    * @param {object} seg 该行当前输入（可能未填全）
    */
-  async function autoDetect(segIndex, seg, allSegs) {
+  async function autoDetect(segIndex, seg, allSegs, range) {
     if (state.kind === 'video' && !state.pcm) {
       status(T('hint.extractRapid'));
       await captureVideoPcm();
@@ -590,7 +590,7 @@
     }
     status(T('hint.analyzing'));
     await new Promise((r) => setTimeout(r, 0)); // 让步一帧，让状态栏提示可见
-    const r = analyzeWindow(windowStart, windowEnd);
+    const r = analyzeWindow(windowStart, windowEnd, range);
     if (r && r.error) {
       status(r.error);
       return { error: r.error };
@@ -607,7 +607,7 @@
     return out;
   }
 
-  function analyzeWindow(startSec, endSec) {
+  function analyzeWindow(startSec, endSec, range) {
     const sr = analysis.DEFAULT_ANALYSIS_SR; // state.pcm 已降采样到分析采样率
     const gs = store.loadGlobalSettings();
     const hop = Math.max(64, Math.min(2048, Math.round(gs.hop)));
@@ -619,7 +619,12 @@
     // 放在长度检查之前——空/单样本窗口 RMS 为 0 或 NaN，能正确落到对应分支
     if (analysis.rmsOf(win) < 1e-4) return { bpm: null, offset: 0, error: T('hint.lowEnergy') };
     if (win.length < sr * 1) return { bpm: null, offset: 0 };
-    return analysis.analyze(win, { sampleRate: sr, hop, delta, minBpm: gs.minBpm, maxBpm: gs.maxBpm });
+    // BPM Tap：非空 range（[tap×0.8, tap×1.2]）覆盖本次识别搜索窗（不改全局设置）
+    return analysis.analyze(win, {
+      sampleRate: sr, hop, delta,
+      minBpm: range ? range.minBpm : gs.minBpm,
+      maxBpm: range ? range.maxBpm : gs.maxBpm,
+    });
   }
 
   function captureVideoPcm() {

@@ -91,7 +91,13 @@
       const isLast = i === rows.length - 1;
       tr.innerHTML = `
         <td class="seg-idx">${i + 1}</td>
-        <td><input type="number" class="seg-bpm" min="40" max="300" step="0.1" value="${r.bpm != null ? r.bpm : ''}" placeholder="BPM" /></td>
+        <td>
+          <div class="seg-bpm-wrap" style="display:inline-flex;gap:4px;align-items:center">
+            <input type="number" class="seg-bpm" min="40" max="300" step="0.1" value="${r.bpm != null ? r.bpm : ''}" placeholder="BPM" />
+            <button class="btn-mini seg-double" title="BPM ×2（倍频修正）">×2</button>
+            <button class="btn-mini seg-halve" title="BPM ÷2（倍频修正）">÷2</button>
+          </div>
+        </td>
         <td>
           <select class="seg-beats">${BEAT_CHOICES.map((b) => `<option value="${b}" ${b == r.beats ? 'selected' : ''}>${b}</option>`).join('')}</select>
           /
@@ -101,7 +107,10 @@
           ${isLast ? '<span class="seg-rest">剩余所有</span>' : ''}
         </td>
         <td><input type="number" class="seg-res" min="1" step="1" value="${r.res != null ? r.res : ''}" placeholder="每小节线数" title="网格分辨率：每小节网格线数，自动识别时默认为拍号分子" /></td>
-        <td><button class="btn-mini seg-auto" title="自动识别该段">识别</button></td>
+        <td><button class="btn-mini seg-auto" title="自动识别该段">识别</button>
+          <button class="btn-mini seg-tap" title="按正拍敲击 8 次，锁定 BPM 并作为识别搜索范围">👆Tap</button>
+          <span class="seg-tap-status">${r._tapTxt || ''}</span>
+        </td>
         <td><button class="btn-mini del seg-del" title="删除该段">✕</button></td>`;
       const refreshLen = () => r._unitInput && r._unitInput.refresh();
       tr.querySelector('.seg-bpm').addEventListener('change', (e) => {
@@ -125,6 +134,44 @@
           rows.splice(i, 1);
           renderRows();
         }
+      });
+      // BPM 倍频修正（×2/÷2，应对识别倍频情况；限 40–300，沿用 2 位规范化）
+      const adjustBpm = (mul) => {
+        const v = parseFloat(r.bpm);
+        if (!isFinite(v)) { el('mAutoStatus').textContent = '请先填写 BPM，再使用 ×2/÷2。'; return; }
+        const nv = Math.round(v * mul * 100) / 100;
+        if (nv < 40 || nv > 300) {
+          el('mAutoStatus').textContent = '×2/÷2 后超出 40–300 范围，未应用。';
+          return;
+        }
+        r.bpm = String(nv);
+        tr.querySelector('.seg-bpm').value = String(nv);
+        el('mAutoStatus').textContent = 'BPM 已调整为 ' + nv + '，确认后生效。';
+        refreshLen();
+      };
+      tr.querySelector('.seg-double').addEventListener('click', () => adjustBpm(2));
+      tr.querySelector('.seg-halve').addEventListener('click', () => adjustBpm(0.5));
+      // BPM Tap：人耳锚定（8 拍锁定 → 填行 + 作为识别搜索范围 [×0.8, ×1.2]）
+      tr.querySelector('.seg-tap').addEventListener('click', () => {
+        if (!r._taper) r._taper = (typeof MC.tapTempo !== 'undefined' && MC.tapTempo) ? MC.tapTempo.createTapper() : null;
+        if (!r._taper) return;
+        const st = r._taper.push(performance.now());
+        const statusText = el('mAutoStatus');
+        const tapSpan = tr.querySelector('.seg-tap-status');
+        if (st.locked) {
+          const v = Math.round(st.bpm * 100) / 100;
+          r.tapBpm = v;
+          r.bpm = String(v);
+          tr.querySelector('.seg-bpm').value = String(v);
+          tapSpan.textContent = '已锁定 ' + v + ' BPM ✓';
+          statusText.textContent = '已锁定 ' + v + ' BPM。点「识别」将按 ±20% 范围搜索（' + Math.max(40, Math.round(v * 0.8)) + '–' + Math.min(300, Math.round(v * 1.2)) + '）。';
+          refreshLen();
+        } else if (st.reset) {
+          tapSpan.textContent = '停顿重拍：' + st.n + '/8';
+        } else {
+          tapSpan.textContent = st.n + '/8 拍' + (st.bpm ? ' · ' + st.bpm : '');
+        }
+        r._tapTxt = tapSpan.textContent;
       });
       const lenCell = tr.querySelector('.seg-length');
       if (lenCell && !isLast) {
@@ -202,13 +249,18 @@
     status.textContent = '正在分析第 ' + (i + 1) + ' 段…';
     autoBusy = true;
     try {
-      const result = await autoCb(i, rowToSeg(r, i === rows.length - 1), rows.map((x, j) => rowToSeg(x, j === rows.length - 1)));
+      // tap 范围：仅本次识别生效（[×0.8, ×1.2] 包裹在 40–300 校验域内）
+      const range = r.tapBpm != null
+        ? { minBpm: Math.max(40, Math.round(r.tapBpm * 0.8)), maxBpm: Math.min(300, Math.round(r.tapBpm * 1.2)) }
+        : null;
+      const result = await autoCb(i, rowToSeg(r, i === rows.length - 1), rows.map((x, j) => rowToSeg(x, j === rows.length - 1)), range);
       if (result && result.error) {
         status.textContent = result.error;
         return;
       }
       if (result && result.bpm) {
         r.bpm = result.bpm.toFixed(1);
+        r.tapBpm = null; // 一次性：tap 范围仅本次识别生效
         // 自动识别默认网格分辨率 = 每小节拍数（每拍一条线），可手动修改
         if (r.res == null || r.res === '') r.res = r.beats;
         // 第 1 段识别的 offset 填入全局偏移（后续段相位按前段衔接，不填）
