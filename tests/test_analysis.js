@@ -245,3 +245,29 @@ test('scoreNear: 双指针与二分 hasNear 全 lag 一致（P3）', () => {
     assert.equal(A.scoreNear(sorted, sample, lag), scoreBinary(lag), `lag=${lag.toFixed(3)}`);
   }
 });
+
+test('buildGrid: offset 下界拒绝全空小节（负值不得超过一个小节长）', () => {
+  const segs = [{ bpm: 120, beatsPerBar: 4, bars: 4 }]; // barDur = 2s
+  // 恰等于一个小节长 → 拒绝（首小节 [−2, 0] 与音频无实质重叠）
+  assert.throws(() => A.buildGrid({ segments: segs, offset: -2, duration: 16 }), /offset 负值不能超过/);
+  assert.throws(() => A.buildGrid({ segments: segs, offset: -2.5, duration: 16 }), /offset 负值不能超过/);
+  // 严格小于一个小节长 → 允许（首小节部分重叠）
+  const g = A.buildGrid({ segments: segs, offset: -1.999, duration: 16 });
+  assert.equal(g.bars[0].startTime, -1.999);
+  assert.ok(g.bars[0].endTime > 0);
+  // offset 合法时首小节负起点允许（第一小节与音频重叠）
+  const g2 = A.buildGrid({ segments: segs, offset: -0.5, duration: 16 });
+  assert.equal(g2.bars[0].startTime, -0.5);
+});
+
+test('buildGrid: 小节截断到最后一个与音频相交的小节（末小节可部分越界）', () => {
+  const segs = [{ bpm: 120, beatsPerBar: 4, bars: 12 }]; // 网格 24s > 音频 16s
+  const g = A.buildGrid({ segments: segs, offset: -0.5, duration: 16 });
+  const last = g.bars[g.bars.length - 1];
+  // 末小节起点在音频内、终点超出 → 保留完整小节长（导出补静音）
+  assert.equal(last.startTime, 15.5);
+  assert.equal(last.endTime, 17.5);
+  assert.ok(last.startTime < 16 && last.endTime > 16);
+  // 其后（与音频无交集）的小节不生成
+  assert.ok(g.bars.every((b) => b.startTime < 16 - 1e-9));
+});

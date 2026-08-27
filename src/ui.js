@@ -40,23 +40,40 @@
     }
     items.forEach((it, idx) => {
       const card = document.createElement('div');
-      card.className = 'seq-card' + (playingId && it.id === playingId ? ' playing' : '');
+      card.className = 'seq-card' + (playingId && it.id === playingId ? ' playing' : '') + (it.silent ? ' silent' : '');
       card.dataset.id = it.id;
-      card.innerHTML = `
-        <span class="seq-num">${idx + 1}</span>
-        <span class="seq-edges">
-          <span class="edge-label">${T('seq.edgeStart')}</span><span class="edge-start"></span>
-          <span class="edge-label">${T('seq.edgeEnd')}</span><span class="edge-end"></span>
-        </span>
-        <span class="spacer"></span>
-        <button class="btn-mini seq-toggle" title="${T('seq.fadeToggle')}" aria-expanded="false">▾</button>
-        <button class="btn-mini up" title="${T('seq.up')}">↑</button>
-        <button class="btn-mini down" title="${T('seq.down')}">↓</button>
-        <button class="btn-mini del" title="${T('seq.del')}">✕</button>
-        <span class="seq-detail" hidden>
-          <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
-          <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
-        </span>`;
+      if (it.silent) {
+        // 静音段：无起/止源区间，主行显示时长；详情区（淡入/淡出 + 时长秒编辑）
+        card.innerHTML = `
+          <span class="seq-num">${idx + 1}</span>
+          <span class="seq-silent">${T('seq.silentLabel')} ${fmtTime(it.durationSec || 0)}s</span>
+          <span class="spacer"></span>
+          <button class="btn-mini seq-toggle" title="${T('seq.fadeToggle')}" aria-expanded="false">▾</button>
+          <button class="btn-mini up" title="${T('seq.up')}">↑</button>
+          <button class="btn-mini down" title="${T('seq.down')}">↓</button>
+          <button class="btn-mini del" title="${T('seq.del')}">✕</button>
+          <span class="seq-detail" hidden>
+            <label class="fade">${T('seq.silentDur')} <input type="number" class="silent-dur" value="${Number((it.durationSec || 0).toFixed(3))}" min="0.01" step="0.01" /> ${T('seq.unitSec')}</label>
+            <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+            <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+          </span>`;
+      } else {
+        card.innerHTML = `
+          <span class="seq-num">${idx + 1}</span>
+          <span class="seq-edges">
+            <span class="edge-label">${T('seq.edgeStart')}</span><span class="edge-start"></span>
+            <span class="edge-label">${T('seq.edgeEnd')}</span><span class="edge-end"></span>
+          </span>
+          <span class="spacer"></span>
+          <button class="btn-mini seq-toggle" title="${T('seq.fadeToggle')}" aria-expanded="false">▾</button>
+          <button class="btn-mini up" title="${T('seq.up')}">↑</button>
+          <button class="btn-mini down" title="${T('seq.down')}">↓</button>
+          <button class="btn-mini del" title="${T('seq.del')}">✕</button>
+          <span class="seq-detail" hidden>
+            <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+            <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+          </span>`;
+      }
       card.querySelector('.seq-toggle').addEventListener('click', () => {
         const d = card.querySelector('.seq-detail');
         const t = card.querySelector('.seq-toggle');
@@ -64,22 +81,26 @@
         t.classList.toggle('open', !d.hidden);
         t.setAttribute('aria-expanded', String(!d.hidden));
       });
-      const edgeGrid = () => handlers.getGrid();
-      const compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
-        kind: 'position',
-        edge: 'start',
-        getGrid: edgeGrid,
-        value: it.invalid ? NaN : it.startTime,
-        onChange: (sec) => handlers.onRange(it.id, sec, 'start'),
-      });
-      const compEnd = MC.UnitInput.create(card.querySelector('.edge-end'), {
-        kind: 'position',
-        edge: 'end',
-        getGrid: edgeGrid,
-        value: it.invalid ? NaN : it.endTime,
-        onChange: (sec) => handlers.onRange(it.id, sec, 'end'),
-      });
-      if (it.invalid || compStart.isInvalid() || compEnd.isInvalid()) card.classList.add('invalid');
+      let compStart = null;
+      let compEnd = null;
+      if (!it.silent) {
+        const edgeGrid = () => handlers.getGrid();
+        compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
+          kind: 'position',
+          edge: 'start',
+          getGrid: edgeGrid,
+          value: it.invalid ? NaN : it.startTime,
+          onChange: (sec) => handlers.onRange(it.id, sec, 'start'),
+        });
+        compEnd = MC.UnitInput.create(card.querySelector('.edge-end'), {
+          kind: 'position',
+          edge: 'end',
+          getGrid: edgeGrid,
+          value: it.invalid ? NaN : it.endTime,
+          onChange: (sec) => handlers.onRange(it.id, sec, 'end'),
+        });
+      }
+      if (it.invalid || (compStart && compStart.isInvalid()) || (compEnd && compEnd.isInvalid())) card.classList.add('invalid');
       card.querySelector('.up').addEventListener('click', () => handlers.onMove(it.id, idx - 1));
       card.querySelector('.down').addEventListener('click', () => handlers.onMove(it.id, idx + 1));
       card.querySelector('.del').addEventListener('click', () => handlers.onRemove(it.id));
@@ -89,6 +110,15 @@
       card.querySelector('.fade-out').addEventListener('change', (e) => {
         handlers.onFade(it.id, it.fadeInMs, Math.max(0, parseInt(e.target.value, 10) || 0));
       });
+      if (it.silent) {
+        card.querySelector('.silent-dur').addEventListener('change', (e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v) && v > 0 && handlers.onSilentDur) handlers.onSilentDur(it.id, v);
+          else {
+            e.target.value = Number((it.durationSec || 0).toFixed(3)); // 还原非法值
+          }
+        });
+      }
       attachDrag(card, idx, handlers, container);
       container.appendChild(card);
     });

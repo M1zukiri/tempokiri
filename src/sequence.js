@@ -151,12 +151,24 @@
 
   /**
    * 序列项 → 渲染 part（样本索引）。
-   * @param {object} item
+   * 绝对区间语义：start/end 允许越界（负起点 = 首部静音、超出曲长 = 尾部静音），
+   * 由 renderMix 负责补零；静音段（silent）整段输出零。
+   * @param {object} item 序列项（{silent, durationSec} 或 {startTime,endTime}）
    * @param {number} sampleRate 导出用原始采样率
-   * @returns {{start:number,end:number,fadeIn:number,fadeOut:number}}
+   * @returns {{start:number,end:number,fadeIn:number,fadeOut:number,silent?:boolean}}
    */
   function itemToPart(item, sampleRate) {
-    const toS = (t) => Math.max(0, Math.round(t * sampleRate));
+    const toS = (t) => Math.round(t * sampleRate);
+    if (item.silent) {
+      const n = Math.max(0, Math.round(item.durationSec * sampleRate));
+      return {
+        start: 0,
+        end: n,
+        fadeIn: Math.round((item.fadeInMs / 1000) * sampleRate),
+        fadeOut: Math.round((item.fadeOutMs / 1000) * sampleRate),
+        silent: true,
+      };
+    }
     return {
       start: toS(item.startTime),
       end: toS(item.endTime),
@@ -175,9 +187,20 @@
     return items.map((it) => itemToPart(it, sampleRate));
   }
 
-  /** 序列项时长（秒）。 */
+  /** 序列项时长（秒）；静音段用 durationSec，普通段 = end − start。 */
   function itemDuration(item) {
-    return item.endTime - item.startTime;
+    return item.silent ? item.durationSec : item.endTime - item.startTime;
+  }
+
+  /**
+   * 序列项是否为「空段落」：无时长或与音频 [0, duration) 完全无重叠。
+   * 部分重叠（如首小节负起点、末小节超长）是合法的——渲染补静音。
+   * @param {object} item
+   * @param {number} duration 音频总时长（秒）
+   */
+  function isEmptyItem(item, duration) {
+    if (item.silent) return !(item.durationSec > 0);
+    return !(item.startTime < item.endTime && item.endTime > 0 && item.startTime < duration);
   }
 
   /** 序列总时长（秒，不含交叉淡化重叠）。 */
@@ -241,6 +264,7 @@
     itemToPart,
     itemsToParts,
     itemDuration,
+    isEmptyItem,
     totalDuration,
     progressMeta,
     snapRange,

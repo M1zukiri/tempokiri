@@ -195,3 +195,29 @@ test('progressMeta: 空序列总时长 0', () => {
   assert.equal(total, 0);
   assert.deepEqual(seams, []);
 });
+
+test('itemToPart/itemDuration/isEmptyItem: 静音段与绝对区间语义', () => {
+  const silent = { silent: true, durationSec: 2.5, fadeInMs: 0, fadeOutMs: 0 };
+  const sp = S.itemToPart(silent, 100);
+  assert.equal(sp.silent, true);
+  assert.equal(sp.start, 0);
+  assert.equal(sp.end, 250);
+  assert.equal(S.itemDuration(silent), 2.5);
+  assert.equal(S.isEmptyItem(silent, 10), false);
+  assert.equal(S.isEmptyItem({ silent: true, durationSec: 0 }, 10), true);
+
+  // 普通项：负起点不再 clamp（渲染层补静音）
+  const normal = { startTime: -0.5, endTime: 1.5, fadeInMs: 0, fadeOutMs: 0 };
+  const p = S.itemToPart(normal, 100);
+  assert.equal(p.start, -50);
+  assert.equal(p.end, 150);
+  assert.equal(S.itemDuration(normal), 2.0);
+  assert.equal(S.isEmptyItem(normal, 10), false); // 部分重叠合法（首小节负 offset）
+
+  // 空段落判定：完全越界 / 零长 / 倒置 / 曲前
+  assert.equal(S.isEmptyItem({ startTime: 16, endTime: 100 }, 16), true);   // 起点在曲尾
+  assert.equal(S.isEmptyItem({ startTime: 15.5, endTime: 100 }, 16), false); // 部分重叠允许（用户用例）
+  assert.equal(S.isEmptyItem({ startTime: 2, endTime: 1 }, 16), true);       // 倒置
+  assert.equal(S.isEmptyItem({ startTime: -5, endTime: -1 }, 16), true);     // 完全在曲前
+  assert.equal(S.isEmptyItem({ startTime: 5, endTime: 5 }, 16), true);       // 零时长
+});

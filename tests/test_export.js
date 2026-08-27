@@ -50,6 +50,39 @@ test('renderMix: 顺序拼接 + 淡入淡出', () => {
   assert.equal(out[7], 8);
 });
 
+test('renderMix: 负起点首部补静音（绝对区间语义，等长输出）', () => {
+  const pcm = new Float32Array([0.5, 0.25, 0.75, 1, 0.5, 0.25]); // 可精确表示的样本值
+  const out = E.renderMix(pcm, [{ start: -2, end: 4 }], 0); // 区间 -2..4 → 6 样本
+  assert.equal(out.length, 6);
+  assert.deepEqual(Array.from(out), [0, 0, 0.5, 0.25, 0.75, 1]);
+});
+
+test('renderMix: 超出曲长尾部补静音', () => {
+  const pcm = new Float32Array([1, 2]);
+  const out = E.renderMix(pcm, [{ start: 0, end: 5 }], 0);
+  assert.equal(out.length, 5);
+  assert.deepEqual(Array.from(out), [1, 2, 0, 0, 0]);
+});
+
+test('renderMix: 静音段整段为零（含与普通段拼接）', () => {
+  const pcm = new Float32Array([1, 2, 3, 4]);
+  const out = E.renderMix(pcm, [
+    { start: 0, end: 2 },
+    { start: 0, end: 3, silent: true },
+    { start: 2, end: 4 },
+  ], 0);
+  assert.equal(out.length, 2 + 3 + 2);
+  assert.deepEqual(Array.from(out), [1, 2, 0, 0, 0, 3, 4]);
+});
+
+test('renderMix: 既有合法区间输出与旧 subarray 语义一致（回归）', () => {
+  const pcm = new Float32Array([1, 2, 3, 4, 5, 6]);
+  const out = E.renderMix(pcm, [{ start: 1, end: 5, fadeIn: 2, fadeOut: 2 }], 0);
+  assert.equal(out.length, 4);
+  // fadeIn 2 样本：out[0]=seg[0]*0/2=0、out[1]=seg[1]*1/2=1.5；fadeOut 2：out[3]=0、out[2]=seg[2]*1/2=2
+  assert.deepEqual(Array.from(out), [0, 1.5, 2, 0]);
+});
+
 test('encodeWav: RIFF 头与数据往返', () => {
   const sr = 8000;
   const samples = new Float32Array([0, 0.5, -0.5, 1, -1, 0.25]);

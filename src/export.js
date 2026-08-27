@@ -66,8 +66,9 @@
   /**
    * 按 parts 顺序拼接整段音频。
    * @param {Float32Array} pcm 完整 mono PCM
-   * @param {Array<{start:number,end:number,fadeIn:number,fadeOut:number}>} parts
-   *        样本索引（end 排他），已按用户排序
+   * @param {Array<{start:number,end:number,fadeIn:number,fadeOut:number,silent?:boolean}>} parts
+   *        样本索引（end 排他），已按用户排序；索引允许越界——首部负区间/尾部超长
+   *        部分以静音（零）填充，保证每段时长 = end − start；silent 段整段为零
    * @param {number} crossfadeSamples
    * @returns {Float32Array}
    */
@@ -75,7 +76,16 @@
     let result = null;
     for (const p of parts) {
       if (p.end <= p.start) continue;
-      const seg = pcm.subarray(p.start, p.end);
+      let seg;
+      if (p.silent) {
+        seg = new Float32Array(p.end - p.start); // 全零静音段
+      } else {
+        seg = new Float32Array(p.end - p.start);
+        // 与原曲 [0, pcm.length] 的重叠部分填充；越界区保持零（绝对区间语义）
+        const s0 = Math.max(0, Math.min(pcm.length, p.start));
+        const s1 = Math.max(0, Math.min(pcm.length, p.end));
+        if (s1 > s0) seg.set(pcm.subarray(s0, s1), s0 - p.start);
+      }
       const faded = applyFades(seg, p.fadeIn || 0, p.fadeOut || 0);
       result = result === null ? faded : crossfadeConcat(result, faded, crossfadeSamples);
     }

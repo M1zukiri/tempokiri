@@ -214,6 +214,7 @@
       onMove: moveItem,
       onFade: setFade,
       onRange: setRange,
+      onSilentDur: setSilentDur,
       getGrid: () => state.grid,
     }, playingSeqId);
     ui.updateSeqInfo(seqInfo, state.sequence, seq);
@@ -241,14 +242,9 @@
     drawBrandPulse(PULSE_IDLE); // 立即用新主题重绘静态律动条（播放中由下一帧 tick 覆盖）
   }
 
-  /** 序列中是否有非法项（用户输入非法或时间超出网格）。 */
+  /** 序列中是否有非法项（空段落：无时长或与音频完全无重叠；部分重叠合法，渲染补静音）。 */
   function anyInvalid() {
-    const g = state.grid;
-    return state.sequence.some((it) => {
-      if (it.invalid) return true;
-      if (!g) return false;
-      return seq.timeToBarCell(g, it.startTime) === null || seq.timeToBarCell(g, it.endTime) === null;
-    });
+    return state.sequence.some((it) => seq.isEmptyItem(it, state.duration || 0));
   }
 
   /** 序列项起终点手动编辑。sec=null 表示本端输入非法：保留输入、仅标红禁播，不重建清空。 */
@@ -265,9 +261,9 @@
     }
     if (which === 'start') it.startTime = sec;
     else it.endTime = sec;
-    const inverted = !(it.startTime < it.endTime);
+    const empty = seq.isEmptyItem(it, state.duration || 0); // 空段落（无时长/无音频重叠）
     // 倒置（任一端修正可恢复）或另一端仍非法时保持 invalid
-    it.invalid = inverted || (it.invalid && it.invalidSide !== which);
+    it.invalid = empty || (it.invalid && it.invalidSide !== which);
     it.invalidSide = it.invalid ? (inverted ? null : it.invalidSide) : null;
     if (it.invalid) {
       markInvalidCard(it, id);
@@ -481,6 +477,8 @@
         endTime: it.endTime,
         fadeInMs: it.fadeInMs,
         fadeOutMs: it.fadeOutMs,
+        silent: !!it.silent,
+        durationSec: it.silent ? it.durationSec : undefined,
         invalid: !!it.invalid,
       })),
       view: state.view ? { start: state.view.start, end: state.view.end } : undefined,
@@ -979,6 +977,17 @@
     renderAll();
   }
 
+  /** 静音段时长编辑（卡片折叠区，秒）。 */
+  function setSilentDur(id, sec) {
+    const it = state.sequence.find((x) => x.id === id);
+    if (!it || !it.silent) return;
+    pushUndo();
+    it.durationSec = Math.round(sec * 1000) / 1000;
+    saveWorkspace();
+    renderAll();
+    status(T('status.silentAdded', { dur: ui.fmtTime(it.durationSec) }));
+  }
+
   // ---------- 播放 ----------
   let mixCache = null; // { key: string, buffer: AudioBuffer } —— 序列内容不变的拼接结果缓存
   let followMs = 90; // 视频跟随 seek 节流间隔（缓存自高级设置）
@@ -1181,17 +1190,19 @@
     playTimer = setTimeout(check, 100);
     tickProgress();
   }
-  /** 拼接时间轴 → 原曲时间（播放线显示用）。 */
+  /** 拼接时间轴 → 原曲时间（播放线显示用）。静音段无原曲区间：播放线冻结在静音前位置。 */
   function mixToOriginalTime(mt) {
     const items = state.sequence;
     let acc = 0;
+    let lastT = 0;
     for (const it of items) {
-      const d = it.endTime - it.startTime;
-      if (mt < acc + d) return it.startTime + (mt - acc);
+      const d = seq.itemDuration(it);
+      if (mt < acc + d) return it.silent ? lastT : it.startTime + (mt - acc);
       acc += d;
+      if (!it.silent) lastT = it.endTime;
     }
     const last = items[items.length - 1];
-    return last ? last.endTime : 0;
+    return last ? (last.silent ? lastT : last.endTime) : 0;
   }
 
   function currentPlayTime() {
@@ -1235,13 +1246,16 @@
           lastPlayHeadX = x;
         }
       }
-      // 拼接播放：进度条跟随 + 定位当前段高亮
+      // 拼接播放：进度条跟随 + 定位当前段高亮（按拼接时间轴累计；静音段计入时长）
       if (mixPlaying && state.sequence.length) {
         const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
         updateSeqProgress(mt);
         let segId = null;
+        let acc = 0;
         for (const it of state.sequence) {
-          if (t != null && t >= it.startTime && t < it.endTime) { segId = it.id; break; }
+          const d = seq.itemDuration(it);
+          if (mt < acc + d) { segId = it.id; break; }
+          acc += d;
         }
         if (segId !== playingSeqId) {
           const prevId = playingSeqId;
@@ -1481,7 +1495,15 @@
       if (!btn || !state.grid) return;
       const delta = parseFloat(btn.dataset.d);
       if (btn.dataset.q === 'offset') {
-        state.offset = Math.round((state.offset + delta) * 1000) / 1000;
+        const next = Math.round((state.offset + delta) * 1000) / 1000;
+        // 全空小节下界：offset 负值不能超过首段一个小节长
+        const f0 = state.grid && state.grid.segments && state.grid.segments[0];
+        const barDur0 = f0 && f0.barDur > 0 ? f0.barDur : Infinity;
+        if (next <= -barDur0) {
+          status(T('status.offsetLimit'), 'warn');
+          return;
+        }
+        state.offset = next;
       } else if (btn.dataset.q === 'bpm') {
         const seg = currentSegment();
         if (!seg) return;
@@ -1523,6 +1545,67 @@
     btnManualOk.addEventListener('click', manualAdd);
     btnManualCancel.addEventListener('click', () => { manualForm.hidden = true; });
 
+    // 静音段：行内表单（时长 + 拍/小节/秒；拍/小节需网格作换算依据）
+    const btnSilentAdd = $('btnSilentAdd');
+    const silentForm = $('silentForm');
+    const silentQty = $('silentQty');
+    const silentUnit = $('silentUnit');
+    const btnSilentOk = $('btnSilentOk');
+    const btnSilentCancel = $('btnSilentCancel');
+    function toggleSilentForm() {
+      const show = silentForm.hidden;
+      silentForm.hidden = !show;
+      if (show) {
+        const hasGrid = !!state.grid;
+        const optBar = silentUnit.querySelector('option[value="bar"]');
+        const optBeat = silentUnit.querySelector('option[value="beat"]');
+        if (optBar) optBar.disabled = !hasGrid;
+        if (optBeat) optBeat.disabled = !hasGrid;
+        if (!hasGrid) silentUnit.value = 'sec';
+      }
+    }
+    function confirmSilent() {
+      const qty = parseFloat(silentQty.value);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        status(T('status.manualAddEmpty'), 'warn');
+        return;
+      }
+      let dur = qty;
+      const unit = silentUnit.value;
+      if (unit === 'bar' || unit === 'beat') {
+        const g = state.grid;
+        const seg0 = g && g.segments && g.segments[0];
+        if (!seg0 || !(seg0.barDur > 0)) {
+          status(T('status.silentNeedGrid'), 'warn');
+          return;
+        }
+        dur = qty * (unit === 'bar' ? seg0.barDur : seg0.beatDur);
+      }
+      const item = {
+        id: seq.newId(),
+        silent: true,
+        durationSec: Math.round(dur * 1000) / 1000,
+        startBar: null,
+        endBar: null,
+        startTime: 0,
+        endTime: 0,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        invalid: false,
+      };
+      pushUndo();
+      state.sequence.push(item);
+      silentForm.hidden = true;
+      saveWorkspace();
+      renderAll();
+      status(T('status.silentAdded', { dur: ui.fmtTime(item.durationSec) }));
+    }
+    if (btnSilentAdd) {
+      btnSilentAdd.addEventListener('click', toggleSilentForm);
+      btnSilentOk.addEventListener('click', confirmSilent);
+      btnSilentCancel.addEventListener('click', () => { silentForm.hidden = true; });
+    }
+
     // 手动添加序列：展开/收起表单（每次展开重建输入组件，使用当前网格）
     let maStartComp = null;
     let maEndComp = null;
@@ -1552,6 +1635,11 @@
       const e = maEndComp.getValue();
       if (s == null || e == null || s >= e) {
         status(T('status.manualAddFailed'), 'warn');
+        return;
+      }
+      // 空段落拦截：与音频 [0, duration) 完全无重叠（含 [16,100] 起点在曲尾）直接不允许添加
+      if (!(e > 0 && s < (state.duration || 0))) {
+        status(T('status.manualAddEmpty'), 'warn');
         return;
       }
       const item = {

@@ -303,6 +303,9 @@
     }
     const offset = parseFloat(el('mOffset').value);
     if (!isFinite(offset)) return '偏移需为数字（可为负）';
+    // 全空小节下界：负 offset 不能超过首段一个小节长（首小节须与音频重叠）
+    const firstBar = barDurOfSeg(rows[0]);
+    if (isFinite(firstBar) && offset <= -firstBar) return '偏移负值不能超过一个小节长度（首小节将与音频完全无重叠）';
     return null;
   }
 

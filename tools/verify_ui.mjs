@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Cdp, sleep } from './e2e_lib.mjs';
+import { Cdp, sleep, wavInfo } from './e2e_lib.mjs';
 
 const MODE = (process.argv[2] === 'before') ? 'before' : 'after';
 const DIST = path.resolve('dist/tempokiri-workstation.html');
@@ -369,6 +369,111 @@ async function s12() {
   await cdp.setViewport(1440, 900);
 }
 
+// ---------- 工具：WAV 指定区间峰值（16-bit 样本级检查） ----------
+function wavPeakInRange(buf, sr, fromSec, toSec) {
+  const startD = 44 + Math.max(0, Math.floor(fromSec * sr)) * 2;
+  const endD = Math.min(buf.length - ((buf.length - 44) % 2 || 2), 44 + Math.floor(toSec * sr) * 2);
+  let peak = 0;
+  for (let i = startD; i + 1 < endD; i += 2) {
+    const v = Math.abs(buf.readInt16LE(i));
+    if (v > peak) peak = v;
+  }
+  return peak;
+}
+
+/** 通过导出弹窗下载 WAV 并返回文件路径。 */
+async function exportWav(name) {
+  await cdp.click('#btnExport');
+  await cdp.waitFor("(() => { const el = document.getElementById('exportOverlay'); return el && !el.hidden; })()", 8000, '导出弹窗');
+  await evalJs(`document.getElementById('aName').value = ${JSON.stringify(name)}; true`);
+  await cdp.prepareDownloads(path.join(OUT, 'dl'));
+  const before = Date.now();
+  await cdp.click('#xOk');
+  await cdp.waitFor("document.getElementById('statusBar').textContent.indexOf('导出完成') !== -1 || document.getElementById('statusBar').textContent.indexOf('导出失败') !== -1", 90000, '导出结束');
+  return cdp.waitForDownload(path.join(OUT, 'dl'), '.wav', 60000, before - 1000);
+}
+
+// ---------- S13 静音段（新功能） ----------
+async function s13() {
+  console.log('\n===== S13 静音段（新功能） =====');
+  await boot();
+  await applyGrid120();
+  await cdp.click('#btnSilentAdd');
+  await sleep(200);
+  check('S13 静音表单可见', await evalJs("!document.getElementById('silentForm').hidden"), 'silentForm');
+  await evalJs("document.getElementById('silentUnit').value='bar'; document.getElementById('silentQty').value='2'; true");
+  await cdp.click('#btnSilentOk');
+  await sleep(400);
+  const cardObj = JSON.parse(await evalJs("(() => { const c = document.querySelector('#seqList .seq-card'); return JSON.stringify({cls: c.className, text: c.innerText.replace(/\\s+/g,' ').slice(0,90)}); })()"));
+  check('S13 静音卡片渲染', cardObj.cls.includes('silent') && cardObj.text.includes('静音'), cardObj.text);
+  check('S13 2 小节 = 4.0s（120BPM 4/4）', await evalJs("(document.querySelector('.seq-silent') || {textContent:''}).textContent.indexOf('4.0s') !== -1"), await evalJs("(document.querySelector('.seq-silent') || {textContent:''}).textContent"));
+  check('S13 总时长 4.0s', await evalJs("document.getElementById('seqProgressTime').textContent.indexOf('/ 0:04.0') !== -1"), await evalJs("document.getElementById('seqProgressTime').textContent"));
+  // 无网格时拍/小节禁用（新 boot 验证入口限制）
+  const f = await shot('silent_card');
+  check('S13 截图已保存', !!f, f);
+  // 导出 WAV：4s 全静音（峰值 0）
+  const wav = await exportWav('silent_test');
+  const wv = wavInfo(fs.readFileSync(wav));
+  check('S13 导出 WAV 时长为 4.0s', Math.abs(wv.dur - 4.0) < 0.02, `dur=${wv.dur.toFixed(3)}`);
+  check('S13 导出峰值=0（全静音）', wv.peak === 0, `peak=${wv.peak}`);
+}
+
+// ---------- S14 负 offset 首小节补静音导出 ----------
+async function s14() {
+  console.log('\n===== S14 负 offset 首小节补静音 =====');
+  await boot();
+  await cdp.click('#btnSettings');
+  await cdp.waitFor("(() => { const el = document.getElementById('modalOverlay'); return el && !el.hidden; })()", 5000, '设置弹窗');
+  await evalJs("document.querySelector('.seg-bpm').value='120'; document.querySelector('.seg-bpm').dispatchEvent(new Event('change',{bubbles:true})); const o=document.getElementById('mOffset'); o.value='-0.5'; o.dispatchEvent(new Event('change',{bubbles:true})); true");
+  await sleep(200);
+  await cdp.click('#mOk');
+  await cdp.waitFor("document.getElementById('quickBar').hidden === false", 8000, '网格应用');
+  check('S14 快捷栏偏移 -0.500', (await evalJs("document.getElementById('qOffsetVal').textContent")) === '-0.500', await evalJs("document.getElementById('qOffsetVal').textContent"));
+  // 双击选中第 1 小节（t=0.1s → ratio ≈ 0.1/16）
+  await addCardAt(0.1 / 16);
+  check('S14 第 1 小节时长 2.0s', await evalJs("document.getElementById('seqInfo').textContent.indexOf('0:02.0') !== -1"), await evalJs("document.getElementById('seqInfo').textContent"));
+  const f = await shot('offset_neg_first_bar');
+  // 导出：2.0s 全长 = 0.5s 静音 + 1.5s 原曲；WAV 样本级校验
+  const wav = await exportWav('offset_neg_test');
+  const buf = fs.readFileSync(wav);
+  const wv = wavInfo(buf);
+  check('S14 导出时长 2.0s', Math.abs(wv.dur - 2.0) < 0.02, `dur=${wv.dur.toFixed(3)}`);
+  const pkHead = wavPeakInRange(buf, wv.sr, 0, 0.48);
+  const pkBody = wavPeakInRange(buf, wv.sr, 0.6, 1.4);
+  check('S14 前 0.5s 全静音', pkHead === 0, `headPeak=${pkHead}`);
+  check('S14 0.5s 后为原曲（非零）', pkBody > 500, `bodyPeak=${pkBody}`);
+  check('S14 截图已保存', !!f, f);
+}
+
+// ---------- S15 空段落拦截 ----------
+async function s15() {
+  console.log('\n===== S15 空段落拦截 =====');
+  await boot(); // 无网格：手动添加走时间模式
+  await cdp.click('#btnManualAdd');
+  await sleep(300);
+  await evalJs("document.querySelector('#maStart .unit-mode-btn').click(); document.querySelector('#maEnd .unit-mode-btn').click()");
+  await sleep(150);
+  const setRange = async (s, e) => {
+    await evalJs(`(() => { const set=(sel,v)=>{const i=document.querySelector(sel+' .unit-time'); i.value=String(v); i.dispatchEvent(new Event('change',{bubbles:true}));}; set('#maStart',${s}); set('#maEnd',${e}); return true; })()`);
+    await sleep(150);
+    await cdp.click('#btnManualOk');
+    await sleep(350);
+  };
+  await setRange(20, 22); // 完全越界（曲长 16s）
+  check('S15 [20,22] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
+  check('S15 [20,22] 卡片数 0', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 0, 'cards=0');
+  await setRange(16, 17); // 起点在曲尾
+  check('S15 [16,17] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
+  await setRange(-5, -1); // 完全在曲前：unitInput 层拒绝负值（提示「请检查」或「无法添加」均可）
+  check('S15 [-5,-1] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1 || (await evalJs("document.getElementById('statusBar').textContent")).indexOf('手动添加失败') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
+  await setRange(15.5, 100); // 部分重叠（用户用例）→ 允许
+  check('S15 [15.5,100] 允许', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 1, 'cards=1');
+  await setRange(2, 1); // 倒置
+  check('S15 [2,1] 倒置拒绝', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 1, 'cards 保持 1');
+  const f = await shot('empty_item_reject');
+  check('S15 截图已保存', !!f, f);
+}
+
 // ---------- 主流程 ----------
 cdp = await Cdp.connect();
 // 统一视口：headless 默认 800x600，seq 面板区域（进度条 y>675）会落到视口外导致命中测试失效
@@ -387,6 +492,9 @@ await s9();
 await s10();
 await s11();
 await s12();
+await s13();
+await s14();
+await s15();
 await cdp.close();
 
 const fails = ASSERTS.filter((a) => a.pass === false);

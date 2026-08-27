@@ -432,6 +432,11 @@
     if (!Array.isArray(segments) || !segments.length) {
       throw new Error('buildGrid: 至少需要一个段落');
     }
+    // 全空小节下界：offset 负值不能超过首段一个小节长（首小节必须与音频重叠）
+    const f0 = segments[0];
+    if (f0 && f0.bpm > 0 && offset <= -(60 / f0.bpm) * (f0.beatsPerBar || 4)) {
+      throw new Error('buildGrid: offset 负值不能超过一个小节长度（首小节将与音频完全无重叠）');
+    }
     let t = offset;
     let barNumber = 1;
     const outSegments = [];
@@ -466,7 +471,9 @@
       // 避免 start + b*barDur（乘法链）与 s + barDur（加法链）的浮点差导致
       // 起点时间戳被上一小节末尾吞掉（如 7.1 显示成 6.4）
       let s = start;
-      for (let b = 0; b < nBars; b++) {
+      for (let b = 0; b < nBars && s < duration - 1e-9; b++) {
+        // 小节截断：不生成与音频完全无重叠的小节（含负起点首小节 = 部分重叠允许；
+        // 末小节 endTime 保留完整小节长，超长部分由导出/播放补静音）
         const e = Math.min(s + barDur, end);
         segBars.push({ barNumber, startTime: s, endTime: e });
         barNumber++;
