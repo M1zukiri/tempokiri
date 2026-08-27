@@ -225,11 +225,13 @@
       return;
     }
     const harmLabel = { '2x': '2×', '0.5x': '½×', '3x': '3×', '0.33x': '⅓×' };
+    // 候选去重：同一 BPM 值（如多峰同值不同相位）只保留首个，避免按钮重复
+    const uniq = cands.filter((c, i, arr) => arr.findIndex((x) => x.bpm === c.bpm) === i);
     box.hidden = false;
     const label = document.createElement('span');
     label.className = 'auto-cand-label';
     label.textContent = T('modal.candsHint');
-    box.appendChild(label);    for (const c of cands) {
+    box.appendChild(label);    for (const c of uniq) {
       const b = document.createElement('button');
       b.className = 'btn-mini auto-cand-bpm';
       b.textContent = c.bpm + (c.harm && harmLabel[c.harm] ? '（' + harmLabel[c.harm] + '）' : '');

@@ -237,6 +237,18 @@ async function s6() {
   await sleep(300);
   await record('S6.候选BPM', () => evalJs("document.getElementById('autoCands').innerText.replace(/\\s+/g,' ').slice(0,200)"));
   check('S6 候选带「点击采用」提示（M9）', await evalJs("document.getElementById('autoCands').innerText.indexOf('点击采用') !== -1"), 'cands 前缀');
+  // 按钮横排（btn-mini 通用规则）：识别/Tap/候选按钮均不得竖排截断
+  const btnRects = await evalJs(`JSON.stringify({
+    auto: (() => { const b = document.querySelector('.seg-auto'); const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
+    tap: (() => { const b = document.querySelector('.seg-tap'); const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
+    cands: [...document.querySelectorAll('.auto-cand-bpm')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), b.textContent]; }),
+  })`);
+  const bj = JSON.parse(btnRects);
+  check('S6 识别按钮横排（非竖排）', bj.auto[0] >= 32 && bj.auto[1] <= 30, '识别 尺寸=' + bj.auto.join('x'));
+  check('S6 Tap 按钮横排', bj.tap[0] >= 44 && bj.tap[1] <= 30, 'Tap 尺寸=' + bj.tap.join('x'));
+  check('S6 候选按钮横排完整', bj.cands.every((c) => c[0] >= 40 && c[1] <= 30 && c[2].length > 0), JSON.stringify(bj.cands));
+  const texts = bj.cands.map((c) => c[2].split('（')[0]);
+  check('S6 候选 BPM 去重', new Set(texts).size === texts.length, JSON.stringify(texts));
   const f = await shot('bpm_modal_cands');
   check('S6 截图已保存', !!f, f);
 }
