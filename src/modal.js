@@ -15,6 +15,8 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  // UMD 引 T：Node 单测 require i18n；浏览器走 MC.i18n（v1.5.0 起 modal 文案收紧后首次引入 T）
+  const T = (typeof module === 'object' && module.exports) ? require('./i18n.js').T : ((typeof MC !== 'undefined' && MC && MC.i18n) ? MC.i18n.T : (k) => k);
 
   const BEAT_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8];
   const UNIT_CHOICES = [2, 4, 8, 16];
@@ -37,10 +39,11 @@
           </label>
         </div>
         <div class="seg-header">段落</div>
+        <p class="seg-note">${T('modal.lengthNote')}</p>
         <table class="seg-table">
           <thead>
             <tr>
-              <th>#</th><th>BPM</th><th>拍号</th><th>长度<br><span class="th-sub">小节/格或时间</span></th><th>网格分辨率<br><span class="th-sub">每小节线数</span></th><th></th><th></th>
+              <th>#</th><th>BPM</th><th>拍号</th><th>长度</th><th>网格分辨率</th><th></th><th></th>
             </tr>
           </thead>
           <tbody id="segTbody"></tbody>
@@ -225,7 +228,7 @@
     box.hidden = false;
     const label = document.createElement('span');
     label.className = 'auto-cand-label';
-    label.textContent = '其他可能 BPM：';
+    label.textContent = T('modal.candsHint');
     box.appendChild(label);    for (const c of cands) {
       const b = document.createElement('button');
       b.className = 'btn-mini auto-cand-bpm';

@@ -8,6 +8,7 @@
   "toolbar": {
     "openFile": "打开文件",
     "setBpm": "设置节拍",
+    "setBpmTitle": "节拍识别与网格设置",
     "autoCut": "✂ 自动剪辑",
     "export": "导出"
   },
@@ -20,12 +21,18 @@
     "playSeq": "▶ 播放拼接序列",
     "addSelection": "＋ 添加选中区间",
     "toEnd": "⤳ 延伸到末尾",
-    "hintInline": "单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放"
+    "hintInline": "单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放 · Shift+拖拽平移",
+    "legendBar": "小节线",
+    "legendBeat": "拍线",
+    "legendSel": "选区",
+    "legendPlay": "播放头",
+    "legendCut": "剪切点"
   },
   "quick": {
     "bpm": "BPM",
     "bpmSeg": "BPM（第 {n} 段）",
-    "offset": "偏移"
+    "offset": "偏移",
+    "editHint": "点击直接编辑（Enter 确认，Esc 取消）"
   },
   "seq": {
     "title": "拼接序列",
@@ -41,6 +48,7 @@
     "up": "上移",
     "down": "下移",
     "del": "删除",
+    "fadeToggle": "淡入/淡出",
     "range": "第 {start}–{end} 小节",
     "info": "{count} 段 · 总时长 {total}",
     "seamTitle": "拼接点 {time}"
@@ -91,6 +99,7 @@
     "readmeTitle": "打开 README 文档",
     "advanced": "高级设置",
     "advancedTitle": "高级设置（性能/音效/解码）",
+    "themeTitle": "切换界面主题（当前 {name}）",
     "meta": "元数据",
     "metaTitle": "元数据（导入时自动读取，导出时自动附加）",
     "checkUpdate": "检查更新",
@@ -120,6 +129,8 @@
     "selectedRangeOne": "已选定：第 {bar} 小节。点击「添加选中区间」加入列表。",
     "selectedRange": "已选定：第 {start}–{end} 小节。点击「添加选中区间」加入列表。",
     "addedRange": "已添加：第 {start}–{end} 小节（{from} – {to}）",
+    "deletedHint": "已删除（Ctrl+Z 撤销）",
+    "undoDone": "已撤销",
     "cursorSet": "播放位置与标记点：{pos}（点「播放」从此处开始）",
     "paused": "已暂停（播放位置保留，点击「播放」从断点继续）",
     "pausedSeq": "序列已暂停（播放位置保留，点击「播放拼接序列」从断点继续）",
@@ -158,7 +169,10 @@
     "analyzing": "正在分析音频…",
     "autoDone": "识别完成：BPM {bpm}，确认后生效。",
     "noBeat": "未能识别出清晰节拍，请手动输入 BPM。",
-    "lowEnergy": "未检测到节拍（音频能量过低，可能为无声或近无声音轨）。"
+    "lowEnergy": "未检测到节拍（音频能量过低，可能为无声或近无声音轨）。",
+    "guide1": "① 打开音频或视频文件",
+    "guide2": "② 自动识别节拍，点击「确认」应用网格",
+    "guide3": "③ 双击选小节 · 拖拽选区 · 或一键自动剪辑"
   },
   "modal": {
     "openNewTitle": "打开新文件",
@@ -167,7 +181,9 @@
     "openNewBody3": "选择「不保留」：清除当前文件的缓存记录，下次打开为空白。",
     "cancel": "取消",
     "discard": "不保留，清空",
-    "keep": "保留并切换"
+    "keep": "保留并切换",
+    "candsHint": "其他可能 BPM（点击采用）：",
+    "lengthNote": "长度：非末段填写小节/格数或时间（秒）；末段自动为剩余所有。网格分辨率：每小节网格线数，识别时默认为拍号分子。"
   },
   "settings": {
     "aria": "高级设置",
@@ -307,6 +323,8 @@
     "majMp3Bitrate": "track.mp3 码率",
     "majNoteVideo": "bg.mp4：无声，上限 1080P 60fps；track.mp3：44100Hz。输出文件固定名为 bg.mp4 与 track.mp3。",
     "majNoteAudio": "当前为纯音频，仅导出 track.mp3（bg.mp4 请自备）。track.mp3：44100Hz。",
+    "groupCodec": "编码",
+    "groupOptions": "选项",
     "statusEmptyName": "请填写文件名",
     "aacEnvHint": "当前环境不支持 AAC 音频编码，视频导出无法带音轨。可改用 Majdata 导出（bg.mp4 纯视频 + 独立 track.mp3），或换用 Chrome/Edge 完整环境。",
     "aacBitrateHint": "当前采样率下该 AAC 码率不受支持，请选择更低码率。",

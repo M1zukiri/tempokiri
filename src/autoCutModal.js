@@ -63,7 +63,7 @@
       MINSEG_CHOICES.map((s) => '<button class="btn btn-mini ac-minseg" data-sec="' + s + '">' + s + 's</button>').join('') +
       '</span>' +
       '<label class="ac-align" id="acAlignWrap"><input type="checkbox" id="acAlign" />' + T('autoCut.alignGrid') + '</label>' +
-      '<button id="acReset" class="btn btn-mini" hidden>' + RESET_PLAN + '</button>' +
+      '<button id="acReset" class="btn btn-mini ac-reset" hidden>' + RESET_PLAN + '</button>' +
       '</div>' +
       '<p class="ac-summary" id="acSummary"></p>' +
       '<div class="ac-section" id="acCutsSection">' +
@@ -102,7 +102,7 @@
       '.ac-minseg{min-width:38px}' +
       '.ac-minseg.active{background:var(--accent);color:var(--accent-fg,#fff);border-color:transparent}' +
       '.ac-align{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-secondary)}' +
-      '.ac-summary{font-size:12px;color:var(--accent-fg,#22d3ee);padding:2px 10px}' +
+      '.ac-summary{font-size:12px;color:var(--text-primary);padding:2px 10px}' +
       '.ac-section{max-height:26vh;overflow:auto;padding:2px 10px 8px}' +
       '.ac-section h4{margin:6px 0 4px;font-size:13px;color:var(--text-secondary)}' +
       '.ac-table{width:100%;border-collapse:collapse;font-size:12px}' +
@@ -110,12 +110,13 @@
       '.ac-table td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.12);font-variant-numeric:tabular-nums}' +
       '.ac-table tr:last-child td{border-bottom:none}' +
       '.ac-score{display:inline-block;min-width:44px;text-align:center;padding:1px 6px;border-radius:8px;font-size:11px}' +
-      '.ac-score.high{background:rgba(34,211,238,.18);color:var(--accent-fg,#22d3ee)}' +
-      '.ac-score.mid{background:rgba(250,204,21,.16);color:#facc15}' +
+      '.ac-score.high{background:rgba(34,211,238,.18);color:var(--accent)}' +
+      '.ac-score.mid{background:rgba(250,204,21,.16);color:var(--warning)}' +
       '.ac-score.low{background:rgba(148,163,184,.14);color:var(--text-secondary)}' +
       '.ac-cand-row td{color:var(--text-secondary);font-size:11px;padding-left:26px}' +
       '.ac-cand-row .ac-listen,.ac-cand-row .ac-use{margin-right:6px}' +
-      '.ac-note{font-size:12px;color:var(--text-secondary);padding:8px 10px}';
+      '.ac-note{font-size:12px;color:var(--text-secondary);padding:8px 10px}' +
+      '.ac-reset{width:auto;height:auto;padding:1px 8px;font-size:11px;white-space:nowrap}';
     document.head.appendChild(style);
 
     document.getElementById('acCancel').addEventListener('click', close);

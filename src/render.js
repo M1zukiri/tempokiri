@@ -365,7 +365,7 @@
         cachedGrad = ctx.createLinearGradient(0, 0, 0, waveH);
         cachedGrad.addColorStop(0, THEME.waveHigh);
         cachedGrad.addColorStop(0.5, THEME.wave);
-        cachedGrad.addColorStop(1, 'rgba(34,211,238,0.55)');
+        cachedGrad.addColorStop(1, THEME.waveDim);
         cachedGradWaveH = waveH;
       }
       ctx.strokeStyle = cachedGrad;

@@ -215,6 +215,34 @@
     if (btnAdvanced) btnAdvanced.addEventListener('click', () => MC.settings.openAdvanced());
     const btnMeta = document.getElementById('btnMeta');
     if (btnMeta) btnMeta.addEventListener('click', () => MC.metaModal.open());
+    // 主题快捷切换：循环 aurora → nebula → paper，保存并派发设置变更事件（main.js 监听后应用）
+    const THEME_ORDER = ['aurora', 'nebula', 'paper'];
+    const THEME_LABELS = {
+      aurora: T('settings.theme.presets.aurora'),
+      nebula: T('settings.theme.presets.nebula'),
+      paper: T('settings.theme.presets.paper'),
+    };
+    const btnTheme = document.getElementById('btnTheme');
+    const themeName = document.getElementById('themeName');
+    const syncThemeBtn = () => {
+      if (!btnTheme) return;
+      const gs = (typeof MC.loadGlobalSettings === 'function') ? MC.loadGlobalSettings() : {};
+      const cur = THEME_ORDER.includes(gs.theme) ? gs.theme : 'aurora';
+      btnTheme.title = T('footer.themeTitle', { name: THEME_LABELS[cur] });
+      if (themeName) themeName.textContent = THEME_LABELS[cur];
+    };
+    if (btnTheme) {
+      btnTheme.addEventListener('click', () => {
+        if (typeof MC.saveGlobalSettings !== 'function') return;
+        const gs = MC.loadGlobalSettings();
+        const cur = THEME_ORDER.includes(gs.theme) ? gs.theme : 'aurora';
+        const next = THEME_ORDER[(THEME_ORDER.indexOf(cur) + 1) % THEME_ORDER.length];
+        MC.saveGlobalSettings({ theme: next });
+        document.dispatchEvent(new CustomEvent('tempokiri:settings-changed'));
+        syncThemeBtn();
+      });
+      syncThemeBtn();
+    }
     // 版本徽标：build.py 已把 '__VERSION__' 替换；src 模式下回退显示 dev
     const badge = document.querySelector('[data-version]');
     if (badge) badge.textContent = resolveVersion();

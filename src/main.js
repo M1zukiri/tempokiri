@@ -39,6 +39,9 @@
   const playHeadCanvas = $('playHead');
   const waveWrap = $('waveWrap');
   const waveHint = $('waveHint');
+  const hintCard = $('hintCard');
+  const btnHintOpen = $('btnHintOpen');
+  const waveLegend = $('waveLegend');
   const videoEl = $('video');
   const videoWrap = $('videoWrap');
   const statusBar = $('statusBar');
@@ -71,6 +74,7 @@
   const seqProgressSeams = $('seqProgressSeams');
   const seqProgressKnob = $('seqProgressKnob');
   const seqProgressTime = $('seqProgressTime');
+  const seqProgressTip = $('seqProgressTip');
 
   // UMD 模块将导出铺平到 MC 命名空间（MC.analyze、MC.encodeWav 等）
   const mod = MC;
@@ -85,18 +89,56 @@
 
   // ---------- 状态辅助 ----------
   function showHint(msg) {
+    if (hintCard) hintCard.hidden = true;
     waveHint.textContent = msg;
     waveHint.hidden = false;
   }
   function hideHint() {
     waveHint.hidden = true;
   }
-  function status(msg) {
+  /** 波形颜色图例：有网格时显示，剪切点标记存在时显示剪切点项。 */
+  function syncLegend() {
+    if (!waveLegend) return;
+    waveLegend.hidden = !state.grid;
+    const cut = waveLegend.querySelector('.lg-cut');
+    if (cut) cut.hidden = !state.cutPoints || !state.cutPoints.length;
+  }
+  // ---------- 撤销栈（序列编辑 + 网格应用；快捷栏微调不入栈防刷屏） ----------
+  const UNDO_MAX = 20;
+  const undoStack = [];
+  function pushUndo() {
+    undoStack.push({
+      seq: JSON.parse(JSON.stringify(state.sequence)),
+      grid: state.grid ? { segments: JSON.parse(JSON.stringify(state.segments)), offset: state.offset } : null,
+    });
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+  }
+  function doUndo() {
+    const snap = undoStack.pop();
+    if (!snap) return;
+    state.sequence = snap.seq;
+    if (snap.grid) {
+      state.segments = snap.grid.segments;
+      state.offset = snap.grid.offset;
+      try {
+        state.grid = analysis.buildGrid({ segments: analysis.resolveSegments(state.segments, state.duration), offset: state.offset, duration: state.duration });
+      } catch (e) {
+        state.grid = null;
+      }
+    }
+    saveWorkspace();
+    renderAll();
+    status(T('status.undoDone'));
+  }
+  function status(msg, kind) {
     statusBar.textContent = msg;
+    // 分级着色：error=失败，warn=需用户注意，其余默认弱灰
+    statusBar.className = kind === 'error' ? 'status-error' : kind === 'warn' ? 'status-warn' : '';
   }
   let waveDirty = false;
   let waveRafPending = false;
   function renderWave() {
+    syncLegend(); // 图例随网格/剪切点状态同步（DOM 开销极小，不进入 rAF）
     // 帧合并：连续多次调用（高频滚轮/拖拽）只排队一次 rAF，实际绘制合并到下一帧
     waveDirty = true;
     if (waveRafPending) return;
@@ -233,6 +275,7 @@
       debouncedSaveWorkspace();
       return;
     }
+    pushUndo(); // 合法端点修改（单步）
     debouncedSaveWorkspace();
     renderWave(); // 波形序列高亮变化（renderWave 内部 rAF 帧合并，连续输入不重复绘制）
     renderSeqProgress(); // 总时长/拼接点变化
@@ -255,7 +298,9 @@
       if (!keep) store.clearSettings(state.file); // 不保留：清除该文件缓存（下次打开为空白）
     }
     stopPlay();
+    undoStack.length = 0; // 撤销栈不跨文件
     state.file = file;
+    waveWrap.classList.remove('no-file'); // 空态光标提示（pointer）→ 波形交互光标（crosshair）
     state.kind = audio.classifyFile(file);
     state.pcm = state.rawMono = state.audioBuffer = null;
     state.meta = null;
@@ -415,6 +460,7 @@
 
   // ---------- 节拍设置 ----------
   function applySettings(segments, offset) {
+    pushUndo(); // 网格变更入撤销栈（快捷栏微调不走此路径）
     state.segments = segments;
     state.offset = offset;
     applyGridSettings();
@@ -517,10 +563,10 @@
     try {
       const resolved = analysis.resolveSegments(state.segments, state.duration);
       state.grid = analysis.buildGrid({ segments: resolved, offset: state.offset, duration: state.duration });
-      showHint(T('wave.hintInline'));
+      hideHint(); // 网格应用后不再显示波形中央的交互提示（避免覆盖波形）
       renderAll();
     } catch (e) {
-      status(T('status.bpmApplyFailed', { msg: e.message }));
+      status(T('status.bpmApplyFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -542,6 +588,62 @@
     qBpmLabel.textContent = seg ? T('quick.bpmSeg', { n: seg.index + 1 }) : T('quick.bpm');
     qBpmVal.textContent = seg && seg.bpm != null ? String(+seg.bpm.toFixed(2)) : '--';
     qOffsetVal.textContent = (state.offset != null ? state.offset : 0).toFixed(3);
+  }
+
+  /** 快捷栏数值「点击直改」：点击数值出现输入框，Enter/blur 提交、Esc 还原（提交走与 ± 微调相同的应用路径）。 */
+  function makeEditableValue(span, toInput, onCommit) {
+    if (!span) return;
+    span.setAttribute('title', T('quick.editHint'));
+    span.addEventListener('click', () => {
+      if (span.querySelector('input')) return;
+      const old = span.textContent;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'q-edit';
+      input.value = toInput(old);
+      span.textContent = '';
+      span.appendChild(input);
+      input.focus();
+      input.select();
+      let cancelled = false;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        else if (e.key === 'Escape') { cancelled = true; input.blur(); }
+      });
+      input.addEventListener('blur', () => {
+        if (cancelled) {
+          span.textContent = old; // 还原并移除输入框
+          return;
+        }
+        const v = parseFloat(input.value);
+        if (Number.isFinite(v) && onCommit(v)) {
+          // 提交成功：applyGridSettings + updateQuickBar 已刷新文本并移除输入框
+        } else {
+          span.textContent = old;
+        }
+      });
+    });
+  }
+
+  /** 点击直改提交：BPM（0.01 精度，40–300 校验）。返回是否已应用。 */
+  function commitEditBpm(v) {
+    const seg = currentSegment();
+    if (!seg) return false;
+    const bpm = Math.round(v * 100) / 100;
+    if (bpm < 40 || bpm > 300) return false;
+    state.segments[seg.index].bpm = bpm;
+    applyGridSettings();
+    saveWorkspace();
+    updateQuickBar();
+    return true;
+  }
+  /** 点击直改提交：偏移（0.001 精度）。 */
+  function commitEditOffset(v) {
+    state.offset = Math.round(v * 1000) / 1000;
+    applyGridSettings();
+    saveWorkspace();
+    updateQuickBar();
+    return true;
   }
 
   function openSettings() {
@@ -774,6 +876,7 @@
       const ok = await confirmReplaceSequence();
       if (!ok) return; // 取消：保持现状，弹窗不关闭
     }
+    pushUndo(); // 自动剪辑导入替换序列前入栈
     state.sequence = plan.segments.map((s) => ({
       id: seq.newId(),
       startBar: null,
@@ -836,6 +939,7 @@
     const r = state.pendingSelection;
     const item = seq.createItem(state.grid, r.startBar, r.endBar);
     if (item) {
+      pushUndo();
       state.sequence.push(item);
       saveWorkspace();
       state.pendingSelection = null;
@@ -847,15 +951,18 @@
   }
 
   function removeItem(id) {
+    pushUndo();
     state.sequence = state.sequence.filter((it) => it.id !== id);
     saveWorkspace();
     renderAll();
+    status(T('status.deletedHint')); // 可 Ctrl+Z 恢复
   }
 
   function moveItem(id, toIndex) {
     const arr = state.sequence;
     const idx = arr.findIndex((it) => it.id === id);
     if (idx < 0 || toIndex < 0 || toIndex >= arr.length || idx === toIndex) return;
+    pushUndo();
     const [it] = arr.splice(idx, 1);
     arr.splice(toIndex, 0, it);
     saveWorkspace();
@@ -865,6 +972,7 @@
   function setFade(id, fadeInMs, fadeOutMs) {
     const it = state.sequence.find((x) => x.id === id);
     if (!it) return;
+    pushUndo();
     it.fadeInMs = fadeInMs;
     it.fadeOutMs = fadeOutMs;
     saveWorkspace();
@@ -958,9 +1066,18 @@
     }
     state.playTime = null;
     renderWave();
+    syncPlayButtons();
     if (playAnalyser) {
       try { playAnalyser.disconnect(); } catch (e) { /* 已断开则忽略 */ }
     }
+  }
+
+  /** 播放按钮状态：活动的播放按钮高亮，另一播放入口弱化（视觉区分当前播放源）。 */
+  function syncPlayButtons() {
+    btnPlay.classList.toggle('playing', playing && !mixPlaying);
+    btnPlaySeq.classList.toggle('playing', mixPlaying);
+    btnPlay.classList.toggle('dimmed', mixPlaying);
+    btnPlaySeq.classList.toggle('dimmed', playing && !mixPlaying);
   }
 
   /** 停止：暂停并把播放位置重置（原曲回标记点、拼接回序列开头）。 */
@@ -991,6 +1108,10 @@
       fileInput.click();
       return;
     }
+    if (!state.grid) {
+      openSettings(); // 还未设置网格：与波形提示「点击设置节拍」一致，直接打开设置
+      return;
+    }
     if (playing) pausePlay();
     state.cursorPos = t;
     state.playPos = t;
@@ -1012,6 +1133,7 @@
     playing = true;
     lastSeqPlay = false;
     btnPlay.textContent = T('wave.pause');
+    syncPlayButtons();
     if (state.kind === 'video' && videoEl.src) {
       playVideoSegment(t, state.duration, () => {
         stopPlay();
@@ -1169,7 +1291,7 @@
       return;
     }
     if (anyInvalid()) {
-      status(T('status.seqInvalid'));
+      status(T('status.seqInvalid'), 'warn');
       return;
     }
     if (mixPlaying) {
@@ -1199,6 +1321,7 @@
     playing = true;
     mixPlaying = true;
     btnPlaySeq.textContent = T('wave.pauseSeq');
+    syncPlayButtons();
     src.onended = () => {
       if (mixPlaying) {
         stopPlay();
@@ -1307,7 +1430,7 @@
         } else if (m.indexOf('Unsupported bitrate') !== -1) {
           msg = T('export.aacBitrateHint');
         }
-        status(T('status.exportFailed', { msg }));
+        status(T('status.exportFailed', { msg }), 'error');
       }
     }, 30);
   }
@@ -1343,6 +1466,7 @@
     });
 
     btnOpenFile.addEventListener('click', () => fileInput.click());
+    if (btnHintOpen) btnHintOpen.addEventListener('click', () => fileInput.click()); // 空态引导卡主按钮
     btnSettings.addEventListener('click', openSettings);
     btnAutoCut.addEventListener('click', runAutoCut);
     btnPlay.addEventListener('click', playOriginal);
@@ -1369,6 +1493,22 @@
       saveWorkspace();
       updateQuickBar();
     });
+    // 快捷栏数值点击直改（0.01/0.001 精度，与 ± 按钮同一应用路径）
+    makeEditableValue(qBpmVal, (old) => { const v = parseFloat(old); return Number.isFinite(v) ? String(v) : ''; }, commitEditBpm);
+    makeEditableValue(qOffsetVal, (old) => { const v = parseFloat(old); return Number.isFinite(v) ? String(v) : ''; }, commitEditOffset);
+    // 操作说明 popover（? 按钮）
+    const hintBtn = $('hintBtn');
+    const hintPop = $('hintPop');
+    if (hintBtn && hintPop) {
+      hintBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hintPop.hidden = !hintPop.hidden;
+        hintBtn.setAttribute('aria-expanded', String(!hintPop.hidden));
+      });
+      document.addEventListener('click', (e) => {
+        if (!hintPop.hidden && !e.target.closest('.hint-wrap')) hintPop.hidden = true;
+      });
+    }
     btnAddSelection.addEventListener('click', addPendingSelection);
     selToEnd.addEventListener('click', () => {
       const g = state.grid, p = state.pendingSelection;
@@ -1411,7 +1551,7 @@
       const s = maStartComp.getValue();
       const e = maEndComp.getValue();
       if (s == null || e == null || s >= e) {
-        status(T('status.manualAddFailed'));
+        status(T('status.manualAddFailed'), 'warn');
         return;
       }
       const item = {
@@ -1424,6 +1564,7 @@
         fadeOutMs: 0,
         invalid: false,
       };
+      pushUndo();
       state.sequence.push(item);
       manualForm.hidden = true;
       saveWorkspace();
@@ -1486,11 +1627,23 @@
       updateSeqProgress(mt);
       seekMix(mt);
     };
+    // 拖动定位悬浮时间气泡（quadrant clamp 到轨道内）
+    const showTip = (ratio) => {
+      if (!seqProgressTip || !state.sequence.length) return;
+      const total = seq.totalDuration(state.sequence);
+      seqProgressTip.textContent = ui.fmtTime(ratio * total);
+      seqProgressTip.hidden = false;
+      const w = seqProgressTrack.clientWidth;
+      const x = Math.max(18, Math.min(w - 18, ratio * w));
+      seqProgressTip.style.left = x + 'px';
+    };
+    const hideTip = () => { if (seqProgressTip) seqProgressTip.hidden = true; };
     seqProgressTrack.addEventListener('pointerdown', (e) => {
       if (!state.sequence.length || anyInvalid()) return;
       progDrag = { ratio: progPos(e), dragged: false };
       e.preventDefault();
       progApply(progDrag.ratio); // 单击即定位
+      showTip(progDrag.ratio);
       try {
         seqProgressTrack.setPointerCapture(e.pointerId);
       } catch (err) {
@@ -1504,8 +1657,10 @@
       // 拖动中只更新视觉，避免反复重建音频；松手时统一定位
       const total = seq.totalDuration(state.sequence);
       updateSeqProgress(progDrag.ratio * total);
+      showTip(progDrag.ratio);
     });
     seqProgressTrack.addEventListener('pointerup', (e) => {
+      hideTip();
       if (!progDrag) return;
       const ratio = progPos(e);
       const dragged = progDrag.dragged;
@@ -1514,14 +1669,20 @@
       if (dragged) progApply(ratio);
     });
     seqProgressTrack.addEventListener('pointercancel', () => {
+      hideTip();
       progDrag = null;
     });
 
-    // 快捷键：空格播放/暂停、Esc 关闭弹窗、←/→ 平移视口
+    // 快捷键：空格播放/暂停、Esc 关闭弹窗、←/→ 平移视口、Ctrl/Cmd+Z 撤销
     document.addEventListener('keydown', (e) => {
       const tag = (e.target && e.target.tagName) || '';
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target && e.target.isContentEditable;
       if (typing) return; // 输入框聚焦时不触发
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        doUndo();
+        return;
+      }
       if (e.code === 'Space') {
         e.preventDefault();
         if (mixPlaying || playing) {

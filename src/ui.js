@@ -48,12 +48,22 @@
           <span class="edge-label">${T('seq.edgeStart')}</span><span class="edge-start"></span>
           <span class="edge-label">${T('seq.edgeEnd')}</span><span class="edge-end"></span>
         </span>
-        <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
-        <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
         <span class="spacer"></span>
+        <button class="btn-mini seq-toggle" title="${T('seq.fadeToggle')}" aria-expanded="false">▾</button>
         <button class="btn-mini up" title="${T('seq.up')}">↑</button>
         <button class="btn-mini down" title="${T('seq.down')}">↓</button>
-        <button class="btn-mini del" title="${T('seq.del')}">✕</button>`;
+        <button class="btn-mini del" title="${T('seq.del')}">✕</button>
+        <span class="seq-detail" hidden>
+          <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+          <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
+        </span>`;
+      card.querySelector('.seq-toggle').addEventListener('click', () => {
+        const d = card.querySelector('.seq-detail');
+        const t = card.querySelector('.seq-toggle');
+        d.hidden = !d.hidden;
+        t.classList.toggle('open', !d.hidden);
+        t.setAttribute('aria-expanded', String(!d.hidden));
+      });
       const edgeGrid = () => handlers.getGrid();
       const compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
         kind: 'position',

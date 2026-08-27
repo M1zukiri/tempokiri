@@ -58,47 +58,53 @@
 
         <div class="exp-panel" data-panel="audio">
           <div class="modal-form">
-            <label>${T('export.format')}
-              <select id="aFormat">
-                <option value="wav">${T('export.wav')}</option>
-                <option value="mp3">${T('export.mp3')}</option>
-              </select>
-            </label>
-            <label id="aBitDepthRow">${T('export.bitDepth')}
-              <select id="aBitDepth">
-                <option value="16">${T('export.depth16')}</option>
-                <option value="24">${T('export.depth24')}</option>
-                <option value="32">${T('export.depth32')}</option>
-              </select>
-            </label>
-            <label id="aMp3Row" hidden>${T('export.mp3Bitrate')}
-              <select id="aMp3BitrateSel">
-                ${BITRATE_PRESETS.mp3.map((k) => '<option value="' + k + '"' + (k === 192 ? ' selected' : '') + '>' + k + ' ' + T('export.kbps') + '</option>').join('')}
-                <option value="custom">${T('export.custom')}</option>
-              </select>
-              <input id="aMp3BitrateNum" type="number" min="8" max="320" step="8" value="192" aria-label="${T('export.mp3Bitrate')}" /> ${T('export.kbps')}
-            </label>
-            <label>${T('export.sampleRate')}
-              <select id="aSampleRate">
-                <option value="src">${T('export.followSource')}</option>
-                <option value="44100">44100 Hz</option>
-                <option value="48000">48000 Hz</option>
-                <option value="22050">22050 Hz</option>
-              </select>
-            </label>
-            <label class="exp-check">
-              <input id="aNormalize" type="checkbox" /> ${T('export.normalize')}
-            </label>
-            <label id="aPeakRow" hidden>${T('export.peak')}
-              <select id="aPeak">
-                <option value="-0.5">-0.5 dBFS</option>
-                <option value="-1" selected>-1 dBFS</option>
-                <option value="-3">-3 dBFS</option>
-              </select>
-            </label>
-            <label>${T('export.crossfade')}
-              <input id="aCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
-            </label>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupCodec')}</div>
+              <label>${T('export.format')}
+                <select id="aFormat">
+                  <option value="wav">${T('export.wav')}</option>
+                  <option value="mp3">${T('export.mp3')}</option>
+                </select>
+              </label>
+              <label id="aBitDepthRow">${T('export.bitDepth')}
+                <select id="aBitDepth">
+                  <option value="16">${T('export.depth16')}</option>
+                  <option value="24">${T('export.depth24')}</option>
+                  <option value="32">${T('export.depth32')}</option>
+                </select>
+              </label>
+              <label id="aMp3Row" hidden>${T('export.mp3Bitrate')}
+                <select id="aMp3BitrateSel">
+                  ${BITRATE_PRESETS.mp3.map((k) => '<option value="' + k + '"' + (k === 192 ? ' selected' : '') + '>' + k + ' ' + T('export.kbps') + '</option>').join('')}
+                  <option value="custom">${T('export.custom')}</option>
+                </select>
+                <input id="aMp3BitrateNum" type="number" min="8" max="320" step="8" value="192" aria-label="${T('export.mp3Bitrate')}" /> ${T('export.kbps')}
+              </label>
+              <label>${T('export.sampleRate')}
+                <select id="aSampleRate">
+                  <option value="src">${T('export.followSource')}</option>
+                  <option value="44100">44100 Hz</option>
+                  <option value="48000">48000 Hz</option>
+                  <option value="22050">22050 Hz</option>
+                </select>
+              </label>
+            </div>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupOptions')}</div>
+              <label class="exp-check">
+                <input id="aNormalize" type="checkbox" /> ${T('export.normalize')}
+              </label>
+              <label id="aPeakRow" hidden>${T('export.peak')}
+                <select id="aPeak">
+                  <option value="-0.5">-0.5 dBFS</option>
+                  <option value="-1" selected>-1 dBFS</option>
+                  <option value="-3">-3 dBFS</option>
+                </select>
+              </label>
+              <label>${T('export.crossfade')}
+                <input id="aCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
+              </label>
+            </div>
             <label>${T('export.fileName')}
               <input id="aName" type="text" />
             </label>
@@ -107,43 +113,49 @@
 
         <div class="exp-panel" data-panel="video" hidden>
           <div class="modal-form">
-            <label>${T('export.videoBitrate')}
-              <select id="vBitrateSel">
-                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
-                <option value="custom">${T('export.custom')}</option>
-              </select>
-              <input id="vBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.videoBitrate')}" /> ${T('export.mbps')}
-            </label>
-            <label>${T('export.framerate')}
-              <select id="vFramerate">
-                <option value="src" selected>${T('export.followSource')}</option>
-                <option value="24">24 ${T('export.fps')}</option>
-                <option value="30">30 ${T('export.fps')}</option>
-                <option value="60">60 ${T('export.fps')}</option>
-              </select>
-            </label>
-            <label>${T('export.resolution')}
-              <select id="vResolution">
-                <option value="orig" selected>${T('export.orig')}</option>
-                <option value="1080p">${T('export.res1080')}</option>
-                <option value="720p">${T('export.res720')}</option>
-                <option value="480p">${T('export.res480')}</option>
-              </select>
-            </label>
-            <label>${T('export.aacBitrate')}
-              <select id="vAudioBitrate">
-                <option value="96">96 ${T('export.kbps')}</option>
-                <option value="128" selected>128 ${T('export.kbps')}</option>
-                <option value="192">192 ${T('export.kbps')}</option>
-                <option value="256">256 ${T('export.kbps')}</option>
-              </select>
-            </label>
-            <label class="exp-check">
-              <input id="vAudio" type="checkbox" checked /> ${T('export.includeAudio')}
-            </label>
-            <label>${T('export.crossfade')}
-              <input id="vCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
-            </label>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupCodec')}</div>
+              <label>${T('export.videoBitrate')}
+                <select id="vBitrateSel">
+                  ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
+                  <option value="custom">${T('export.custom')}</option>
+                </select>
+                <input id="vBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.videoBitrate')}" /> ${T('export.mbps')}
+              </label>
+              <label>${T('export.framerate')}
+                <select id="vFramerate">
+                  <option value="src" selected>${T('export.followSource')}</option>
+                  <option value="24">24 ${T('export.fps')}</option>
+                  <option value="30">30 ${T('export.fps')}</option>
+                  <option value="60">60 ${T('export.fps')}</option>
+                </select>
+              </label>
+              <label>${T('export.resolution')}
+                <select id="vResolution">
+                  <option value="orig" selected>${T('export.orig')}</option>
+                  <option value="1080p">${T('export.res1080')}</option>
+                  <option value="720p">${T('export.res720')}</option>
+                  <option value="480p">${T('export.res480')}</option>
+                </select>
+              </label>
+              <label>${T('export.aacBitrate')}
+                <select id="vAudioBitrate">
+                  <option value="96">96 ${T('export.kbps')}</option>
+                  <option value="128" selected>128 ${T('export.kbps')}</option>
+                  <option value="192">192 ${T('export.kbps')}</option>
+                  <option value="256">256 ${T('export.kbps')}</option>
+                </select>
+              </label>
+            </div>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupOptions')}</div>
+              <label class="exp-check">
+                <input id="vAudio" type="checkbox" checked /> ${T('export.includeAudio')}
+              </label>
+              <label>${T('export.crossfade')}
+                <input id="vCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
+              </label>
+            </div>
             <label>${T('export.fileName')}
               <input id="vName" type="text" />
             </label>
@@ -153,33 +165,39 @@
         <div class="exp-panel" data-panel="majdata" hidden>
           <p id="mNote" class="modal-sub">${T('export.majNoteVideo')}</p>
           <div class="modal-form">
-            <label id="mVideoRow">${T('export.majVideoBitrate')}
-              <select id="mVideoBitrateSel">
-                ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
-                <option value="custom">${T('export.custom')}</option>
-              </select>
-              <input id="mVideoBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.majVideoBitrate')}" /> ${T('export.mbps')}
-            </label>
-            <label>${T('export.majMp3Bitrate')}
-              <select id="mMp3Bitrate">
-                <option value="160">160 ${T('export.kbps')}</option>
-                <option value="192">192 ${T('export.kbps')}</option>
-                <option value="320" selected>320 ${T('export.kbps')}</option>
-              </select>
-            </label>
-            <label class="exp-check">
-              <input id="mNormalize" type="checkbox" /> ${T('export.normalize')}
-            </label>
-            <label id="mPeakRow" hidden>${T('export.peak')}
-              <select id="mPeak">
-                <option value="-0.5">-0.5 dBFS</option>
-                <option value="-1" selected>-1 dBFS</option>
-                <option value="-3">-3 dBFS</option>
-              </select>
-            </label>
-            <label>${T('export.crossfade')}
-              <input id="mCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
-            </label>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupCodec')}</div>
+              <label id="mVideoRow">${T('export.majVideoBitrate')}
+                <select id="mVideoBitrateSel">
+                  ${BITRATE_PRESETS.video.map((m) => '<option value="' + m + '"' + (m === 6 ? ' selected' : '') + '>' + m + ' ' + T('export.mbps') + '</option>').join('')}
+                  <option value="custom">${T('export.custom')}</option>
+                </select>
+                <input id="mVideoBitrateNum" type="number" min="0.5" max="50" step="0.5" value="6" aria-label="${T('export.majVideoBitrate')}" /> ${T('export.mbps')}
+              </label>
+              <label>${T('export.majMp3Bitrate')}
+                <select id="mMp3Bitrate">
+                  <option value="160">160 ${T('export.kbps')}</option>
+                  <option value="192">192 ${T('export.kbps')}</option>
+                  <option value="320" selected>320 ${T('export.kbps')}</option>
+                </select>
+              </label>
+            </div>
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupOptions')}</div>
+              <label class="exp-check">
+                <input id="mNormalize" type="checkbox" /> ${T('export.normalize')}
+              </label>
+              <label id="mPeakRow" hidden>${T('export.peak')}
+                <select id="mPeak">
+                  <option value="-0.5">-0.5 dBFS</option>
+                  <option value="-1" selected>-1 dBFS</option>
+                  <option value="-3">-3 dBFS</option>
+                </select>
+              </label>
+              <label>${T('export.crossfade')}
+                <input id="mCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
+              </label>
+            </div>
           </div>
         </div>
 
@@ -197,9 +215,11 @@
     style.textContent =
       '.exp-tabs{display:flex;gap:8px;margin-bottom:14px}' +
       '.exp-tab{padding:6px 14px;border-radius:8px;border:1px solid var(--border-muted);background:var(--surface-raised);color:var(--text-secondary);cursor:pointer;font-size:13px}' +
-      '.exp-tab.active{color:var(--accent);border-color:var(--accent)}' +
+      '.exp-tab.active{color:var(--accent);border-color:var(--accent);background:var(--accent-muted)}' +
       '.exp-tab:disabled{opacity:.4;cursor:not-allowed}' +
-      '.exp-check{flex-direction:row !important;gap:6px !important;cursor:pointer}';
+      '.exp-check{flex-direction:row !important;gap:6px !important;cursor:pointer}' +
+      '.exp-group{display:flex;flex-direction:column;gap:10px;padding:10px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-md)}' +
+      '.exp-group-title{font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.5px}';
     document.head.appendChild(style);
     return overlay;
   }

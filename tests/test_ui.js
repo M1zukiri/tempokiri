@@ -68,6 +68,18 @@ test('renderSequenceList: 空列表渲染提示', () => {
   assert.ok(container.innerHTML.includes('尚未添加段落'));
 });
 
+test('renderSequenceList: 卡片含折叠区与切换按钮（fade 默认收起）', () => {
+  global.MC = global.MC || {};
+  global.MC.UnitInput = { create: () => ({ isInvalid: () => false }) };
+  const items = [{ id: 'a', fadeInMs: 30, fadeOutMs: 40, startTime: 0, endTime: 1 }];
+  const { container, cards } = makeContainer();
+  U.renderSequenceList(container, items, { getGrid: () => null });
+  const html = cards[0].innerHTML || '';
+  assert.ok(html.includes('seq-detail'), '含折叠区（seq-detail）');
+  assert.ok(html.includes('seq-toggle'), '含展开切换按钮');
+  assert.ok(html.includes('fade-in') && html.includes('fade-out'), '淡入/淡出输入保留');
+});
+
 test('renderSequenceList: 播放中的卡片带 playing 类', () => {
   global.MC = global.MC || {};
   global.MC.UnitInput = { create: () => ({ isInvalid: () => false }) };

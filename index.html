@@ -156,7 +156,7 @@
   }
   .btn:hover:not(:disabled) {
     background: var(--surface-active);
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--border-muted);
     color: var(--text-primary);
   }
   .btn:focus-visible {
@@ -174,6 +174,9 @@
   }
   .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-color: transparent; box-shadow: 0 2px 10px var(--accent-glow); }
   .btn-primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 4px 16px var(--accent-glow); }
+  /* 播放态：当前播放源按钮高亮，另一播放入口弱化 */
+  .btn.playing { border-color: var(--accent); color: var(--accent); box-shadow: var(--shadow-glow); }
+  .btn.dimmed { opacity: 0.45; }
 
   #stage { position: relative; margin: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
   #waveWrap {
@@ -189,6 +192,8 @@
   }
   #waveWrap.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow), inset 0 0 12px var(--accent-muted); }
   #wave { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  /* 空态（未载入文件）时波形区整体可点击打开文件：光标提示 pointer */
+  #waveWrap.no-file #wave { cursor: pointer; }
   #playHead { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
   #waveHint[hidden] { display: none; }
   #waveHint {
@@ -230,6 +235,34 @@
   }
   #selToEnd:hover { border-color: var(--accent); color: var(--accent); }
   #selToEnd[hidden] { display: none; }
+  /* 空态引导卡（未载入文件）：文字穿透点击交由波形区处理，仅按钮可点 */
+  .hint-card {
+    position: absolute; inset: 0; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; text-align: center; padding: 20px;
+    pointer-events: none;
+  }
+  .hint-card[hidden] { display: none; }
+  .hint-steps { display: flex; flex-direction: column; gap: 7px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+  .hint-card .btn-primary { pointer-events: auto; }
+  /* 波形颜色图例（网格存在时显示，右下角） */
+  .wave-legend {
+    position: absolute; right: 12px; bottom: 22px; z-index: 1;
+    display: flex; align-items: center; gap: 12px;
+    padding: 4px 10px; border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--surface-base) 78%, transparent);
+    border: 1px solid var(--border-subtle);
+    font-size: 11px; color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .wave-legend[hidden] { display: none; }
+  .wave-legend .lg-item { display: inline-flex; align-items: center; gap: 4px; }
+  .wave-legend i { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
+  .wave-legend .lg-bar { background: color-mix(in srgb, var(--text-primary) 75%, transparent); }
+  .wave-legend .lg-beat { background: color-mix(in srgb, var(--text-primary) 15%, transparent); }
+  .wave-legend .lg-sel { background: var(--accent); }
+  .wave-legend .lg-play { background: var(--danger); }
+  .wave-legend .lg-cutline { background: var(--warning); }
 
   #waveRow { display: flex; gap: 14px; align-items: stretch; }
   #videoWrap {
@@ -257,8 +290,10 @@
     font-size: 12px;
     letter-spacing: 0.2px;
   }
+  /* 状态分级着色（main.js status(msg, kind) 控制） */
+  #statusBar.status-error { color: var(--danger); }
+  #statusBar.status-warn { color: var(--warning); }
 
-  .hint-inline { color: var(--text-secondary); font-size: 12px; }
   #seqInfo { color: var(--text-secondary); font-weight: 400; margin-left: 8px; font-size: 12px; }
   .empty { color: var(--text-secondary); font-size: 13px; padding: 8px 0; }
   .seq-card {
@@ -317,14 +352,41 @@
   }
   .btn-mini:hover { background: var(--surface-overlay); color: var(--text-primary); border-color: var(--border-muted); }
   .btn-mini.del:hover { border-color: var(--danger); color: var(--danger); }
+  /* 序列卡片：折叠行（淡入/淡出）与展开切换 */
+  .seq-detail { display: flex; gap: 12px; flex-basis: 100%; padding-left: 32px; flex-wrap: wrap; }
+  .seq-detail[hidden] { display: none; }
+  .seq-toggle { transition: transform var(--transition-fast); }
+  .seq-toggle.open { transform: rotate(180deg); }
+  /* 快捷栏数值点击直改 */
+  .q-val { cursor: pointer; }
+  .q-edit {
+    width: 72px; height: 22px;
+    background: var(--bg-app);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  /* 操作说明 popover（控制栏 ? 按钮） */
+  .hint-wrap { position: relative; margin-left: 4px; }
+  .hint-btn { width: 24px; height: 24px; font-size: 12px; font-weight: 600; }
+  .hint-pop {
+    position: absolute; right: 0; bottom: calc(100% + 8px);
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    box-shadow: var(--shadow-md);
+    z-index: 5;
+    white-space: nowrap;
+  }
+  .hint-pop[hidden] { display: none; }
 
   /* 模态框 */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100;
-  }
   .modal-overlay {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.55);
@@ -356,6 +418,7 @@
   .seg-table .seg-bpm { width: 70px; }
   .seg-table .seg-qty { width: 64px; }
   .seg-table .seg-res { width: 60px; }
+  .seg-note { margin: -2px 0 10px; font-size: 11px; color: var(--text-tertiary); line-height: 1.6; }
   .modal-status { color: var(--accent); font-size: 12px; margin-bottom: 10px; }
   .q-group { display: flex; align-items: center; gap: 6px; background: var(--surface-base); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); }
   .q-label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
@@ -380,7 +443,9 @@
   }
   .cb-group { display: flex; align-items: center; gap: 8px; }
   .cb-group .btn { padding: 6px 12px; }
-  .controlbar .hint-inline { margin-left: 2px; }
+  /* hidden 属性与 display:flex 的优先级：class 规则会覆盖 hidden，需显式关闭 */
+  .controlbar[hidden] { display: none; }
+  .quickbar[hidden] { display: none; }
   .quickbar { display: flex; align-items: center; gap: 14px; margin-left: auto; }
   .seq-toolbar { margin-bottom: 8px; }
   .seq-panel {
@@ -498,6 +563,23 @@
     transition: transform 0.1s ease;
     pointer-events: none;
   }
+  /* 拖动定位时的悬浮时间气泡 */
+  .seq-progress-tip {
+    position: absolute;
+    bottom: 14px;
+    transform: translateX(-50%);
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-muted);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 3;
+  }
+  .seq-progress-tip[hidden] { display: none; }
   .seq-progress-time {
     font-size: 12px;
     color: var(--text-secondary);
@@ -582,9 +664,9 @@
     box-shadow: 0 0 12px rgba(251,114,153,0.35);
   }
   .footer-gh:hover {
-    border-color: #e6edf3;
-    color: #e6edf3;
-    box-shadow: 0 0 12px rgba(230,237,243,0.3);
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--text-primary) 25%, transparent);
   }
   #btnReadme:hover, #btnCheckUpdate:hover, #btnAdvanced:hover {
     border-color: var(--accent);
@@ -653,11 +735,21 @@
     .quickbar { gap: 8px; flex-wrap: wrap; width: 100%; }
     .q-group { gap: 4px; flex-wrap: wrap; }
     .q-btns .btn-mini { min-width: 30px; padding: 0 4px; font-size: 10px; }
+    /* 窄屏：视频预览与波形上下堆叠，避免波形被压扁 */
+    #waveRow { flex-direction: column; gap: 10px; }
+    #videoWrap { width: 100%; }
+    #video { max-height: 200px; }
     #waveWrap { height: 220px; }
     .seq-panel { padding: 12px 14px; margin: 10px 12px; }
     #stage { margin: 12px 14px; }
     #statusBar { margin: 0 14px; }
     .site-footer { margin: 12px 14px 14px; padding: 10px 14px; }
+  }
+  /* 超窄屏（≤400px）：进一步压缩微调按钮与引导文字 */
+  @media (max-width: 400px) {
+    .q-btns .btn-mini { min-width: 26px; font-size: 9px; }
+    .hint-steps { font-size: 12px; }
+    .wave-legend { gap: 8px; font-size: 10px; right: 8px; bottom: 20px; }
   }
 </style>
 </head>
@@ -666,7 +758,7 @@
     <div class="brand"><span class="brand-name" data-i18n="app.brandName">Tempokiri</span><span class="brand-tag" data-i18n="app.brandTag">节奏感知的音频/视频剪辑工作站</span><span class="footer-version">v<span data-version>__VERSION__</span></span><canvas id="brandPulse" width="64" height="20" aria-hidden="true"></canvas></div>
     <input id="fileInput" type="file" accept="audio/*,video/*" hidden />
     <button id="btnOpenFile" class="btn" data-i18n="toolbar.openFile">打开文件</button>
-    <button id="btnSettings" class="btn" disabled data-i18n="toolbar.setBpm">设置节拍</button>
+    <button id="btnSettings" class="btn" disabled data-i18n="toolbar.setBpm" data-i18n-title="toolbar.setBpmTitle">设置节拍</button>
     <button id="btnAutoCut" class="btn" disabled data-i18n="toolbar.autoCut">✂ 自动剪辑</button>
     <span class="spacer"></span>
     <button id="btnExport" class="btn btn-primary" disabled data-i18n="toolbar.export">导出</button>
@@ -675,12 +767,27 @@
   <div id="stage">
     <div id="waveRow">
       <div id="videoWrap" hidden><video id="video"></video></div>
-      <div id="waveWrap">
+      <div id="waveWrap" class="no-file">
         <canvas id="wave"></canvas>
         <canvas id="playHead"></canvas>
-        <div id="waveHint" data-i18n="wave.hint">拖入音频或视频文件，或点击此处选择文件开始剪辑</div>
+        <div id="hintCard" class="hint-card">
+          <div class="hint-steps">
+            <div class="hint-step" data-i18n="hint.guide1">① 打开音频或视频文件</div>
+            <div class="hint-step" data-i18n="hint.guide2">② 自动识别节拍，点击「确认」应用网格</div>
+            <div class="hint-step" data-i18n="hint.guide3">③ 双击选小节 · 拖拽选区 · 或一键自动剪辑</div>
+          </div>
+          <button id="btnHintOpen" class="btn btn-primary" data-i18n="toolbar.openFile">打开文件</button>
+        </div>
+        <div id="waveHint" hidden data-i18n="wave.hint">拖入音频或视频文件，或点击此处选择文件开始剪辑</div>
         <div id="captureBar" hidden><div id="captureFill"></div></div>
         <button id="selToEnd" class="sel-chip" hidden data-i18n="wave.toEnd">⤳ 延伸到末尾</button>
+        <div id="waveLegend" class="wave-legend" hidden>
+          <span class="lg-item"><i class="lg-bar"></i><span data-i18n="wave.legendBar">小节线</span></span>
+          <span class="lg-item"><i class="lg-beat"></i><span data-i18n="wave.legendBeat">拍线</span></span>
+          <span class="lg-item"><i class="lg-sel"></i><span data-i18n="wave.legendSel">选区</span></span>
+          <span class="lg-item"><i class="lg-play"></i><span data-i18n="wave.legendPlay">播放头</span></span>
+          <span class="lg-item lg-cut" hidden><i class="lg-cutline"></i><span data-i18n="wave.legendCut">剪切点</span></span>
+        </div>
       </div>
     </div>
     <div id="controlBar" class="controlbar" hidden>
@@ -691,8 +798,7 @@
         <button id="btnAddSelection" class="btn" disabled data-i18n="wave.addSelection">＋ 添加选中区间</button>
       </span>
       <span class="spacer"></span>
-      <div id="quickBar" class="quickbar" hidden>
-        <span class="q-group">
+      <div id="quickBar" class="quickbar" hidden>        <span class="q-group">
           <span class="q-label" id="qBpmLabel" data-i18n="quick.bpm">BPM</span>
           <span class="q-btns q-neg">
             <button class="btn btn-mini" data-q="bpm" data-d="-1">-1</button>
@@ -721,7 +827,12 @@
           </span>
         </span>
       </div>
-      <span class="hint-inline" data-i18n="wave.hintInline">单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放</span>
+      <div class="hint-wrap">
+        <button id="hintBtn" class="btn-mini hint-btn" type="button" aria-expanded="false" aria-label="操作说明">?</button>
+        <div id="hintPop" class="hint-pop" hidden>
+          <span data-i18n="wave.hintInline">单击定位 · 双击选小节 · 拖拽选区 · 滚轮平移 · Ctrl+滚轮缩放 · Shift+拖拽平移</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -740,6 +851,7 @@
         <div class="seq-progress-fill" id="seqProgressFill"></div>
         <div class="seq-progress-seams" id="seqProgressSeams"></div>
         <div class="seq-progress-knob" id="seqProgressKnob"></div>
+        <div id="seqProgressTip" class="seq-progress-tip" hidden></div>
       </div>
       <span class="seq-progress-time" id="seqProgressTime">0:00.0 / 0:00.0</span>
     </div>
@@ -773,6 +885,7 @@
         <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9.5 1a.5.5 0 0 1 .5.5v1.05a5 5 0 0 1 1.73.69l.74-.74a.5.5 0 0 1 .7 0l1.4 1.4a.5.5 0 0 1 0 .71l-.74.74c.28.52.5 1.1.69 1.73H15.5a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-1.05a5 5 0 0 1-.69 1.73l.74.74a.5.5 0 0 1 0 .7l-1.4 1.4a.5.5 0 0 1-.7 0l-.74-.74a5 5 0 0 1-1.73.69V15.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-1.05a5 5 0 0 1-1.73-.69l-.74.74a.5.5 0 0 1-.7 0l-1.4-1.4a.5.5 0 0 1 0-.7l.74-.74a5 5 0 0 1-.69-1.73H1.5a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h1.05a5 5 0 0 1 .69-1.73l-.74-.74a.5.5 0 0 1 0-.71l1.4-1.4a.5.5 0 0 1 .7 0l.74.74c.52-.28 1.1-.5 1.73-.69V1.5a.5.5 0 0 1 .5-.5Zm-1 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/></svg>
         <span data-i18n="footer.advanced">高级设置</span>
       </button>
+      <button id="btnTheme" class="footer-btn btn-theme" data-i18n-title="footer.themeTitle" title="切换界面主题"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 1 0 0 16 4 4 0 0 0 0-8 4 4 0 0 1 0-8Z"/></svg><span id="themeName">Aoi Aurora</span></button>
       <button id="btnMeta" class="footer-btn" data-i18n-title="footer.metaTitle" title="元数据（导入时自动读取，导出时自动附加）">
         <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
         <span data-i18n="footer.meta">元数据</span>
