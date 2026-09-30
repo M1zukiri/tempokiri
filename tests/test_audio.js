@@ -78,6 +78,56 @@ test('readWavSampleRate: 非 WAV/非法输入返回 null', () => {
   assert.equal(A.readWavSampleRate(new Uint8Array(64).buffer), null, '无 RIFF/WAVE 标记');
 });
 
+/** 构造 MP3 片段：可选 ID3v2 头 + 一个 MPEG 帧头 + 若干填充字节。 */
+function mp3Bytes(opts = {}) {
+  const { id3Size = 0, b1 = 0xfb, b2 = 0x90, tail = 64 } = opts;
+  const head = id3Size > 0 ? 10 + id3Size : 0;
+  const buf = new ArrayBuffer(head + 4 + tail);
+  const dv = new DataView(buf);
+  if (id3Size > 0) {
+    dv.setUint8(0, 0x49); dv.setUint8(1, 0x44); dv.setUint8(2, 0x33);
+    dv.setUint8(3, 3); dv.setUint8(4, 0); dv.setUint8(5, 0); // 版本 3，无 footer
+    // syncsafe 长度：每字节 7 位
+    dv.setUint8(6, (id3Size >> 21) & 0x7f);
+    dv.setUint8(7, (id3Size >> 14) & 0x7f);
+    dv.setUint8(8, (id3Size >> 7) & 0x7f);
+    dv.setUint8(9, id3Size & 0x7f);
+  }
+  dv.setUint8(head, 0xff);
+  dv.setUint8(head + 1, b1);
+  dv.setUint8(head + 2, b2);
+  dv.setUint8(head + 3, 0);
+  return buf;
+}
+
+test('readMp3SampleRate: MPEG1 三档采样率', () => {
+  // b1=0xFB → MPEG1 / Layer III / 无 CRC；b2 的 bit3-2 为采样率索引
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b2: 0x90 })), 44100);
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b2: 0x94 })), 48000);
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b2: 0x98 })), 32000);
+});
+
+test('readMp3SampleRate: 跳过 ID3v2 标签后仍能定位首帧', () => {
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ id3Size: 2048, b2: 0x90 })), 44100);
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ id3Size: 100, b2: 0x94 })), 48000);
+});
+
+test('readMp3SampleRate: MPEG2/2.5 按版本取对应采样率表', () => {
+  // b1=0xF3 → 版本 10(MPEG2) / 层 01(III) / 无 CRC
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b1: 0xf3, b2: 0x90 })), 22050);
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b1: 0xf3, b2: 0x94 })), 24000);
+  // b1=0xE3 → 版本 00(MPEG2.5)
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b1: 0xe3, b2: 0x90 })), 11025);
+});
+
+test('readMp3SampleRate: 保留值与非 MP3 输入返回 null', () => {
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b2: 0x9c })), null, '采样率索引 3 = reserved');
+  assert.equal(A.readMp3SampleRate(mp3Bytes({ b1: 0xf9 })), null, '层 00 = reserved');
+  assert.equal(A.readMp3SampleRate(new ArrayBuffer(2)), null, '长度不足');
+  assert.equal(A.readMp3SampleRate(new ArrayBuffer(128)), null, '全零无帧同步');
+  assert.equal(A.readMp3SampleRate(A.readWavSampleRate ? wavHeader(44100) : new ArrayBuffer(0)), null, 'WAV 不是 MP3');
+});
+
 test('interleavedToPlanar: 立体声交错重排为平面布局', () => {
   const frames = 8;
   // 交错：inter[f*2+0] = 左声道（0.5 正弦），inter[f*2+1] = 右声道（-0.5 正弦）

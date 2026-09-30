@@ -16,7 +16,7 @@
     pcm: null, // 分析用 mono（22050）
     rawMono: null, // 原始采样率 mono（导出用）
     audioBuffer: null, // 试听用
-    sampleRate: 22050,
+    sampleRate: 0, // 文件原始采样率（未加载文件前无意义，勿写成 22050——那是 state.pcm 的分析率）
     duration: 0,
     peaks: null,
     segments: [{ bpm: null, beatsPerBar: 4, beatUnit: 4 }], // 段定义（用户输入）

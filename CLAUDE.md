@@ -53,6 +53,7 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 
 ## 版本历史
 
+- **1.17.4**：MP3 定源率修复（M2）＋ 采样率语义澄清（M9）——① **MP3 定源率**：新增 `audio.js readMp3SampleRate`（跳过 ID3v2（syncsafe 长度 + 可选 footer）→ 找首个 MPEG 帧同步 → 按版本取采样率表：MPEG1 44100/48000/32000、MPEG2 22050/24000/16000、MPEG2.5 11025/12000/8000，层/索引 reserved 跳过），`decodeAudioFile` 对 MP3 也走 `OfflineAudioContext(1,1,srcRate).decodeAudioData`——此前非 WAV 一律用 `ctx.decodeAudioData`，结果被重采样到**设备率**（实测 44100 Hz 的 MP3 解码后得到 48000），「跟随源」导出名不副实；② **`state.sampleRate` 初值 22050 → 0**（它语义上是文件源率，未加载文件时伪装成分析率会误导——已确认所有读取点都有 `rawMono` 空值保护）；③ 测试：`test_audio.js` +5（MPEG1 三档 / 跳过 ID3v2 / MPEG2 与 2.5 表 / reserved 与非 MP3 返回 null），全量 **219/219**。验证：`tools/diag_mp3_sr.mjs` 实测 4 首 44.1k MP3——修复后 decodeAudioFile 给 44100（修复前 AudioContext 会给 48000）；48000 源不受影响；**BPM 结果零变化**（117 / 97.9 / 159.1 / 159.5 修复前后完全一致，onset 数仅差 1）；build 零报错（963 KB）
 - **1.17.3**：负数时间转换修复（用户 m4a 导入复现 + 用户报障"第一段无法输入小节/格数、怀疑负数时间处理"）——① **rangeInput commit 残留校验** `ts >= 0`（1.17.1 只修了 sequence.timeRangeToBars 层，组件层漏改）：负 offset 网格内合法负起点（如 -0.5s）被拒绝 → 输入回退 = "无法输入"；改为 `isFinite` + `te > ts`（负时间合法，与 timeToBarCell 同规约）；② **sequence.timeRangeToBars** 去掉 `startSec >= 0` 下限（负时间→小节/格派生可用）；③ **rangeInput commit bars 无网格放行**（`if (g && …)` 代替 `if (!g || …)`——无网格时允许先存小节/格语义，派生显示 '—'，网格恢复后再换算）；④ 测试：`test_range_convert.js` +2（负时间派生合法/网格外负时间 null），26/26。验证：单测通过、verify_unit_semantics 10/10、smoke/opts 回归全绿、diag_neg_time（负 offset 下 time 输入 -0.5→3.5：保存 + 派生 barsRef 1小节2格–3小节1格 正确）、build 零报错（961 KB）
 
 - **1.17.2**：rangeInput 布局可读性修复（用户截图反馈"输入框太不直观"）——① **分组微标签**：小节/格行 `起 小节[ ] 格[ ] · 止 小节[ ] 格[ ]`（原 4 个无标签数字框并排）、时间行 `起点[ ] 终点[ ]`（秒）；② **派生显示去输入框化**：未选中语义由"禁用输入框并排"改为**只读文本**（bars → `1小节1格 – 1小节4格`；time → `fmtT 0:00.0 – 0:02.0`），整块半透明；③ 块结构 `.ri-block(.ri-active)`：选中=输入、未选中=文本(CSS 显隐)，主行随 mode 显示（`renderEdgeMain` 已有）已联动；④ 时间输入秒格式保持（精确编辑）。验证：截图双态核对（bars 选中/time 选中）、verify_unit_semantics 10/10 回归、build 零报错（960 KB）
@@ -102,7 +103,20 @@ node --test tests/test_*.js   # 单元测试（analysis/export/sequence/audio/re
 - **0.2.0**：性能（帧合并/批量 path/seek 节流）、设计（渐变波形/播放态卡片）、高级设置（交叉淡化/快捷键/视图持久化）
 - **0.1.0**：初始版本
 
+## 负结果实验记录（已验证，勿重复尝试）
+
+改动前先看这里 —— 以下方案都有真实语料对照数据支撑的**负收益**结论。
+
+| 实验 | 做法 | 结果（140 首 batch_review+batch_test，配对同曲同解码） | 结论 |
+|---|---|---|---|
+| **抗混叠低通** | `resample` 降采样前加多相 Hann-sinc 低通（截止 = 目标 Nyquist） | hit0.1 **25.7% → 21.4%**；层正确 79.3% → 78.6%；落半频层 69 → **76 首**；35/140 结果变化且多数变坏（真值 160→线性 160.1 命中 / AA 81.4 掉半频） | ❌ 回滚。根因：降采样到 22050 会丢掉 >11.025 kHz 的 hi-hat/镲片 onset，而它们正是支撑"较高 BPM 层"的证据；线性降采样虽混叠，却把高频能量的**时间结构**折回低频，歪打正着。补丁留档：`eval/handmaid/m1_antialias_neg_result.patch` |
+| **提高分析率到 44100** | 22050 → 44100（hop 512→1024、frame 2048→4096，保持同样的毫秒窗与频率分辨率） | hit0.1 **25.7% → 16.4%**；层正确 79.3% → 69.3%；C 更准 58 / A 更准 62 | ❌ 不做。⚠️ 且该对照**不干净**：onset 数从 299 塌到 130，说明 flux 聚合特性随 bin 数变化（2049 vs 1025）被一并改动，不只是"采样率"一个变量 |
+
+> 教训：**分析前端（22050 + 朴素线性降采样）是经验最优，别用"教科书正确"去改它。** 合成音轨上的结论（§"改采样率零收益"、亚帧插值收益不稳定）都不可作为判据，只有真实语料能判定。
+
 ## 深入文档
 
 - 设计文档：`docs/superpowers/specs/`（工作站设计、优化计划、自动剪辑设计 2026-08-19-auto-cut-design.md）
 - 产品文档（内嵌页脚弹窗）：`README.md`
+- 改进计划与实验记录：`PLAN.md`
+- 评估资产：`tools/evaluate_handmaid.mjs`（基线）、`tools/eval_aa_ab.mjs`（抗混叠对照）、`tools/eval_sr_ab.mjs`（采样率对照）、`tools/diag_mp3_sr.mjs`（解码采样率诊断）；数据库与结果留在 `个人/tempokiri/eval/handmaid/`（不入库）

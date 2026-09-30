@@ -292,6 +292,55 @@
   }
 
   /**
+   * 解析 MP3 第一帧头（MPEG audio frame header）的真实采样率。
+   * 与 readWavSampleRate 同理：Chromium 的 decodeAudioData 会把结果重采样到
+   * AudioContext 设备率（实测：语料是 44100 Hz 的 MP3，280/280 次解码全部得到
+   * 48000），「跟随源」导出因此名不副实。MP3 可从帧头取源率。
+   *
+   * 帧头：11 位同步字（0xFFE）后接版本(2) / 层(2) / 保护位(1)，采样率索引在
+   * 第 3 字节的 bit3-2；采样率表随 MPEG 版本不同（1 / 2 / 2.5）。
+   * @param {ArrayBuffer|DataView} buf
+   * @returns {number|null} 采样率；非 MP3/无法解析返回 null
+   */
+  function readMp3SampleRate(buf) {
+    try {
+      const dv = buf instanceof DataView ? buf : new DataView(buf);
+      if (dv.byteLength < 4) return null;
+      // 跳过 ID3v2 标签（大小是 4 个 syncsafe 整数，每字节 7 位有效）
+      let off = 0;
+      if (dv.getUint8(0) === 0x49 && dv.getUint8(1) === 0x44 && dv.getUint8(2) === 0x33) {
+        if (dv.byteLength < 10) return null;
+        const size =
+          ((dv.getUint8(6) & 0x7f) << 21) |
+          ((dv.getUint8(7) & 0x7f) << 14) |
+          ((dv.getUint8(8) & 0x7f) << 7) |
+          (dv.getUint8(9) & 0x7f);
+        off = 10 + size;
+        if (dv.getUint8(5) & 0x10) off += 10; // 存在 footer 时再跳过 10 字节
+      }
+      // MPEG1 / MPEG2 / MPEG2.5 三张采样率表（索引 3 = reserved，跳过）
+      const TABLE = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+      const limit = Math.min(dv.byteLength - 4, off + 262144); // 只在前 256 KB 内找首帧
+      for (let i = off; i < limit; i++) {
+        if (dv.getUint8(i) !== 0xff) continue;
+        const b1 = dv.getUint8(i + 1);
+        if ((b1 & 0xe0) !== 0xe0) continue; // 同步字
+        const layer = (b1 >> 1) & 0x03;
+        if (layer === 0) continue; // reserved
+        const ver = (b1 >> 3) & 0x03;
+        const table = TABLE[ver];
+        if (!table) continue; // ver=1 reserved
+        const idx = (dv.getUint8(i + 2) >> 2) & 0x03;
+        if (idx === 3) continue; // reserved
+        return table[idx];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * 解码音频文件。
    * 返回：pcm（降采样分析用）、rawMono（原始采样率，导出用）、audioBuffer（试听用）。
    * @param {File} file
@@ -304,11 +353,14 @@
     const buf = await file.arrayBuffer();
     // WAV：以源采样率创建 OfflineAudioContext 解码，避免被设备率（常见 48k）
     // 重采样——否则「跟随源」导出的 WAV 会被静默改为 48k（无损归档场景失真）。
-    // 非 WAV（MP3 等无法可靠读头）保持现状：跟随设备率，弹窗会标注实际率。
+    // MP3：同样处理——实测 44100 Hz 的 MP3 经 ctx.decodeAudioData 后一律变成
+    // 设备率 48k（语料 280/280 全中），帧头可直接读到真实源率。
+    // 其余格式（无法可靠读头）保持现状：跟随设备率，弹窗会标注实际率。
     const wavRate = readWavSampleRate(buf);
+    const srcRate = wavRate || readMp3SampleRate(buf);
     let audioBuffer;
-    if (wavRate && wavRate > 0) {
-      const octx = new OfflineAudioContext(1, 1, wavRate);
+    if (srcRate && srcRate > 0) {
+      const octx = new OfflineAudioContext(1, 1, srcRate);
       audioBuffer = await octx.decodeAudioData(buf);
     } else {
       audioBuffer = await ctx.decodeAudioData(buf);
@@ -459,5 +511,5 @@
       duration: duration || mono.length / sampleRate,
     };
   }
-  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks, interleavedToPlanar, readWavSampleRate };
+  return { classifyFile, decodeAudioFile, decodeVideoAudioTrack, captureVideoPcm, getAudioContext, extOf, mixPlanarChunks, interleavedToPlanar, readWavSampleRate, readMp3SampleRate };
 });
