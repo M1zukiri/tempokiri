@@ -163,6 +163,54 @@ test('buildGrid: 非法参数抛错', () => {
   assert.throws(() => A.buildGrid({ segments: [{ bpm: 120, beatsPerBar: 4 }], offset: 0, duration: 10 }));
 });
 
+/** 确定性节拍信号（seed 固定）：每拍一个短噪声脉冲。用于对阈值敏感的断言。 */
+function makeBeatSignalDet(bpm, seconds, sr = A.DEFAULT_ANALYSIS_SR) {
+  const n = Math.round(seconds * sr);
+  const pcm = new Float32Array(n);
+  const beat = 60 / bpm;
+  const burst = Math.round(sr * 0.03);
+  let seed = 1234567;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let t = 0; t < seconds; t += beat) {
+    const start = Math.round(t * sr);
+    for (let i = 0; i < burst && start + i < n; i++) pcm[start + i] = rnd() * 2 - 1;
+  }
+  return pcm;
+}
+
+test('触顶自适应上限: 主峰贴上界时放宽上限并给出正确的 BPM', () => {
+  // 真值 205/210/215 在 maxBpm=200 下只能被截断到 200，触顶后重扫应回到真值附近
+  for (const [truth, tol] of [[205, 1], [210, 1], [215, 1]]) {
+    const r = A.analyze(makeBeatSignalDet(truth, 30), { sampleRate: 22050, minBpm: 60, maxBpm: 200 });
+    assert.equal(r.ceilExtended, true, truth + ' 应触发触顶重扫');
+    assert.ok(Math.abs(r.bpm - truth) <= tol, truth + ' → ' + r.bpm);
+  }
+});
+
+test('触顶自适应上限: 未触顶时不改变结果、不置标', () => {
+  const r = A.analyze(makeBeatSignalDet(190, 30), { sampleRate: 22050, minBpm: 60, maxBpm: 200 });
+  assert.equal(r.ceilExtended, false);
+  assert.ok(Math.abs(r.bpm - 190) <= 1);
+});
+
+test('触顶自适应上限: maxBpmCap 可关闭放宽（cap = maxBpm）', () => {
+  const r = A.analyze(makeBeatSignalDet(205, 30), { sampleRate: 22050, minBpm: 60, maxBpm: 200, maxBpmCap: 200 });
+  assert.equal(r.ceilExtended, false, 'cap 等于上限时不应重扫');
+  assert.ok(Math.abs(r.bpm - 200) <= 1.5, '保持被截断的结果，实际 ' + r.bpm);
+});
+
+test('触顶自适应上限: 上限已到 300（应用校验域顶）时不再放宽', () => {
+  const r = A.analyze(makeBeatSignalDet(300, 30), { sampleRate: 22050, minBpm: 60, maxBpm: 300 });
+  assert.equal(r.ceilExtended, false, '已到 cap 不应重扫（否则会产出被弹窗拒绝的值）');
+});
+
+test('触顶自适应上限: 已知局限——落次谐波的真值 >200 救不了', () => {
+  // 真值 240 的主峰落在 120（窗口内次谐波），根本触不到 200 的上限
+  const r = A.analyze(makeBeatSignalDet(240, 30), { sampleRate: 22050, minBpm: 60, maxBpm: 200 });
+  assert.equal(r.ceilExtended, false, '次谐波情形不触发（这是已知局限，需八度判定而非扫窗）');
+  assert.ok(Math.abs(r.bpm - 120) <= 2, '实际 ' + r.bpm);
+});
+
 test('resample: 长度与端点保持', () => {
   const src = new Float32Array([0, 1, 0, -1]);
   const out = A.resample(src, 4, 8);

@@ -627,8 +627,31 @@
     // 注意：detectOnsets 必须以降采样后的采样率计算时间，
     // 用户传入的原始 sampleRate 必须被覆盖，否则 onset 时间减半、BPM 翻倍。
     const onsets = detectOnsets(flux, Object.assign({}, opts, { sampleRate: analysisSr }));
-    const scan = scanBpm(onsets, opts);
-    const bpm = scan.bpm;
+    let scan = scanBpm(onsets, opts);
+    let bpm = scan.bpm;
+    // 触顶自适应上限（1.18.0）：主峰贴住扫描上限，说明真实的拍周期被上限截断了
+    // （例如真值 205 在 maxBpm=200 下只能给出 200 附近的解），此时以放宽的上限重扫一次。
+    //
+    // 边界（务必保持）：
+    //   - 重扫上限封顶 300 —— modal.js 的 BPM 校验域是 40–300，超出会产出被弹窗
+    //     拒绝的值；上限已到 cap 时不再重扫，避免无意义开销
+    //   - 只在触顶时触发：实测 85/1800 首触发，全量对照 ≤0.6 命中 31.2% → 33.8%，
+    //     层正确 83.2% → 85.7%，落半频与中位误差**一分不变**（只动触顶那批）；
+    //     而无条件放宽（40–320）反而更差（层正确 81.7% → 67.7%）
+    //   - 真值 >300 的曲子救不了：主峰常落在次谐波（242 → 121），根本触不到上限，
+    //     那需要八度判定而不是扫窗
+    const ceilLo = opts.maxBpm || 200;
+    const ceilCap = opts.maxBpmCap != null ? opts.maxBpmCap : 300;
+    let ceilExtended = false;
+    if (bpm != null && bpm >= ceilLo * 0.97 && ceilLo < ceilCap) {
+      const up = Math.max(ceilLo + 1, Math.min(ceilLo * 2, ceilCap));
+      const wide = scanBpm(onsets, Object.assign({}, opts, { maxBpm: up }));
+      if (wide.bpm != null) {
+        scan = wide;
+        bpm = wide.bpm;
+        ceilExtended = true;
+      }
+    }
     // offset = 首条网格线位置 = 第一个 onset（开头第一个可听见的瞬态）。
     // 用户按听感校准（心予報 mp3：0.46s ≈ 首个 onset 0.464s）时首线就是音乐实际
     // 开始处，无需相位换算；首个 onset 若为弱装饰音可在设置窗口手动微调。
@@ -637,7 +660,8 @@
       offset = Math.round(onsets[0] * 1000) / 1000;
     }
     // bpmCandidates：竞争层 BPM 候选（v1.11.0，供 UI 展示「其他可能 BPM」）
-    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands };
+    // ceilExtended：本次是否走了触顶重扫（供 UI 提示扫描范围被放宽）
+    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands, ceilExtended };
   }
 
   return {

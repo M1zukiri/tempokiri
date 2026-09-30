@@ -206,6 +206,7 @@
     "decoding": "正在解码音频…",
     "analyzing": "正在分析音频…",
     "autoDone": "识别完成：BPM {bpm}，确认后生效",
+    "autoDoneExtended": "识别完成：BPM {bpm}（已放宽扫描上限，原上限附近无更优解），确认后生效",
     "noBeat": "未能识别出BPM，请手动输入",
     "lowEnergy": "未检测到节拍",
     "guide1": "① 打开音频或视频文件",
