@@ -34,7 +34,8 @@ const SEED = parseInt(arg('seed', '42'), 10);
 const VARIANTS = arg('variants', 'base,baseRep,interp').split(',');
 const WINDOW = arg('window', 'default');
 const DEDUP = arg('dedup', 'title');
-const OUT = `C:/Users/M1zukuro/Desktop/个人/tempokiri/eval/adx/eval_${WINDOW}_n${N}_s${SEED}.jsonl`;
+// 文件名必须带变体标签：否则换变体重跑会被断点续跑逻辑跳过（结果里根本没有新变体字段）
+const OUT = `C:/Users/M1zukuro/Desktop/个人/tempokiri/eval/adx/eval_${WINDOW}_n${N}_s${SEED}_${VARIANTS.join('-')}.jsonl`;
 
 const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
 let items = db.items.filter((e) => e.hasAudio);
@@ -152,6 +153,38 @@ const PAGE_JS = `(async () => {
     if (VARIANTS.has('interp')) out.interp = MC.estimateBpm(detect(flux, 22050, hop, frame, true), { minBpm, maxBpm });
     out.__ms = Math.round(tRes + tFlux);
   }
+  if (VARIANTS.has('adaptive') || VARIANTS.has('adaptiveKeep')) {
+    // M5：条件式自适应上限 —— 仅当主峰触顶（>= maxBpm*0.97）时才以 ×2 上限重扫。
+    // 前提：一刀切放宽（40–320）实测更差（层正确 81.7%→67.7%），所以必须条件触发。
+    const scan = (minB, maxB) => MC.analyze(p22, { sampleRate: 22050, hop, frameSize: frame, delta, minBpm: minB, maxBpm: maxB });
+    const r0 = scan(minBpm, maxBpm);
+    const trig = r0.bpm != null && r0.bpm >= maxBpm * 0.97;
+    let hi = null;
+    if (trig) hi = scan(minBpm, maxBpm * 2).bpm;
+    out.adaptive = trig ? hi : r0.bpm;                                            // 触顶一律采用重扫结果
+    out.adaptiveKeep = (trig && hi != null && hi > maxBpm * 0.97) ? hi : r0.bpm;   // 仅当确实扫到更高才采用
+    out.__trig = trig ? 1 : 0;
+  }
+  if (VARIANTS.has('alwaysKeep')) {
+    // 补充变体：无条件用 ×2 上限扫一次，但**只采用 > 原上限的结果**（否则保留默认窗结果）。
+    // 与 adaptive 的区别：不要求主峰触顶——因为真值 242 的曲子主峰会落在 121（窗口内的
+    // 次谐波），根本触不到 200 的上限，P3 的触顶条件对它形同虚设。
+    const scan2 = (minB, maxB) => MC.analyze(p22, { sampleRate: 22050, hop, frameSize: frame, delta, minBpm: minB, maxBpm: maxB });
+    const r0b = scan2(minBpm, maxBpm);
+    const r1b = scan2(minBpm, maxBpm * 2);
+    out.alwaysKeep = (r1b.bpm != null && r1b.bpm > maxBpm) ? r1b.bpm : r0b.bpm;
+    out.__r1 = r1b.bpm;
+  }
+  if (VARIANTS.has('adaptive300')) {
+    // 可上线形式：重扫上限封顶在 300 —— modal.js 的 BPM 校验域是 40–300，
+    // 直接取 maxBpm*2（默认 200 → 400）会产出被弹窗拒绝的值。
+    const scan3 = (minB, maxB) => MC.analyze(p22, { sampleRate: 22050, hop, frameSize: frame, delta, minBpm: minB, maxBpm: maxB });
+    const r0c = scan3(minBpm, maxBpm);
+    const trig3 = r0c.bpm != null && r0c.bpm >= maxBpm * 0.97;
+    let hi3 = null;
+    if (trig3) hi3 = scan3(minBpm, Math.max(maxBpm, Math.min(maxBpm * 2, 300))).bpm;
+    out.adaptive300 = trig3 ? hi3 : r0c.bpm;
+  }
   if (VARIANTS.has('aa')) out.aa = MC.analyze(aaResample(raw, srcSr, 22050), { sampleRate: 22050, hop, frameSize: frame, delta, minBpm, maxBpm }).bpm;
   if (VARIANTS.has('sr44')) out.sr44 = MC.analyze(lin(raw, srcSr, 44100), { sampleRate: 44100, hop: hop * 2, frameSize: frame * 2, delta, minBpm, maxBpm }).bpm;
   return JSON.stringify(out);
@@ -248,6 +281,15 @@ function report() {
       if (sub.length) bands[b] = ((sub.filter((r) => Math.abs(r[v] - r.truth) <= 0.6).length / sub.length) * 100).toFixed(0) + '%';
     }
     const half = rs.filter((r) => cls(r[v], r.truth) === 'x0.5').length;
-    console.log(`  ${v.padEnd(8)} ≤0.1:${hit(0.1).padStart(5)}%  ≤0.6:${hit(0.6).padStart(5)}%  ≤1.0:${hit(1).padStart(5)}%  层正确:${layer.padStart(5)}%  半频:${String(half).padStart(3)}  中位误差:${errs[Math.floor(errs.length / 2)].toFixed(2)}  分档:${JSON.stringify(bands)}`);
+    console.log(`  ${v.padEnd(13)} ≤0.1:${hit(0.1).padStart(5)}%  ≤0.6:${hit(0.6).padStart(5)}%  ≤1.0:${hit(1).padStart(5)}%  层正确:${layer.padStart(5)}%  半频:${String(half).padStart(3)}  中位误差:${errs[Math.floor(errs.length / 2)].toFixed(2)}  分档:${JSON.stringify(bands)}`);
+  }
+  // 自适应变体的触发统计：只看被触发的子集，避免被未触发样本稀释
+  const trig = recs.filter((r) => r.__trig === 1);
+  if (trig.length && recs[0].adaptive !== undefined) {
+    const imp = (k) => trig.filter((r) => Math.abs(r[k] - r.truth) < Math.abs(r.base - r.truth) - 0.05).length;
+    const wor = (k) => trig.filter((r) => Math.abs(r[k] - r.truth) > Math.abs(r.base - r.truth) + 0.05).length;
+    console.log(`\n  触顶触发 ${trig.length}/${recs.length} 首（其中真值 >200 的 ${trig.filter((r) => r.truth > 200).length} 首）`);
+    console.log(`    adaptive     更准 ${imp('adaptive')} / 变差 ${wor('adaptive')}`);
+    if (recs[0].adaptiveKeep !== undefined) console.log(`    adaptiveKeep 更准 ${imp('adaptiveKeep')} / 变差 ${wor('adaptiveKeep')}`);
   }
 }
