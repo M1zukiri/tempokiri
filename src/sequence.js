@@ -50,6 +50,7 @@
    * @returns {[number, number]|null} [startTime, endTime] 或 null
    */
   function barToTime(grid, barNumber) {
+    if (!grid || !grid.bars || !grid.bars.length) return null;
     const bar = grid.bars.find((b) => b.barNumber === barNumber);
     return bar ? [bar.startTime, bar.endTime] : null;
   }
@@ -127,6 +128,7 @@
 
   /**
    * 由小节选择创建序列项（fade 用毫秒）。
+   * 底层记录 = 小节/格（mode 'bars'）；startTime/endTime 为派生缓存（syncItemTimes 重算）。
    * @param {object} grid
    * @param {number} startBar
    * @param {number} endBar
@@ -138,15 +140,94 @@
     const s = barToTime(grid, startBar);
     const e = barToTime(grid, endBar);
     if (!s || !e) return null;
-    return {
+    const item = {
       id: newId(),
+      mode: 'bars', // 底层记录：小节/格；时间为派生缓存
       startBar,
+      startCell: 1,
       endBar,
-      startTime: s[0],
-      endTime: e[1],
+      endCell: barResolution(grid, endBar) || 1,
+      startTime: null,
+      endTime: null,
       fadeInMs,
       fadeOutMs,
     };
+    syncItemTimes(item, grid);
+    return item;
+  }
+
+  /**
+   * 同步序列项的两套语义（给定 grid）：
+   *   bars 模式（底层=小节/格）→ 重算派生 startTime/endTime；
+   *   time 模式（底层=秒）→ 重算派生 startBar/startCell/endBar/endCell（显示用）。
+   * 单向换算，无时间↔小节往返值误差。
+   * 失效规则：bars 越界（bar 不在网格 / 该小节分辨率异常）→ 派生时间置 null（下游 isEmptyItem 判 invalid），
+   * 绝不保留陈旧缓存。
+   */
+  function syncItemTimes(item, grid) {
+    if (!item || item.silent || !grid) return;
+    if (item.mode === 'bars') {
+      // 补全缺省格（旧数据/迁移）：起点格 1、终点格 = 所在小节分辨率
+      if (!item.startCell) item.startCell = 1;
+      if (!item.endCell) item.endCell = barResolution(grid, item.endBar) || 1;
+      const s = barCellToTime(grid, item.startBar, item.startCell);
+      const e = barCellToTime(grid, item.endBar, item.endCell);
+      if (s instanceof Array && e instanceof Array) {
+        item.startTime = s[0];
+        item.endTime = e[1];
+      } else {
+        item.startTime = null; // 越界 → 显式失效（旧缓存不得保留）
+        item.endTime = null;
+      }
+      return;
+    }
+    // time 模式：派生小节/格显示
+    const sbc = timeToBarCell(grid, item.startTime);
+    const ebc = timeToBarCellEnd(grid, item.endTime);
+    item.startBar = sbc ? sbc.bar : null;
+    item.startCell = sbc ? sbc.cell : null;
+    item.endBar = ebc ? ebc.bar : null;
+    item.endCell = ebc ? ebc.cell : null;
+  }
+
+  /** 网格/参数变化后重算全部非静音段的派生缓存（音乐单位段随动；时间锚定段内容不动）。 */
+  function resyncGridItems(items, grid) {
+    if (!items || !grid) return;
+    for (const it of items) {
+      if (!it.silent) syncItemTimes(it, grid);
+    }
+  }
+
+  /** bars 范围 → 派生时间范围（单向；越界/无效返回 null）。 */
+  function barsRangeToTime(grid, bv) {
+    if (!grid || !bv || !(bv.startBar > 0) || !(bv.endBar > 0)) return null;
+    const s = barCellToTime(grid, bv.startBar, bv.startCell || 1);
+    const e = barCellToTime(grid, bv.endBar, bv.endCell || 1);
+    if (!s || !e) return null;
+    return { startSec: s[0], endSec: e[1] };
+  }
+
+  /** time 范围 → 派生小节/格（单向；超出网格返回 null）。负时间合法：网格起点可随负 offset 为负。 */
+  function timeRangeToBars(grid, tv) {
+    if (!grid || !tv || !(tv.endSec > tv.startSec)) return null;
+    const s = timeToBarCell(grid, tv.startSec);
+    const e = timeToBarCellEnd(grid, tv.endSec);
+    if (!s || !e) return null;
+    return { startBar: s.bar, startCell: s.cell, endBar: e.bar, endCell: e.cell };
+  }
+
+  /** 双语义 spec 换算：以 spec.mode 语义为基准派生另一侧；返回完整 spec（两路皆携带，失败侧 null）。 */
+  function rangeSpecSync(spec, grid) {
+    const out = { mode: spec && spec.mode === 'time' ? 'time' : 'bars', bars: null, time: null };
+    if (!spec) return out;
+    if (out.mode === 'bars' && spec.bars) {
+      out.bars = spec.bars;
+      out.time = barsRangeToTime(grid, spec.bars);
+    } else if (out.mode === 'time' && spec.time) {
+      out.time = spec.time;
+      out.bars = timeRangeToBars(grid, spec.time);
+    }
+    return out;
   }
 
   /**
@@ -251,6 +332,18 @@
     const num = bar ? bar.barNumber : 1;
     return { startBar: num, endBar: num };
   }
+  /**
+   * Majdata 补空小节：空小节时长。
+   * 取网格第一段 barDur（应用网格后）；无网格/段无效时回退默认（120BPM·4/4 = 2s）。
+   * @param {Array<{barDur:number}>|null} segments 网格段列表
+   * @param {number} [fallback=2] 回退时长（秒）
+   * @returns {number} 一个小节的时长（秒）
+   */
+  function padBarDuration(segments, fallback = 2) {
+    const f0 = segments && segments[0];
+    return f0 && f0.barDur > 0 ? f0.barDur : fallback;
+  }
+
   return {
     newId,
     barToTime,
@@ -268,5 +361,11 @@
     totalDuration,
     progressMeta,
     snapRange,
+    padBarDuration,
+    syncItemTimes,
+    resyncGridItems,
+    barsRangeToTime,
+    timeRangeToBars,
+    rangeSpecSync,
   };
 });

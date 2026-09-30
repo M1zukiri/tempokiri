@@ -269,7 +269,7 @@ async function s7() {
   check('S7 截图已保存', !!f, f);
 }
 
-// ---------- S8 主题按钮与三主题波形（M8 / H2） ----------
+// ---------- S8 主题按钮与五主题波形（M8 / H2 / 1.13.0） ----------
 async function s8() {
   console.log('\n===== S8 主题快捷切换（M8 / H2） =====');
   await boot('aurora');
@@ -277,19 +277,16 @@ async function s8() {
   await record('S8.主题按钮初始', () => evalJs("(() => { const b = document.getElementById('btnTheme'); return JSON.stringify({exists: !!b, label: b ? b.textContent : null, theme: document.documentElement.dataset.theme}); })()"));
   check('S8 页脚主题按钮存在（M8）', await evalJs("!!document.getElementById('btnTheme')"), 'btnTheme');
   if (await evalJs("!!document.getElementById('btnTheme')")) {
-    await cdp.click('#btnTheme');
-    await sleep(600);
-    check('S8 点击后切到 nebula', await evalJs("document.documentElement.dataset.theme === 'nebula'"), 'data-theme=nebula');
-    const fN = await shot('theme_nebula');
-    await cdp.click('#btnTheme');
-    await sleep(600);
-    check('S8 再点切到 paper', await evalJs("document.documentElement.dataset.theme === 'paper'"), 'data-theme=paper');
-    const fP = await shot('theme_paper');
+    const expectOrder = ['nebula', 'paper', 'seigaiha', 'kurenai', 'aurora'];
+    let shots = [];
+    for (const expect of expectOrder) {
+      await cdp.click('#btnTheme');
+      await sleep(600);
+      check(`S8 点击切到 ${expect}`, await evalJs(`document.documentElement.dataset.theme === '${expect}'`), `data-theme=${expect}`);
+      shots.push(await shot(`theme_${expect}`));
+    }
     await record('S8.主题持久化', () => evalJs("JSON.parse(localStorage.getItem('tempokiri.remix.global.v1') || '{}').theme"));
-    await cdp.click('#btnTheme');
-    await sleep(600);
-    check('S8 循环回 aurora', await evalJs("document.documentElement.dataset.theme === 'aurora'"), 'data-theme=aurora');
-    check('S8 截图已保存', !!(fN && fP), [fN, fP].join(';'));
+    check('S8 截图已保存', shots.every(Boolean), shots.join(';'));
   } else {
     check('S8 点击后切到 nebula', false, 'before 状态无 btnTheme：跳过循环');
   }

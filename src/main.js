@@ -53,6 +53,8 @@
   const btnPlay = $('btnPlay');
   const btnPlaySeq = $('btnPlaySeq');
   const btnStop = $('btnStop');
+  const btnMtr = $('btnMtr');
+  const btnMtrSet = $('btnMtrSet');
   const quickBar = $('quickBar');
   const qBpmLabel = $('qBpmLabel');
   const qBpmVal = $('qBpmVal');
@@ -64,8 +66,7 @@
   const fileInput = $('fileInput');
   const btnManualAdd = $('btnManualAdd');
   const manualForm = $('manualForm');
-  const maStart = $('maStart');
-  const maEnd = $('maEnd');
+  const maRange = $('maRange');
   const btnManualOk = $('btnManualOk');
   const btnManualCancel = $('btnManualCancel');
   const seqProgress = $('seqProgress');
@@ -235,7 +236,7 @@
 
   /** 应用界面主题：切 `data-theme` 属性 + 同步波形 canvas 色值。 */
   function applyTheme(name) {
-    const n = (name === 'nebula' || name === 'paper') ? name : 'aurora';
+    const n = (name === 'nebula' || name === 'paper' || name === 'seigaiha' || name === 'kurenai') ? name : 'aurora';
     document.documentElement.dataset.theme = n;
     render.setTheme(n);
     pulseColor = null; // 律动条颜色缓存失效，下次绘制重读新 accent
@@ -247,31 +248,34 @@
     return state.sequence.some((it) => seq.isEmptyItem(it, state.duration || 0));
   }
 
-  /** 序列项起终点手动编辑。sec=null 表示本端输入非法：保留输入、仅标红禁播，不重建清空。 */
-  function setRange(id, sec, which) {
+  /**
+   * 序列项起终点编辑（rangeInput 整范围 spec）。
+   * spec = { mode, bars?, time? }；以选中语义为底层记录，另一侧派生由 syncItemTimes 维护。
+   */
+  function setRange(id, spec) {
     const it = state.sequence.find((x) => x.id === id);
-    if (!it) return;
-    if (sec == null) {
-      it.invalid = true;
-      it.invalidSide = which;
-      markInvalidCard(it, id);
-      btnPlaySeq.disabled = true;
-      debouncedSaveWorkspace();
-      return;
+    if (!it || it.silent || !spec) return;
+    pushUndo();
+    if (spec.mode === 'time' && spec.time) {
+      it.mode = 'time';
+      it.startTime = spec.time.startSec;
+      it.endTime = spec.time.endSec;
+    } else if (spec.bars) {
+      it.mode = 'bars';
+      it.startBar = spec.bars.startBar;
+      it.startCell = spec.bars.startCell;
+      it.endBar = spec.bars.endBar;
+      it.endCell = spec.bars.endCell;
     }
-    if (which === 'start') it.startTime = sec;
-    else it.endTime = sec;
+    seq.syncItemTimes(it, state.grid);
     const empty = seq.isEmptyItem(it, state.duration || 0); // 空段落（无时长/无音频重叠）
-    // 倒置（任一端修正可恢复）或另一端仍非法时保持 invalid
-    it.invalid = empty || (it.invalid && it.invalidSide !== which);
-    it.invalidSide = it.invalid ? (inverted ? null : it.invalidSide) : null;
+    it.invalid = empty;
     if (it.invalid) {
       markInvalidCard(it, id);
       btnPlaySeq.disabled = true;
       debouncedSaveWorkspace();
       return;
     }
-    pushUndo(); // 合法端点修改（单步）
     debouncedSaveWorkspace();
     renderWave(); // 波形序列高亮变化（renderWave 内部 rAF 帧合并，连续输入不重复绘制）
     renderSeqProgress(); // 总时长/拼接点变化
@@ -317,6 +321,8 @@
     btnPlay.disabled = false;
     btnPlaySeq.disabled = false;
     btnStop.disabled = false;
+    btnMtr.disabled = false;
+    btnMtrSet.disabled = false;
     controlBar.hidden = false;
     btnExport.disabled = false;
     btnAddSelection.disabled = true;
@@ -471,14 +477,22 @@
       segments: state.segments,
       offset: state.offset,
       sequence: state.sequence.map((it) => ({
+        mode: it.mode,
         startBar: it.startBar,
         endBar: it.endBar,
+        startCell: it.startCell,
+        endCell: it.endCell,
         startTime: it.startTime,
         endTime: it.endTime,
         fadeInMs: it.fadeInMs,
         fadeOutMs: it.fadeOutMs,
         silent: !!it.silent,
         durationSec: it.silent ? it.durationSec : undefined,
+        unit: it.silent ? it.unit : undefined,
+        qty: it.silent ? it.qty : undefined,
+        bpm: it.silent ? it.bpm : undefined,
+        beatsPerBar: it.silent ? it.beatsPerBar : undefined,
+        beatUnit: it.silent ? it.beatUnit : undefined,
         invalid: !!it.invalid,
       })),
       view: state.view ? { start: state.view.start, end: state.view.end } : undefined,
@@ -502,16 +516,22 @@
     for (const rec of list) {
       let it = null;
       if (rec.startTime != null && rec.endTime != null) {
+        // 迁移规则：startBar 非空 → 小节/格为底层（旧数据均为小节来源）；否则精确时间锚定
+        const isBars = rec.startBar != null && rec.endBar != null;
         it = {
           id: seq.newId(),
+          mode: (rec.mode === 'time' || rec.mode === 'bars') ? rec.mode : (isBars ? 'bars' : 'time'),
           startBar: rec.startBar != null ? rec.startBar : null,
           endBar: rec.endBar != null ? rec.endBar : null,
+          startCell: rec.startCell != null ? rec.startCell : (isBars ? 1 : null),
+          endCell: rec.endCell != null ? rec.endCell : null,
           startTime: rec.startTime,
           endTime: rec.endTime,
           fadeInMs: rec.fadeInMs || 0,
           fadeOutMs: rec.fadeOutMs || 0,
           invalid: !!rec.invalid,
         };
+        if (it.mode === 'bars') seq.syncItemTimes(it, state.grid); // 补派生时间缓存
       } else if (state.grid && rec.startBar != null && rec.endBar != null) {
         // 旧缓存：无时间字段，按小节重建
         it = seq.createItem(state.grid, rec.startBar, rec.endBar);
@@ -561,6 +581,7 @@
     try {
       const resolved = analysis.resolveSegments(state.segments, state.duration);
       state.grid = analysis.buildGrid({ segments: resolved, offset: state.offset, duration: state.duration });
+      seq.resyncGridItems(state.sequence, state.grid); // 小节/格定义段随新网格重算派生时间（内容随小节移动）
       hideHint(); // 网格应用后不再显示波形中央的交互提示（避免覆盖波形）
       renderAll();
     } catch (e) {
@@ -977,12 +998,14 @@
     renderAll();
   }
 
-  /** 静音段时长编辑（卡片折叠区，秒）。 */
+  /** 静音段时长编辑（卡片折叠区，秒）。编辑后语义退化为「精确时长」（音乐单位随动语义不再成立）。 */
   function setSilentDur(id, sec) {
     const it = state.sequence.find((x) => x.id === id);
     if (!it || !it.silent) return;
     pushUndo();
     it.durationSec = Math.round(sec * 1000) / 1000;
+    it.unit = 'sec'; // 退化：精确时长定义（节拍器不打点）
+    it.qty = it.durationSec;
     saveWorkspace();
     renderAll();
     status(T('status.silentAdded', { dur: ui.fmtTime(it.durationSec) }));
@@ -1004,8 +1027,28 @@
   let playAnalyser = null; // 律动品牌标数据源（AnalyserNode，播放时采集时域振幅）
   let pulseData = null; // analyser 时域采样缓冲
   let pulseColor = null; // 律动条颜色缓存（主题切换时由 applyTheme 置空失效）
+  let pulseEnv = null;   // 律动条包络状态（RMS + 快攻慢放平滑，避免逐帧闪烁）
 
   const PULSE_IDLE = [0.3, 0.7, 1, 0.8, 0.5, 0.9, 0.6, 0.3]; // 静止态正弦包络
+
+  // ---------- 节拍器 ----------
+  let mtrOn = false;        // 开关（store 持久化）
+  let mtrSeqOn = true;      // 拼接序列播放时启用（默认开，设置弹窗可关）
+  let mtrUnit = 0;          // 几分音符（0 = 自动取拍号分母）
+  let mtrVolume = 80;       // 音量 0-200
+  let mtrTone = 'click';    // 音色：click | beep | wood
+  let mtrGain = null;       // 节拍器总线增益 → destination
+  let mtrNextT = null;      // 下一拍网格时间（秒）
+  let mtrNextAccent = false;// 下一拍是否重音（小节首拍）
+  let mtrTimer = null;      // lookahead 调度定时器
+  let mtrLastGrid = null;   // 上次调度的网格时间（拼接原曲时间回退检测）
+  let mtrAxis = 'orig';     // 拍点时间轴：orig（原曲网格）| mix（静音段 mix 轴合成）| silent（静默）
+
+  const MTR_TONES = {
+    click: { type: 'triangle', freq: 1500, accentFreq: 1900, dur: 0.05 }, // 短促「嗒」：重音更高
+    beep: { type: 'sine', freq: 880, accentFreq: 1175, dur: 0.12 },         // 柔和蜂鸣
+    wood: { type: 'triangle', freq: 430, accentFreq: 620, dur: 0.07 },      // 木质敲击
+  };
 
   /** 律动条颜色：读当前主题 accent（缓存；applyTheme 置空后下次重读）。 */
   function pulseColorOf() {
@@ -1024,6 +1067,141 @@
       const h = Math.max(2, Math.round(amps[i] * 16));
       ctx.fillRect(i * 8, c.height - h, 5, h);
     }
+  }
+
+  // ---------- 节拍器（跟随播放，拍点与小节线对齐；独立声源，不写入音频/导出） ----------
+  /** 启动节拍器：从当前播放位置的下一拍开始 lookahead 调度。 */
+  function startMetronome() {
+    if (!mtrOn || mtrTimer) return;
+    if (!state.grid || !state.grid.segments) return; // 无网格 → 无小节线
+    const t0 = currentPlayTime();
+    if (t0 == null) return;
+    const first = MC.metronome.nextClick(state.grid.segments, t0 - 1e-6, mtrUnit);
+    if (!first) return;
+    mtrNextT = first.t;
+    mtrNextAccent = first.accent;
+    mtrLastGrid = t0;
+    mtrAxis = 'orig';
+    if (!mtrGain) {
+      mtrGain = playCtx.createGain();
+      mtrGain.gain.value = (mtrVolume / 100) * 0.5;
+      mtrGain.connect(playCtx.destination);
+    }
+    mtrTimer = setInterval(mtrTick, 25);
+  }
+
+  /** 停止节拍器：清调度器（已排程的短音自然衰减，数毫秒内结束）。 */
+  function stopMetronome() {
+    if (mtrTimer) {
+      clearInterval(mtrTimer);
+      mtrTimer = null;
+    }
+    mtrNextT = null;
+    mtrAxis = 'orig';
+  }
+
+  /** lookahead 调度：提前 ~120ms 排程拍点（拍点按网格时间轴，段内参数随段切换）。 */
+  function mtrTick() {
+    if (!mtrOn || !playing) {
+      stopMetronome();
+      return;
+    }
+    const segs = state.grid && state.grid.segments;
+    if (!segs || !segs.length) return;
+    const AHEAD = 0.2;
+    const ctx = playCtx;
+    const nowCtx = ctx.currentTime;
+    // 拼接播放：音乐单位静音段在 mix 轴合成拍点（自带 BPM/拍号，与其他段一致的时长语义）
+    if (mixPlaying && state.sequence.length) {
+      const mt = playStartPos + (playCtx.currentTime - playStartCtxTime);
+      const hit = MC.metronome.mixItemAt(state.sequence, mt);
+      if (hit) {
+        const it = hit.item;
+        if (it.silent && (it.unit === 'bar' || it.unit === 'beat')) {
+          // 音乐单位静音段：mix 轴打点（段起点重音，段内小节边界重音）
+          if (mtrAxis !== 'mix') {
+            const f = MC.metronome.nextClickInSilent(it, hit.startMix, mt - 1e-6, mtrUnit);
+            mtrNextT = f ? f.t : null;
+            mtrNextAccent = f ? f.accent : false;
+            mtrAxis = 'mix';
+          }
+          while (mtrNextT != null && mtrNextT < mt + AHEAD) {
+            if (mtrNextT + 0.005 >= mt) {
+              mtrSchedule(mtrNextAccent, Math.max(nowCtx + 0.01, nowCtx + (mtrNextT - mt)));
+            }
+            const n = MC.metronome.nextClickInSilent(it, hit.startMix, mtrNextT, mtrUnit);
+            // 防御浮点边界：拍点必须严格前进（否则终止，防死循环）
+            if (!n || n.t <= mtrNextT + 1e-9) {
+              mtrNextT = null;
+              break;
+            }
+            mtrNextT = n.t;
+            mtrNextAccent = n.accent;
+          }
+          return;
+        }
+        if (it.silent) {
+          // 时间单位静音段：无节拍语义，静默（保持 mix 轴状态，结束段后重同步）
+          mtrAxis = 'silent';
+          return;
+        }
+      }
+    }
+    // 原曲轴（普通音乐段/原曲播放）：网格拍点
+    const nowGrid = currentPlayTime();
+    if (nowGrid == null) return;
+    if (mtrAxis !== 'orig') {
+      // 从静音段模式切回：重同步拍点游标
+      const f = MC.metronome.nextClick(segs, nowGrid - 1e-6, mtrUnit);
+      mtrNextT = f ? f.t : null;
+      mtrNextAccent = f ? f.accent : false;
+      mtrAxis = 'orig';
+    } else if (MC.metronome.shouldResync(mtrLastGrid, nowGrid)) {
+      // 拼接播放：重复段后原曲时间大幅回退 → 拍点游标重同步（否则节拍器静默）
+      const f = MC.metronome.nextClick(segs, nowGrid - 1e-6, mtrUnit);
+      mtrNextT = f ? f.t : null;
+      mtrNextAccent = f ? f.accent : false;
+    }
+    mtrLastGrid = nowGrid;
+    while (mtrNextT != null && mtrNextT < nowGrid + AHEAD) {
+      if (mtrNextT + 0.005 >= nowGrid) {
+        // 排程时间不早于当前（调度积压/seek 时避免 setValueAtTime(过去) 造成瞬时静音）
+        mtrSchedule(mtrNextAccent, Math.max(nowCtx + 0.01, nowCtx + (mtrNextT - nowGrid)));
+      }
+      const n = MC.metronome.nextClick(segs, mtrNextT, mtrUnit);
+      // 防御浮点边界：拍点必须严格前进（否则终止，防死循环）
+      if (!n || n.t <= mtrNextT + 1e-9) {
+        mtrNextT = null;
+        break;
+      }
+      mtrNextT = n.t;
+      mtrNextAccent = n.accent;
+    }
+  }
+
+  /** 播放一个节拍音色：osc + 短促指数衰减包络；重音更高频、更响。 */
+  function mtrSchedule(accent, ctxT) {
+    const t = MTR_TONES[mtrTone] || MTR_TONES.click;
+    const osc = playCtx.createOscillator();
+    const g = playCtx.createGain();
+    osc.type = t.type;
+    osc.frequency.value = accent ? t.accentFreq : t.freq;
+    const amp = accent ? 1.0 : 0.8; // 重音靠音高区分（更高频），响度差异克制
+    g.gain.setValueAtTime(amp, ctxT);
+    g.gain.exponentialRampToValueAtTime(0.001, ctxT + t.dur);
+    osc.connect(g);
+    g.connect(mtrGain);
+    osc.start(ctxT);
+    osc.stop(ctxT + t.dur + 0.02);
+  }
+
+  /** 应用节拍器设置（弹窗保存回调）：音量改动即时作用于总线增益。 */
+  function applyMtrSettings(s) {
+    if (s.unit != null) mtrUnit = s.unit;
+    if (s.volume != null) mtrVolume = s.volume;
+    if (s.tone != null) mtrTone = s.tone;
+    if (s.seqOn != null) mtrSeqOn = !!s.seqOn;
+    if (mtrGain) mtrGain.gain.value = (mtrVolume / 100) * 0.5;
   }
 
   /** 确保律动分析节点存在（fftSize 128 → frequencyBinCount 64，供 8 柱 × 8 点采样）。 */
@@ -1076,6 +1254,7 @@
     state.playTime = null;
     renderWave();
     syncPlayButtons();
+    stopMetronome();
     if (playAnalyser) {
       try { playAnalyser.disconnect(); } catch (e) { /* 已断开则忽略 */ }
     }
@@ -1157,6 +1336,7 @@
       return;
     }
     status(T('status.playFrom', { pos: posDesc(t) }));
+    startMetronome();
   }
 
   function playAudioSegment(start, end, onEnd) {
@@ -1222,16 +1402,20 @@
     if (!playing) return;
     if (playAnalyser) {
       playAnalyser.getByteTimeDomainData(pulseData);
-      const amps = new Array(8);
+      const targets = new Array(8);
       for (let i = 0; i < 8; i++) {
-        let m = 0;
+        let sum = 0;
         for (let j = 0; j < 8; j++) {
-          const v = Math.abs(pulseData[i * 8 + j] - 128) / 128;
-          if (v > m) m = v;
+          const v = (pulseData[i * 8 + j] - 128) / 128;
+          sum += v * v;
         }
-        amps[i] = m;
+        targets[i] = Math.sqrt(sum / 8); // RMS：比瞬时峰值稳定
       }
-      drawBrandPulse(amps);
+      if (!pulseEnv) pulseEnv = PULSE_IDLE.slice();
+      for (let i = 0; i < 8; i++) {
+        pulseEnv[i] = render.envelopeTrack(pulseEnv[i], targets[i], 0.55, 0.12); // 快攻慢放（VU 表式）
+      }
+      drawBrandPulse(pulseEnv);
     }
     tickFrame++;
     if (tickFrame % 2 === 0) {
@@ -1346,6 +1530,7 @@
     tickProgress();
     lastSeqPlay = true;
     status(T('status.playingSeq'));
+    if (mtrSeqOn) startMetronome(); // 拼接序列播放：设置里可关闭
   }
 
   // ---------- 导出 ----------
@@ -1413,6 +1598,9 @@
           status(T('status.videoExported', { name: opts.fileName }));
         } else {
           // Majdata：bg.mp4（无声，上限 1080P60）+ track.mp3（44100Hz）
+          // 补空小节：开头插入一小节静音——音轨 padSilenceStart；视频 padStartSec（首帧冻结），保持音画同步
+          const padDur = opts.padBar ? seq.padBarDuration(state.grid && state.grid.segments) : 0;
+          const majMix = padDur > 0 ? exp.padSilenceStart(mix, padDur, state.sampleRate) : mix;
           if (state.kind === 'video') {
             await MC.exportVideo({
               file: state.file,
@@ -1426,10 +1614,11 @@
               maxHeight: 1080,
               audioBitrate: 128000,
               mute: true,
+              padStartSec: padDur,
               onProgress: (p) => status(T('status.majRendering', { pct: Math.round(p * 100) })),
             });
           }
-          let tMix = analysis.resample(mix, state.sampleRate, 44100);
+          let tMix = analysis.resample(majMix, state.sampleRate, 44100);
           if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
           const buf = MC.attachToMp3(exp.encodeMp3(tMix, 44100, opts.mp3Bitrate), state.meta || {});
           exp.downloadBlob(buf, 'track.mp3', 'audio/mpeg');
@@ -1489,6 +1678,31 @@
       else playSequence();
     });
     btnStop.addEventListener('click', stopPlay);
+    // 节拍器：开关（跟随播放，拍点与小节线对齐）+ 设置弹窗
+    if (btnMtr) {
+      btnMtr.addEventListener('click', () => {
+        if (!state.grid || !state.grid.segments) {
+          status(T('metronome.noGrid'), 'warn');
+          return;
+        }
+        mtrOn = !mtrOn;
+        btnMtr.classList.toggle('on', mtrOn);
+        store.saveGlobalSettings({ metronomeOn: mtrOn });
+        if (mtrOn && playing) startMetronome();
+        else if (!mtrOn && !playing) stopMetronome();
+        status(mtrOn ? T('metronome.on') : T('metronome.off'));
+      });
+    }
+    if (btnMtrSet) {
+      btnMtrSet.addEventListener('click', () => {
+        if (typeof MC.metronomeModal !== 'function' && !(MC.metronomeModal && MC.metronomeModal.open)) return;
+        const seg0 = (state.grid && state.grid.segments && state.grid.segments[0]) || null;
+        MC.metronomeModal.open(mtrUnit, mtrVolume, mtrTone, seg0, mtrSeqOn, (s) => {
+          applyMtrSettings(s);
+          store.saveGlobalSettings({ metronomeUnit: s.unit, metronomeVolume: s.volume, metronomeTone: s.tone, metronomeSeqOn: s.seqOn });
+        });
+      });
+    }
     // 快捷微调：BPM/offset 立即生效并重绘
     quickBar.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-q]');
@@ -1545,46 +1759,118 @@
     btnManualOk.addEventListener('click', manualAdd);
     btnManualCancel.addEventListener('click', () => { manualForm.hidden = true; });
 
-    // 静音段：行内表单（时长 + 拍/小节/秒；拍/小节需网格作换算依据）
+    // 静音段：行内表单（时长单位 + 音乐参数；节拍器行为与普通段一致：音乐单位打点、时间单位不打点）
     const btnSilentAdd = $('btnSilentAdd');
     const silentForm = $('silentForm');
     const silentQty = $('silentQty');
     const silentUnit = $('silentUnit');
+    const silentMus = $('silentMus');
+    const silentSec = $('silentSec');
+    const silentQtySec = $('silentQtySec');
+    const silentBpm = $('silentBpm');
+    const silentMeter = $('silentMeter');
     const btnSilentOk = $('btnSilentOk');
     const btnSilentCancel = $('btnSilentCancel');
+    if (silentBpm) silentBpm.placeholder = T('seq.silentBpmPh');
+    if (silentMeter) silentMeter.placeholder = T('seq.silentMeterPh');
+    function silentBarDur() {
+      return (60 / silBpmOrDefault()) * silBpbOrDefault();
+    }
+    /** 音乐单位行编辑 → 精确时长派生（单向）。 */
+    function syncSilentFromMus() {
+      const q = parseFloat(silentQty.value);
+      silentQtySec.value = Number.isFinite(q) && q > 0 ? String(+(q * silentBarDur()).toFixed(3)) : '';
+    }
+    /** 精确时长编辑 → 音乐单位派生（单向，按当前 BPM/拍号换算）。 */
+    function syncSilentFromSec() {
+      const q = parseFloat(silentQtySec.value);
+      silentQty.value = Number.isFinite(q) && q > 0 ? String(+(q / silentBarDur()).toFixed(3)) : '';
+    }
+    /** radio 切换：应用当前缓存值到选中语义，另一侧禁用（只读派生随后单向往上更新）。 */
+    function setSilentModeSection(mode) {
+      const mus = mode === 'mus';
+      silentQty.disabled = !mus;
+      silentUnit.disabled = !mus;
+      silentQtySec.disabled = mus;
+      if (mus) syncSilentFromSec(); else syncSilentFromMus();
+    }
+    function silBpmOrDefault() {
+      const v = parseFloat(silentBpm.value);
+      if (Number.isFinite(v) && v > 0) return v;
+      const p = silentMusicParams('bar');
+      return p.bpm;
+    }
+    function silBpbOrDefault() {
+      const m = /^\s*(\d{1,2})\s*[/:]\s*(\d{1,2})\s*$/.exec(silentMeter.value || '');
+      if (m) return parseInt(m[1], 10);
+      return silentMusicParams('bar').beatsPerBar;
+    }
+    if (silentMus) silentMus.addEventListener('change', () => setSilentModeSection('mus'));
+    if (silentSec) silentSec.addEventListener('change', () => setSilentModeSection('sec'));
+    if (silentQty) silentQty.addEventListener('input', () => { if (silentMus && silentMus.checked) syncSilentFromMus(); });
+    if (silentQtySec) silentQtySec.addEventListener('input', () => { if (silentSec && silentSec.checked) syncSilentFromSec(); });
     function toggleSilentForm() {
       const show = silentForm.hidden;
       silentForm.hidden = !show;
       if (show) {
-        const hasGrid = !!state.grid;
-        const optBar = silentUnit.querySelector('option[value="bar"]');
-        const optBeat = silentUnit.querySelector('option[value="beat"]');
-        if (optBar) optBar.disabled = !hasGrid;
-        if (optBeat) optBeat.disabled = !hasGrid;
-        if (!hasGrid) silentUnit.value = 'sec';
+        // 音乐单位不再依赖网格：静音段自带 BPM/拍号（跟随前段 > 网格首段 > 120/4-4）
+        silentMus.checked = true;
+        silentSec.checked = false;
+        silentQty.value = '1';
+        silentQtySec.value = '1';
+        setSilentModeSection('mus');
+        const prev = state.sequence[state.sequence.length - 1];
+        const bpmHint = prev && prev.silent ? prev.bpm
+          : (prev && state.grid && state.grid.segments ? (MC.metronome.segmentAt(state.grid.segments, prev.startTime) || {}).bpm
+            : (state.grid && state.grid.segments ? state.grid.segments[0].bpm : 120));
+        if (silentBpm && bpmHint > 0) silentBpm.value = '';
+        if (silentMeter) silentMeter.value = '';
+        if (silentBpm && bpmHint > 0) silentBpm.title = bpmHint;
       }
     }
+    /** 静音段 BPM/拍号来源链：显式输入 > 前段参数 > 网格 > 默认 120/4-4。 */
+    function silentMusicParams(unit) {
+      const prev = state.sequence[state.sequence.length - 1];
+      let bpm = 120, bpb = 4, ub = 4;
+      if (prev && prev.silent) {
+        bpm = prev.bpm || 120; bpb = prev.beatsPerBar || 4; ub = prev.beatUnit || 4;
+      } else if (prev && state.grid && state.grid.segments) {
+        const seg = MC.metronome.segmentAt(state.grid.segments, prev.startTime);
+        if (seg) { bpm = seg.bpm; bpb = seg.beatsPerBar; ub = seg.beatUnit; }
+      } else if (state.grid && state.grid.segments) {
+        const seg = state.grid.segments[0];
+        bpm = seg.bpm; bpb = seg.beatsPerBar; ub = seg.beatUnit;
+      }
+      const bpmIn = parseFloat(silentBpm.value);
+      if (Number.isFinite(bpmIn) && bpmIn > 0) bpm = bpmIn;
+      const m = /^\s*(\d{1,2})\s*[/:]\s*(\d{1,2})\s*$/.exec(silentMeter.value || '');
+      if (m) { bpb = parseInt(m[1], 10); ub = parseInt(m[2], 10); }
+      return { bpm, beatsPerBar: Math.max(1, bpb), beatUnit: Math.max(1, ub), unit: unit };
+    }
     function confirmSilent() {
-      const qty = parseFloat(silentQty.value);
+      const mus = silentMus && silentMus.checked;
+      const unit = mus ? silentUnit.value : 'sec';
+      const qty = parseFloat(mus ? silentQty.value : silentQtySec.value);
       if (!Number.isFinite(qty) || qty <= 0) {
         status(T('status.manualAddEmpty'), 'warn');
         return;
       }
       let dur = qty;
-      const unit = silentUnit.value;
+      const p = silentMusicParams(unit);
       if (unit === 'bar' || unit === 'beat') {
-        const g = state.grid;
-        const seg0 = g && g.segments && g.segments[0];
-        if (!seg0 || !(seg0.barDur > 0)) {
-          status(T('status.silentNeedGrid'), 'warn');
-          return;
-        }
-        dur = qty * (unit === 'bar' ? seg0.barDur : seg0.beatDur);
+        const beatDur = 60 / p.bpm;
+        const barDur = beatDur * p.beatsPerBar;
+        dur = qty * (unit === 'bar' ? barDur : beatDur);
       }
       const item = {
         id: seq.newId(),
         silent: true,
         durationSec: Math.round(dur * 1000) / 1000,
+        unit,
+        qty,
+        bpm: p.bpm,
+        beatsPerBar: p.beatsPerBar,
+        beatUnit: p.beatUnit,
         startBar: null,
         endBar: null,
         startTime: 0,
@@ -1606,52 +1892,71 @@
       btnSilentCancel.addEventListener('click', () => { silentForm.hidden = true; });
     }
 
-    // 手动添加序列：展开/收起表单（每次展开重建输入组件，使用当前网格）
-    let maStartComp = null;
-    let maEndComp = null;
+    // 手动添加序列：展开/收起表单（rangeInput：小节/格 或 时间起止点，二选一；tab 默认小节/格）
+    let maRangeComp = null;
     function toggleManualForm() {
       const show = manualForm.hidden;
       manualForm.hidden = !show;
       if (show) {
-        maStart.textContent = '';
-        maEnd.textContent = '';
-        maStartComp = MC.UnitInput.create(maStart, {
-          kind: 'position',
-          edge: 'start',
+        maRangeComp = MC.rangeInput.create(maRange, {
           getGrid: () => state.grid,
-          value: state.cursorPos || 0,
-        });
-        maEndComp = MC.UnitInput.create(maEnd, {
-          kind: 'position',
-          edge: 'end',
-          getGrid: () => state.grid,
-          value: (state.cursorPos || 0) + 1,
+          value: {
+            mode: 'bars',
+            startBar: state.cursorPos != null ? (seq.timeToBarCell(state.grid, state.cursorPos) || { bar: 1, cell: 1 }).bar : 1,
+            startCell: state.cursorPos != null ? (seq.timeToBarCell(state.grid, state.cursorPos) || { cell: 1 }).cell : 1,
+            endBar: (seq.timeToBarCell(state.grid, state.cursorPos || 0) || { bar: 1 }).bar,
+            endCell: (seq.timeToBarCell(state.grid, state.cursorPos || 0) || { cell: 1 }).cell,
+            startTime: state.cursorPos || 0,
+            endTime: (state.cursorPos || 0) + 2,
+          },
         });
       }
     }
     function manualAdd() {
-      if (!maStartComp || !maEndComp) return;
-      const s = maStartComp.getValue();
-      const e = maEndComp.getValue();
-      if (s == null || e == null || s >= e) {
+      if (!maRangeComp) return;
+      const spec = maRangeComp.getSpec();
+      if (!spec || (spec.mode === 'time' ? !(spec.time && spec.time.endSec > spec.time.startSec) : !(spec.bars && spec.bars.endBar >= spec.bars.startBar))) {
         status(T('status.manualAddFailed'), 'warn');
         return;
       }
+      let item;
+      if (spec.mode === 'time') {
+        item = {
+          id: seq.newId(),
+          mode: 'time',
+          startBar: null,
+          endBar: null,
+          startCell: null,
+          endCell: null,
+          startTime: spec.time.startSec,
+          endTime: spec.time.endSec,
+          fadeInMs: 0,
+          fadeOutMs: 0,
+          invalid: false,
+        };
+        seq.syncItemTimes(item, state.grid); // 派生小节/格显示
+      } else {
+        item = {
+          id: seq.newId(),
+          mode: 'bars',
+          startBar: spec.bars.startBar,
+          startCell: spec.bars.startCell,
+          endBar: spec.bars.endBar,
+          endCell: spec.bars.endCell,
+          startTime: null,
+          endTime: null,
+          fadeInMs: 0,
+          fadeOutMs: 0,
+          invalid: false,
+        };
+        seq.syncItemTimes(item, state.grid);
+      }
+      const s = item.startTime, e = item.endTime;
       // 空段落拦截：与音频 [0, duration) 完全无重叠（含 [16,100] 起点在曲尾）直接不允许添加
       if (!(e > 0 && s < (state.duration || 0))) {
         status(T('status.manualAddEmpty'), 'warn');
         return;
       }
-      const item = {
-        id: seq.newId(),
-        startBar: null,
-        endBar: null,
-        startTime: s,
-        endTime: e,
-        fadeInMs: 0,
-        fadeOutMs: 0,
-        invalid: false,
-      };
       pushUndo();
       state.sequence.push(item);
       manualForm.hidden = true;
@@ -1791,6 +2096,7 @@
         MC.settings && MC.settings.closeAdvanced && MC.settings.closeAdvanced();
         MC.metaModal && MC.metaModal.close && MC.metaModal.close();
         MC.autoCutModal && MC.autoCutModal.close && MC.autoCutModal.close();
+        MC.metronomeModal && MC.metronomeModal.close && MC.metronomeModal.close();
         manualForm.hidden = true;
         const footOverlay = document.getElementById('readmeOverlay') || document.getElementById('easterEggOverlay');
         if (footOverlay) footOverlay.remove();
@@ -1818,6 +2124,15 @@
     });
     refreshAdvancedSettings();
     document.addEventListener('tempokiri:settings-changed', refreshAdvancedSettings);
+
+    // 节拍器初始设置（store 持久化），同按钮态
+    const gs0 = store.loadGlobalSettings();
+    mtrOn = !!gs0.metronomeOn;
+    mtrSeqOn = gs0.metronomeSeqOn !== false;
+    mtrUnit = gs0.metronomeUnit || 0;
+    mtrVolume = gs0.metronomeVolume != null ? gs0.metronomeVolume : 80;
+    mtrTone = gs0.metronomeTone || 'click';
+    if (btnMtr) btnMtr.classList.toggle('on', mtrOn);
 
     drawBrandPulse(PULSE_IDLE); // 品牌律动条初始静态波形
     document.title = T('app.title');

@@ -215,12 +215,14 @@
     if (btnAdvanced) btnAdvanced.addEventListener('click', () => MC.settings.openAdvanced());
     const btnMeta = document.getElementById('btnMeta');
     if (btnMeta) btnMeta.addEventListener('click', () => MC.metaModal.open());
-    // 主题快捷切换：循环 aurora → nebula → paper，保存并派发设置变更事件（main.js 监听后应用）
-    const THEME_ORDER = ['aurora', 'nebula', 'paper'];
+    // 主题快捷切换：循环 aurora → nebula → paper → seigaiha → kurenai，保存并派发设置变更事件（main.js 监听后应用）
+    const THEME_ORDER = ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai'];
     const THEME_LABELS = {
       aurora: T('settings.theme.presets.aurora'),
       nebula: T('settings.theme.presets.nebula'),
       paper: T('settings.theme.presets.paper'),
+      seigaiha: T('settings.theme.presets.seigaiha'),
+      kurenai: T('settings.theme.presets.kurenai'),
     };
     const btnTheme = document.getElementById('btnTheme');
     const themeName = document.getElementById('themeName');

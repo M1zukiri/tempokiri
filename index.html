@@ -104,6 +104,63 @@
     --scroll-thumb-hover: #b8b0a0;
     --danger: #d63a5a;
   }
+  [data-theme="seigaiha"] {
+    /* Seigaiha 青海波 —— 蓝绿深海 · 深色主题
+       核心取色: 绿松石蓝·三色(第1组) #00A7DF/#C9E4E3/#FFF574 + 孔雀石绿·三色(第1组) #009974
+       表面层级: 湖绿/青黑推导的深青黑 */
+    --bg-app: #08121a;
+    --surface-base: #0d1a23;
+    --surface-raised: #12222d;
+    --surface-overlay: #182b38;
+    --surface-active: #1f3544;
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-muted: rgba(255,255,255,0.12);
+    --border-focus: rgba(0,167,223,0.55);
+    --accent: #00a7df;
+    --accent-muted: rgba(0,167,223,0.15);
+    --accent-glow: rgba(0,167,223,0.25);
+    --accent-hover: #3bbdec;
+    --text-primary: #eaf4f7;
+    --text-secondary: #9db6be;
+    --text-tertiary: #6e8c96;
+    /* 扩展令牌覆盖(danger/warning/success/shadow 共享 :root 暗色值) */
+    --accent-2: #009974;
+    --accent-fg: #03222f;
+    --wave-bg: #0b151d;
+    --grid-line: rgba(255,255,255,0.02);
+    --shadow-inset-wave: inset 0 2px 8px rgba(0,0,0,0.5);
+    --scroll-thumb: #1e3a47;
+    --scroll-thumb-hover: #2a5060;
+  }
+  [data-theme="kurenai"] {
+    /* Kurenai 绯暮 —— 红黄暖光 · 深色主题
+       核心取色: 金麦色·三色(第1组) #F0B200/#B44751/#37245B + 石榴红·三色(第1组) #E60012/#F3981C
+       表面层级: 酒红/暗红推导的深酒红黑 */
+    --bg-app: #1a0f12;
+    --surface-base: #241419;
+    --surface-raised: #2e1a20;
+    --surface-overlay: #3a232a;
+    --surface-active: #452c34;
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-muted: rgba(255,255,255,0.12);
+    --border-focus: rgba(240,178,0,0.55);
+    --accent: #f0b200;
+    --accent-muted: rgba(240,178,0,0.15);
+    --accent-glow: rgba(240,178,0,0.25);
+    --accent-hover: #ffc63a;
+    --danger: #e60012;
+    --text-primary: #fbf3ec;
+    --text-secondary: #c9afa8;
+    --text-tertiary: #92766f;
+    /* 扩展令牌覆盖(warning/success/shadow 共享 :root 暗色值) */
+    --accent-2: #b44751;
+    --accent-fg: #3a2410;
+    --wave-bg: #1d1014;
+    --grid-line: rgba(255,255,255,0.02);
+    --shadow-inset-wave: inset 0 2px 8px rgba(0,0,0,0.5);
+    --scroll-thumb: #4a3138;
+    --scroll-thumb-hover: #5c3e46;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
@@ -176,6 +233,7 @@
   .btn-primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 4px 16px var(--accent-glow); }
   /* 播放态：当前播放源按钮高亮，另一播放入口弱化 */
   .btn.playing { border-color: var(--accent); color: var(--accent); box-shadow: var(--shadow-glow); }
+  .btn.on { border-color: var(--accent); background: var(--accent); color: var(--panel); box-shadow: var(--shadow-glow); }
   .btn.dimmed { opacity: 0.45; }
 
   #stage { position: relative; margin: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -480,6 +538,20 @@
   .unit-fields.unit-invalid input { border-color: #e5484d; background: rgba(229,72,77,0.14); }
   .unit-fields input { width: 58px; padding: 2px 4px; }
   .unit-ref:has(+ .unit-invalid), .unit-invalid + .unit-ref { color: #e5484d; }
+  .range-input { display: inline-flex; flex-direction: column; gap: 3px; font-size: 12px; }
+  .range-input .ri-block { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .range-input .ri-block .ri-fields { display: none; }
+  .range-input .ri-block.ri-active .ri-fields { display: inline-flex; gap: 4px; }
+  .range-input .ri-block.ri-active .ri-fgroup { display: inline-flex; align-items: center; gap: 3px; }
+  .range-input .ri-block.ri-active .ri-ref { display: none; }
+  .range-input .ri-block:not(.ri-active) .ri-ref { display: inline-flex; font-size: 12px; color: var(--text-tertiary); }
+  .range-input .ri-block:not(.ri-active) { opacity: 0.75; }
+  .range-input .ri-fld { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+  .range-input .ri-ref { color: var(--text-tertiary); font-size: 12px; }
+  .range-input .ri-row { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-secondary); white-space: nowrap; cursor: pointer; }
+  .range-input .ri-row input[type="radio"] { accent-color: var(--accent); margin: 0; }
+  .range-input input[type="number"] { width: 52px; padding: 2px 4px; font-size: 12px; border: 1px solid var(--border-muted); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text-primary); }
+  .range-input input[type="number"]:focus { outline: none; border-color: var(--accent); }
   .seq-edges { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .edge-label { font-size: 11px; color: var(--text-tertiary); }
   .seq-card.invalid { border-color: #e5484d; box-shadow: 0 0 0 1px #e5484d inset; }
@@ -807,6 +879,8 @@
         <button id="btnStop" class="btn" disabled data-i18n="wave.stop">⏹ 停止</button>
         <button id="btnPlaySeq" class="btn" disabled data-i18n="wave.playSeq">▶ 播放拼接序列</button>
         <button id="btnAddSelection" class="btn" disabled data-i18n="wave.addSelection">＋ 添加选中区间</button>
+        <button id="btnMtr" class="btn" disabled data-i18n="metronome.toggle">🎵 节拍器</button>
+        <button id="btnMtrSet" class="btn-mini" disabled data-i18n-title="metronome.setTitle" title="节拍器设置">⚙</button>
       </span>
       <span class="spacer"></span>
       <div id="quickBar" class="quickbar" hidden>        <span class="q-group">
@@ -868,19 +942,22 @@
       <span class="seq-progress-time" id="seqProgressTime">0:00.0 / 0:00.0</span>
     </div>
     <div id="manualForm" class="manual-form" hidden>
-      <span class="edge-label" data-i18n="seq.edgeStart">起</span><span id="maStart"></span>
-      <span class="edge-label" data-i18n="seq.edgeEnd">止</span><span id="maEnd"></span>
+      <span class="edge-label" data-i18n="seq.edgeStart">起</span><span id="maRange"></span>
       <button id="btnManualOk" class="btn btn-mini-wide" data-i18n="seq.add">添加</button>
       <button id="btnManualCancel" class="btn btn-mini-wide" data-i18n="seq.cancel">取消</button>
     </div>
     <div id="silentForm" class="manual-form" hidden>
       <span class="edge-label" data-i18n="seq.silentDur">时长</span>
+      <label class="ri-row"><input type="radio" name="silentMode" id="silentMus" checked /> <span data-i18n="seq.silentMusPair">小节/拍</span></label>
       <input id="silentQty" type="number" min="0.01" step="0.01" value="1" aria-label="静音时长" />
       <select id="silentUnit">
-        <option value="sec" data-i18n="seq.unitSec">秒</option>
         <option value="bar" data-i18n="seq.unitBar">小节</option>
         <option value="beat" data-i18n="seq.unitBeat">拍</option>
       </select>
+      <label class="ri-row"><input type="radio" name="silentMode" id="silentSec" /> <span data-i18n="seq.unitTime">精确时长</span></label>
+      <input id="silentQtySec" type="number" min="0.001" step="0.01" value="1" aria-label="精确时长（秒）" disabled />
+      <input id="silentBpm" type="number" min="1" max="400" step="0.01" aria-label="静音段 BPM（空=跟随前段）" />
+      <input id="silentMeter" type="text" aria-label="静音段拍号（如 4/4，空=跟随前段）" />
       <button id="btnSilentOk" class="btn btn-mini-wide" data-i18n="seq.add">添加</button>
       <button id="btnSilentCancel" class="btn btn-mini-wide" data-i18n="seq.cancel">取消</button>
     </div>
@@ -931,6 +1008,7 @@
   <script src="src/tapTempo.js"></script>
   <script src="src/sequence.js"></script>
   <script src="src/unitInput.js"></script>
+  <script src="src/rangeInput.js"></script>
   <script src="src/store.js"></script>
   <script src="src/settings.js"></script>
   <script src="src/export.js"></script>
@@ -944,6 +1022,8 @@
   <script src="src/ui.js"></script>
   <script src="src/metaModal.js"></script>
   <script src="src/autoCutModal.js"></script>
+  <script src="src/metronome.js"></script>
+  <script src="src/metronomeModal.js"></script>
   <script src="src/footer.js"></script>
   <script src="src/main.js"></script>
   <script>

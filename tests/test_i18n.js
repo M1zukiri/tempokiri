@@ -19,7 +19,7 @@ test('T: {name} 插值', () => {
   assert.equal(I.T('status.playFrom', { pos: '1:23.4' }), '从 1:23.4 开始播放');
   assert.equal(I.T('seq.info', { count: 3, total: '0:12.5' }), '3 段 · 总时长 0:12.5');
   assert.equal(I.T('footer.eggSub', { local: '1.4.2', remote: '1.1.2' }), '你的本地版本 v1.4.2 比 GitHub 官方 v1.1.2 更新。');
-  assert.equal(I.T('status.selectedRange', { start: 1, end: 4 }), '已选定：第 1–4 小节。点击「添加选中区间」加入列表。');
+  assert.equal(I.T('status.selectedRange', { start: 1, end: 4 }), '已选定：第 1–4 小节');
 });
 
 test('T: 缺 key 回退 key 名（便于发现漏配）', () => {
@@ -52,11 +52,13 @@ test('strings.json: 叶子 key 全部为字符串且无空值（文档完整性�
     return acc;
   };
   const leaves = walk(strings);
+  // 有意置空的 key（用于隐藏提示，2026-08-26 文案精简）：白名单允许空值
+  const EMPTY_ALLOWED = new Set(['quick.editHint', 'autoCut.sub']);
   assert.ok(leaves.length > 150, '文案总数应 > 150：' + leaves.length);
   for (const [k, v] of leaves) {
     if (k === '_doc') continue;
     assert.equal(typeof v, 'string', k + ' 应为字符串');
-    assert.ok(v.length > 0, k + ' 不能为空');
+    if (!EMPTY_ALLOWED.has(k)) assert.ok(v.length > 0, k + ' 不能为空');
   }
 });
 

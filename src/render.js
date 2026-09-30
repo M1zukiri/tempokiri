@@ -136,6 +136,12 @@
     return lo;
   }
 
+  /** 律动条包络平滑：上升用 attackCoef（快）、下降用 decayCoef（慢）——VU 表式跟踪，避免逐帧闪烁。 */
+  function envelopeTrack(prev, target, attackCoef, decayCoef) {
+    const coef = target > prev ? attackCoef : decayCoef;
+    return prev + (target - prev) * coef;
+  }
+
   const THEME = {
     bg: 'transparent',
     gridBg: 'transparent',
@@ -197,6 +203,36 @@
       cutLine: '#c2410c',
       axis: '#7a7268',
       barLabel: '#5c554d',
+    },
+    seigaiha: {
+      bg: 'transparent',
+      gridBg: 'transparent',
+      wave: '#00a7df',
+      waveHigh: '#47d0f7',
+      waveDim: 'rgba(0,167,223,0.42)',
+      barLine: 'rgba(255,255,255,0.75)',
+      beatLine: 'rgba(255,255,255,0.14)',
+      selFill: 'rgba(0,167,223,0.22)',
+      selBorder: '#00a7df',
+      playLine: '#f43f5e',
+      cutLine: '#fb923c',
+      axis: '#7d97a0',
+      barLabel: '#9ab3bc',
+    },
+    kurenai: {
+      bg: 'transparent',
+      gridBg: 'transparent',
+      wave: '#b44751',
+      waveHigh: '#f1736b',
+      waveDim: 'rgba(180,71,81,0.42)',
+      barLine: 'rgba(255,244,236,0.75)',
+      beatLine: 'rgba(255,244,236,0.14)',
+      selFill: 'rgba(240,178,0,0.20)',
+      selBorder: '#f0b200',
+      playLine: '#ff7a93',
+      cutLine: '#f3981c',
+      axis: '#a0837b',
+      barLabel: '#b79a90',
     },
   };
 
@@ -579,5 +615,5 @@
     return m + ':' + ss;
   }
 
-  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawRange, drawPlayHead, playHeadMoved, setRenderScale, setTheme, CANVAS_THEMES, THEME };
+  return { buildPeaks, bucketIndexStep, lowerBound, upperBound, lowerBoundBars, upperBoundBars, timeToX, xToTime, draw, drawRange, drawPlayHead, playHeadMoved, setRenderScale, setTheme, CANVAS_THEMES, THEME, envelopeTrack };
 });

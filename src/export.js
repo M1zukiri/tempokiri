@@ -144,6 +144,21 @@
    * @param {number} [targetDb=-1] 目标峰值（dBFS，≤0）
    * @returns {Float32Array} 新数组，不改原数据
    */
+  /**
+   * Majdata 补空小节：在音频开头插入 durSec 秒静音。
+   * @param {Float32Array} samples 拼接后 PCM
+   * @param {number} durSec 静音时长（秒）；≤0 或采样率非法时返回原引用
+   * @param {number} sampleRate 采样率
+   * @returns {Float32Array} 新数组（前段为零），不改原数据
+   */
+  function padSilenceStart(samples, durSec, sampleRate) {
+    if (!(durSec > 0) || !(sampleRate > 0)) return samples;
+    const pad = Math.max(1, Math.round(durSec * sampleRate));
+    const out = new Float32Array(samples.length + pad);
+    out.set(samples, pad);
+    return out;
+  }
+
   function peakNormalize(samples, targetDb = -1) {
     let peak = 0;
     for (let i = 0; i < samples.length; i++) {
@@ -227,6 +242,7 @@
     encodeWav,
     encodeMp3,
     peakNormalize,
+    padSilenceStart,
     toInt16,
     downloadBlob,
   };

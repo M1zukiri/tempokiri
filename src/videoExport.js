@@ -232,6 +232,18 @@
   }
 
   /**
+   * Majdata 补空小节：开头痛静期间的首帧冻结帧数。
+   * 按输出帧间隔取整（最近帧），正时长至少 1 帧；pad≤0 或帧间隔非法返回 0（不填充）。
+   * @param {number} padUs 开头痛静时长（微秒）
+   * @param {number} frameStepUs 输出帧时间戳间隔（微秒）
+   * @returns {number} 需编码的冻结帧数
+   */
+  function padFrameCount(padUs, frameStepUs) {
+    if (!(padUs > 0) || !(frameStepUs > 0)) return 0;
+    return Math.max(1, Math.round(padUs / frameStepUs));
+  }
+
+  /**
    * 主入口：视频合成导出。
    * @param {object} opts
    * @param {File} opts.file 原视频文件
@@ -239,11 +251,13 @@
    * @param {Float32Array} opts.mix 合成音频（mono PCM）
    * @param {number} opts.mixSampleRate
    * @param {string} opts.fileName 输出文件名（不含扩展名）
+   * @param {number} [opts.padStartSec=0] 开头痛静时长（秒）：视频时间轴后移并在开头冻结首帧（Majdata 补空小节）
    * @param {(p:number)=>void} [opts.onProgress]
    */
   async function exportVideo(opts) {
     if (!supportsWebCodecs()) throw new Error('当前浏览器不支持 WebCodecs 视频合成');
-    const { parts, mix, mixSampleRate, fileName, videoBitrate = 6_000_000, framerate = null, maxWidth = null, maxHeight = null, audioBitrate = 128000, mute = false } = opts;
+    const { parts, mix, mixSampleRate, fileName, videoBitrate = 6_000_000, framerate = null, maxWidth = null, maxHeight = null, audioBitrate = 128000, mute = false, padStartSec = 0 } = opts;
+    const padUs = Math.max(0, Math.round(padStartSec * 1e6));
     const buf = await opts.file.arrayBuffer();
 
     const progress = (p) => {
@@ -263,10 +277,10 @@
     const outTsUs = (sec) => {
       let acc = 0;
       for (const [s, e] of windows) {
-        if (sec < e) return Math.round((acc + Math.max(0, sec - s)) * 1e6);
+        if (sec < e) return padUs + Math.round((acc + Math.max(0, sec - s)) * 1e6);
         acc += e - s;
       }
-      return Math.round(acc * 1e6);
+      return padUs + Math.round(acc * 1e6);
     };
 
     // 分辨率缩放目标与抽帧间隔（muxer 与编码器共用）
@@ -274,6 +288,7 @@
     const scaled = scale.w !== src.width || scale.h !== src.height;
     const srcFps = estimateFps(src.samples, src.timescale);
     const interval = frameKeepInterval(srcFps, framerate);
+    const frameStepUs = Math.max(1, Math.round(interval * 1e6 / srcFps)); // 输出帧时间戳间隔（微秒）
 
     // 3. mp4-muxer 输出容器
     const Mp4Muxer = window.Mp4Muxer;
@@ -362,6 +377,14 @@
             } else {
               outFrame = new VideoFrame(frame, { timestamp: t });
             }
+            if (keptFrames === 0 && padUs > 0) {
+              // 开头痛静（Majdata 补空小节）：冻结首帧，填充 pad 时长后再正常编码
+              const nPads = padFrameCount(padUs, frameStepUs);
+              const stepUs = Math.round(padUs / nPads);
+              for (let k = 0; k < nPads; k++) {
+                encVideo.encode(new VideoFrame(outFrame, { timestamp: Math.round(k * stepUs) }));
+              }
+            }
             if (keptFrames % interval === 0) {
               encVideo.encode(outFrame);
               if (frameCount % 60 === 0) progress(0.05 + 0.75 * (frameCount / totalFrames));
@@ -445,5 +468,5 @@
     done();
   }
 
-  return { exportVideo, supportsWebCodecs, demuxMp4, computeVideoScale, frameKeepInterval, estimateFps, probeAacEncode, aacBitrateCap };
+  return { exportVideo, supportsWebCodecs, demuxMp4, computeVideoScale, frameKeepInterval, estimateFps, probeAacEncode, aacBitrateCap, padFrameCount };
 });

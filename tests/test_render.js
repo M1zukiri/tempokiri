@@ -287,14 +287,20 @@ test('setTheme: 切换 canvas 主题色并回退未知主题（主题系统）',
   R.setTheme('paper');
   assert.equal(R.THEME.bg, 'transparent');
   assert.equal(R.THEME.wave, '#0f766e');
+  R.setTheme('seigaiha');
+  assert.equal(R.THEME.bg, 'transparent');
+  assert.equal(R.THEME.wave, '#00a7df');
+  R.setTheme('kurenai');
+  assert.equal(R.THEME.bg, 'transparent');
+  assert.equal(R.THEME.wave, '#b44751');
   R.setTheme('unknown-theme');
   assert.equal(R.THEME.wave, '#22d3ee', '未知主题应回退 aurora');
   R.setTheme('aurora'); // 恢复默认，避免污染后续用例
 });
 
-test('CANVAS_THEMES: 三套主题各含 13 个绘制字段（主题系统）', () => {
+test('CANVAS_THEMES: 五套主题各含 13 个绘制字段（主题系统）', () => {
   const fields = ['bg', 'gridBg', 'wave', 'waveHigh', 'waveDim', 'barLine', 'beatLine', 'selFill', 'selBorder', 'playLine', 'cutLine', 'axis', 'barLabel'];
-  for (const name of ['aurora', 'nebula', 'paper']) {
+  for (const name of ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai']) {
     assert.ok(R.CANVAS_THEMES[name], '缺少主题：' + name);
     for (const f of fields) {
       assert.ok(R.CANVAS_THEMES[name][f], `${name}.${f} 缺失`);
@@ -307,6 +313,18 @@ test('CANVAS_THEMES: 三套主题各含 13 个绘制字段（主题系统）', (
     beatLine: 'rgba(255,255,255,0.14)', selFill: 'rgba(34,211,238,0.22)',
     selBorder: '#22d3ee', playLine: '#f43f5e', cutLine: '#fb923c', axis: '#7d8794', barLabel: '#9aa4b2',
   });
+});
+
+test('envelopeTrack: 律动条包络平滑（快攻慢放，避免逐帧闪烁）', () => {
+  // 上升用 attackCoef、下降用 decayCoef
+  assert.ok(Math.abs(R.envelopeTrack(0, 1, 0.55, 0.12) - 0.55) < 1e-9);
+  assert.ok(Math.abs(R.envelopeTrack(1, 0, 0.55, 0.12) - 0.88) < 1e-9);
+  // 目标相同保持不变
+  assert.ok(Math.abs(R.envelopeTrack(0.5, 0.5, 0.55, 0.12) - 0.5) < 1e-9);
+  // 衰减慢于攻击：同差值下下降余量更大
+  const up = R.envelopeTrack(0, 1, 0.55, 0.12);
+  const down = R.envelopeTrack(1, 0, 0.55, 0.12);
+  assert.ok(down > up, 'decay 余量大于 attack 步进（VU 表观感）');
 });
 
 // ---- P0 增量渲染 ----

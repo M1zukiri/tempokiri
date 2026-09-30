@@ -96,3 +96,16 @@ test('probeAacEncode: flush 失败抛出可读错误码', async () => {
     '应抛出带 AAC_ENCODER_UNSUPPORTED 错误码的可读错误'
   );
 });
+
+test('padFrameCount: 开头痛静小节的首帧冻结帧数（Majdata 视频补空小节）', () => {
+  // 2 秒 @ 25fps → 50 帧；1 秒 @ 25fps → 25 帧
+  assert.equal(V.padFrameCount(2e6, 40000), 50);
+  assert.equal(V.padFrameCount(1e6, 40000), 25);
+  // 零 pad → 0 帧（不触发冻结填充）
+  assert.equal(V.padFrameCount(0, 40000), 0);
+  // 非整帧时长按最近帧取整（2.5 帧 → 2；3.8 帧 → 4）
+  assert.equal(V.padFrameCount(99999, 40000), 2);
+  assert.equal(V.padFrameCount(150000, 40000), 4);
+  // 极小正时长至少 1 帧
+  assert.equal(V.padFrameCount(1, 40000), 1);
+});

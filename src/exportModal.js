@@ -197,6 +197,10 @@
               <label>${T('export.crossfade')}
                 <input id="mCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
               </label>
+              <label class="exp-check">
+                <input id="mPadBar" type="checkbox" /> ${T('export.majPadBar')}
+              </label>
+              <p id="mPadBarNote" class="modal-sub">${T('export.majPadBarDesc')}</p>
             </div>
           </div>
         </div>
@@ -398,6 +402,7 @@
           normalize: el('mNormalize').checked,
           peakDb: parseFloat(el('mPeak').value),
           crossfadeMs,
+          padBar: el('mPadBar').checked,
         });
       }
       close();

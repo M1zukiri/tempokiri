@@ -84,7 +84,10 @@
     if (res > 0) seg.resolution = res;
     if (!isLast) {
       const qty = parseFloat(r.qty);
-      if (isFinite(qty) && qty > 0) seg.durationSec = qty;
+      if (isFinite(qty) && qty > 0) {
+        if (r.mode === 'dur') seg.durationSec = qty; // 精确时长（秒）底层
+        else seg.bars = Math.max(1, Math.round(qty)); // 小节数底层（resolveSegments 随 BPM 动态展开）
+      }
     }
     return seg;
   }
@@ -118,7 +121,7 @@
           <span class="seg-tap-status">${r._tapTxt || ''}</span>
         </td>
         <td><button class="btn-mini del seg-del" title="删除该段">✕</button></td>`;
-      const refreshLen = () => r._unitInput && r._unitInput.refresh();
+      const refreshLen = () => r._refreshLen && r._refreshLen();
       tr.querySelector('.seg-bpm').addEventListener('change', (e) => {
         const v = parseFloat(e.target.value);
         if (isFinite(v)) {
@@ -181,13 +184,44 @@
       });
       const lenCell = tr.querySelector('.seg-length');
       if (lenCell && !isLast) {
-        const comp = MC.UnitInput.create(lenCell, {
-          kind: 'length',
-          getStep: () => stepOf(r),
-          value: parseFloat(r.qty) || 0,
-          onChange: (sec) => { r.qty = sec; },
-        });
-        r._unitInput = comp;
+        // 段长二选一（与全局语义统一）：【√】小节数（底层=小节，随 BPM 动态展开）/ 精确时长（秒）
+        const name = 'seglen' + i;
+        lenCell.innerHTML =
+          '<span class="seg-len">' +
+          '<label class="seg-len-row"><input type="radio" name="' + name + '" value="bars" ' + (r.mode !== 'dur' ? 'checked' : '') + ' /> ' + T('modal.segLenBars') +
+          ' <input type="number" class="len-bars" min="1" step="1" value="' + (r.mode !== 'dur' ? (parseFloat(r.qty) || '') : '') + '" /></label>' +
+          '<label class="seg-len-row"><input type="radio" name="' + name + '" value="dur" ' + (r.mode === 'dur' ? 'checked' : '') + ' /> ' + T('modal.segLenSec') +
+          ' <input type="number" class="len-sec" min="0.001" step="0.01" value="' + (r.mode === 'dur' ? (parseFloat(r.qty) || '') : '') + '" /></label>' +
+          '</span>';
+        const rBars = lenCell.querySelector('input[value="bars"]');
+        const rSec = lenCell.querySelector('input[value="dur"]');
+        const iBars = lenCell.querySelector('.len-bars');
+        const iSec = lenCell.querySelector('.len-sec');
+        const sync = (mode) => {
+          const st = stepOf(r);
+          if (mode === 'bars') {
+            iSec.disabled = true; iBars.disabled = false;
+            const b = parseFloat(iBars.value);
+            iSec.value = Number.isFinite(b) && b > 0 ? +(b * st.barDur).toFixed(3) : '';
+          } else {
+            iBars.disabled = true; iSec.disabled = false;
+            const s = parseFloat(iSec.value);
+            iBars.value = Number.isFinite(s) && s > 0 ? +((s / st.barDur)).toFixed(3) : '';
+          }
+        };
+        const commit = (mode) => {
+          r.mode = mode;
+          const v = parseFloat(mode === 'bars' ? iBars.value : iSec.value);
+          if (Number.isFinite(v) && v > 0) r.qty = v;
+          sync(mode);
+        };
+        rBars.addEventListener('change', () => commit('bars'));
+        rSec.addEventListener('change', () => commit('dur'));
+        iBars.addEventListener('change', () => { if (rBars.checked) commit('bars'); });
+        iSec.addEventListener('change', () => { if (rSec.checked) commit('dur'); });
+        sync(r.mode !== 'dur' ? 'bars' : 'dur');
+        r._segLen = { sync, commit };
+        r._refreshLen = () => sync(r.mode !== 'dur' ? 'bars' : 'dur');
       }
       tbody.appendChild(tr);
     });
@@ -328,7 +362,8 @@
       bpm: s.bpm != null ? s.bpm : null,
       beats: s.beatsPerBar || 4,
       unit: s.beatUnit || 4,
-      qty: s.durationSec != null ? s.durationSec : s.bars != null ? s.bars * barDurOfSeg(s) : null,
+      mode: s.durationSec != null ? 'dur' : 'bars', // 底层 = 用户定义方式（时长秒 或 小节数）
+      qty: s.durationSec != null ? s.durationSec : s.bars != null ? s.bars : null,
       res: s.resolution != null ? s.resolution : null,
     }));
     renderRows();
@@ -367,7 +402,7 @@
     });
 
     el('mAddSeg').addEventListener('click', () => {
-      rows.push({ bpm: null, beats: 4, unit: 4, mode: 'bars', qty: null });
+      rows.push({ bpm: null, beats: 4, unit: 4, mode: 'bars', res: null, qty: null });
       renderRows();
     });
   }

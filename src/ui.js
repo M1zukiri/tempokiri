@@ -43,10 +43,13 @@
       card.className = 'seq-card' + (playingId && it.id === playingId ? ' playing' : '') + (it.silent ? ' silent' : '');
       card.dataset.id = it.id;
       if (it.silent) {
-        // 静音段：无起/止源区间，主行显示时长；详情区（淡入/淡出 + 时长秒编辑）
+        // 静音段：无起/止源区间，主行显示时长；音乐单位定义时附注参数（如 2 小节 @ 140）
+        const mus = (it.unit === 'bar' || it.unit === 'beat')
+          ? `（${it.qty} ${T(it.unit === 'bar' ? 'seq.unitBar' : 'seq.unitBeat')} @ ${it.bpm || 120} BPM ${it.beatsPerBar || 4}/${it.beatUnit || 4}）`
+          : '';
         card.innerHTML = `
           <span class="seq-num">${idx + 1}</span>
-          <span class="seq-silent">${T('seq.silentLabel')} ${fmtTime(it.durationSec || 0)}s</span>
+          <span class="seq-silent">${T('seq.silentLabel')} ${fmtTime(it.durationSec || 0)}s${mus}</span>
           <span class="spacer"></span>
           <button class="btn-mini seq-toggle" title="${T('seq.fadeToggle')}" aria-expanded="false">▾</button>
           <button class="btn-mini up" title="${T('seq.up')}">↑</button>
@@ -58,6 +61,7 @@
             <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
           </span>`;
       } else {
+        // 主行显示按底层语义（mode）；折叠区为完整 rangeInput 编辑（小节/格 ↔ 时间起止点）
         card.innerHTML = `
           <span class="seq-num">${idx + 1}</span>
           <span class="seq-edges">
@@ -70,6 +74,7 @@
           <button class="btn-mini down" title="${T('seq.down')}">↓</button>
           <button class="btn-mini del" title="${T('seq.del')}">✕</button>
           <span class="seq-detail" hidden>
+            <div class="range-edit"></div>
             <label class="fade">${T('seq.fadeIn')} <input type="number" class="fade-in" value="${it.fadeInMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
             <label class="fade">${T('seq.fadeOut')} <input type="number" class="fade-out" value="${it.fadeOutMs}" min="0" max="5000" step="10" /> ${T('seq.ms')}</label>
           </span>`;
@@ -81,26 +86,22 @@
         t.classList.toggle('open', !d.hidden);
         t.setAttribute('aria-expanded', String(!d.hidden));
       });
-      let compStart = null;
-      let compEnd = null;
-      if (!it.silent) {
-        const edgeGrid = () => handlers.getGrid();
-        compStart = MC.UnitInput.create(card.querySelector('.edge-start'), {
-          kind: 'position',
-          edge: 'start',
-          getGrid: edgeGrid,
-          value: it.invalid ? NaN : it.startTime,
-          onChange: (sec) => handlers.onRange(it.id, sec, 'start'),
-        });
-        compEnd = MC.UnitInput.create(card.querySelector('.edge-end'), {
-          kind: 'position',
-          edge: 'end',
-          getGrid: edgeGrid,
-          value: it.invalid ? NaN : it.endTime,
-          onChange: (sec) => handlers.onRange(it.id, sec, 'end'),
-        });
+      let compRange = null;
+      if (!it.silent && typeof MC.rangeInput === 'object' && MC.rangeInput.create) {
+        const rangeHost = card.querySelector('.range-edit');
+        if (rangeHost) {
+          compRange = MC.rangeInput.create(rangeHost, {
+            getGrid: () => handlers.getGrid(),
+            value: it,
+            onChange: (spec) => {
+              handlers.onRange(it.id, spec);
+              renderEdgeMain(card, it); // 主行显示随底层语义(mode)刷新
+            },
+          });
+        }
       }
-      if (it.invalid || (compStart && compStart.isInvalid()) || (compEnd && compEnd.isInvalid())) card.classList.add('invalid');
+      if (!it.silent) renderEdgeMain(card, it);
+      if (it.invalid) card.classList.add('invalid');
       card.querySelector('.up').addEventListener('click', () => handlers.onMove(it.id, idx - 1));
       card.querySelector('.down').addEventListener('click', () => handlers.onMove(it.id, idx + 1));
       card.querySelector('.del').addEventListener('click', () => handlers.onRemove(it.id));
@@ -122,6 +123,21 @@
       attachDrag(card, idx, handlers, container);
       container.appendChild(card);
     });
+  }
+
+  /** 主行起止显示跟随底层语义（mode）：小节/格 或 时间。 */
+  function renderEdgeMain(card, it) {
+    const s = card.querySelector('.edge-start');
+    const e = card.querySelector('.edge-end');
+    if (!s || !e || it.silent) return;
+    const fmt = (t) => (Number.isFinite(t) ? fmtTime(t) : '—');
+    if (it.mode === 'time') {
+      s.textContent = fmt(it.startTime);
+      e.textContent = fmt(it.endTime);
+    } else {
+      s.textContent = (it.startBar != null ? it.startBar : '?') + T('seq.unitBar') + (it.startCell ? ' ' + it.startCell + T('seq.unitCell') : '');
+      e.textContent = (it.endBar != null ? it.endBar : '?') + T('seq.unitBar') + (it.endCell ? ' ' + it.endCell + T('seq.unitCell') : '');
+    }
   }
 
   /**

@@ -65,7 +65,7 @@ function makeContainer() {
 test('renderSequenceList: 空列表渲染提示', () => {
   const { container } = makeContainer();
   U.renderSequenceList(container, [], { getGrid: () => null });
-  assert.ok(container.innerHTML.includes('尚未添加段落'));
+  assert.ok(container.innerHTML.includes('拼接序列为空'));
 });
 
 test('renderSequenceList: 卡片含折叠区与切换按钮（fade 默认收起）', () => {

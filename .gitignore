@@ -18,3 +18,12 @@ dist/
 # Large local test media (kept locally for browser E2E, not pushed)
 examples/*.mp4
 examples/*.f32
+
+# Local E2E / verification artifacts (screenshots, backups, logs)
+tools/e2e_out/
+tools/ui_shots/
+tools/backup_ui_fix_20260826/
+tools/diag_*.png
+tools/*.bak
+tools/*.bak.mjs
+*.log

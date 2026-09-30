@@ -221,3 +221,16 @@ test('itemToPart/itemDuration/isEmptyItem: 静音段与绝对区间语义', () =
   assert.equal(S.isEmptyItem({ startTime: -5, endTime: -1 }, 16), true);     // 完全在曲前
   assert.equal(S.isEmptyItem({ startTime: 5, endTime: 5 }, 16), true);       // 零时长
 });
+
+test('padBarDuration: 补充空小节取网格首段时长，无网格回退默认（Majdata 补空小节）', () => {
+  // 有网格：取第一段的 barDur
+  assert.equal(S.padBarDuration([{ barDur: 1.5 }, { barDur: 3 }], 2), 1.5);
+  assert.equal(S.padBarDuration([{ barDur: 0.8 }], 2), 0.8);
+  // 无网格 / 空列表 / 无效段：回退默认 120BPM·4/4 = 2s
+  assert.equal(S.padBarDuration([], 2), 2);
+  assert.equal(S.padBarDuration(null, 2), 2);
+  assert.equal(S.padBarDuration([{ barDur: 0 }], 2), 2);
+  assert.equal(S.padBarDuration([{ barDur: -1 }], 2), 2);
+  // 自定义回退值生效
+  assert.equal(S.padBarDuration([], 3.5), 3.5);
+});

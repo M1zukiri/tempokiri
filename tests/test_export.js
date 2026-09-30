@@ -210,3 +210,21 @@ test('encodeMp3: 有声输入量化后输出非静音（帧同步 + 数据体非
   assert.ok(loud.byteLength > 10000, '有声输入应产生正常大小的 MP3');
   assert.ok(Math.abs(loud.byteLength - silent.byteLength) < loud.byteLength * 0.2, 'CBR 下大小接近');
 });
+
+test('padSilenceStart: 开头插入静音小节（Majdata 补空小节）', () => {
+  const mix = Float32Array.from([0.5, -0.25, 0.1, 0.3, 0.2, 0.9, 0.7, 0.4]);
+  // 2 秒静音 @ 4Hz → 8 个零，输出 = 8 + 8
+  const out = E.padSilenceStart(mix, 2, 4);
+  assert.equal(out.length, 16, '长度 = 静音 + 原音频');
+  for (let i = 0; i < 8; i++) assert.equal(out[i], 0, '前段全零：' + i);
+  for (let i = 0; i < mix.length; i++) assert.equal(out[8 + i], mix[i], '后段保持原值：' + i);
+  // 非整数帧边界：0.5s @ 44100 → 22050 个零
+  const out2 = E.padSilenceStart(Float32Array.from([1, -1]), 0.5, 44100);
+  assert.equal(out2.length, 22050 + 2);
+  assert.equal(out2[22049], 0);
+  assert.equal(out2[22050], 1);
+  assert.equal(out2[22051], -1);
+  // 时长 ≤ 0 返回原引用（不分配、不改写）
+  assert.equal(E.padSilenceStart(mix, 0, 4), mix);
+  assert.equal(E.padSilenceStart(mix, -1, 4), mix);
+});

@@ -98,16 +98,20 @@ test('主题字段：validateField 枚举校验与 FIELD_DEFS 定义（主题系
   assert.equal(s.validateField('theme', 'aurora'), true);
   assert.equal(s.validateField('theme', 'nebula'), true);
   assert.equal(s.validateField('theme', 'paper'), true);
+  assert.equal(s.validateField('theme', 'seigaiha'), true);
+  assert.equal(s.validateField('theme', 'kurenai'), true);
   assert.equal(s.validateField('theme', 'x'), false);
   assert.equal(s.validateField('theme', ''), false);
   assert.equal(s.validateField('theme', 1), false);
   const f = s.FIELD_DEFS.find((x) => x.key === 'theme');
   assert.ok(f, 'FIELD_DEFS 缺少 theme 字段');
   assert.equal(f.control, 'select');
-  assert.deepEqual(f.presets.map((p) => p.value), ['aurora', 'nebula', 'paper']);
+  assert.deepEqual(f.presets.map((p) => p.value), ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai']);
   // 断言与 strings.json 同源（改文案不破坏测试）
   const dict = require('../strings.json');
   assert.equal(f.presets[0].label, dict.settings.theme.presets.aurora);
   assert.equal(f.presets[1].label, dict.settings.theme.presets.nebula);
   assert.equal(f.presets[2].label, dict.settings.theme.presets.paper);
+  assert.equal(f.presets[3].label, dict.settings.theme.presets.seigaiha);
+  assert.equal(f.presets[4].label, dict.settings.theme.presets.kurenai);
 });
