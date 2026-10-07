@@ -23,6 +23,23 @@
 
   const DEFAULT_ANALYSIS_SR = 22050;
 
+  // —— 八度判定（1.19.0，原评估报告 P1「半频归一」）参数 ——
+  // 落半频是当前最大的单点损失（全量 1812 首中 806 首，45%）。算法几乎总能找到
+  // 正确的"律动族"，只是挑错八度（层正确 83%+ 但精确命中仅 34%）。
+  // 判定依据：若存在 ≈2× 主峰的强候选层，说明真实拍频可能是主峰的两倍。
+  const OCT_RATIO_TOL = 0.08;  // 候选与主峰的倍频关系容差
+  const OCT_REL = 0.55;        // 候选层相对主峰的最低强度（rel = 候选分 / 主峰分）
+  const OCT_MIN_TARGET = 90;   // 提升目标下限（低于此值不进候选）
+  // 主峰守卫：只在主峰低于此值时才允许提升。这是纯先验——本语料（maimai 系谱面）
+  // 94% 的曲子 ≥120 BPM，主峰 <120 基本可判为半速误判。
+  // 全量实测（1812 首）：无守卫 67.3% / w<100 68.2% / w<110 71.3% / **w<120 71.7%**；
+  // 代价在真值 ≤120 的曲子（105 首，占 5.8%）上从 45% 降到 21%——纯自相关证据
+  // 分不开"真值 100"与"真值 200 但主峰落在 100"，只能靠音域先验。
+  // 若要把低 BPM 曲目保护得更重，改小此常量即可（w<100 时低档回到 48%，
+  // 代价是整体掉到 68.2%）。竞争层候选列表仍会展示另一半，用户可一键切回。
+  const OCTAVE_GUARD_BPM = 120;
+  const OCTAVE_CAP = 300;      // 提升目标上限 = modal.js 的 BPM 校验域顶
+
   /** 生成 Hann 窗（对称，length 个点）。 */
   function hannWindow(n) {
     const w = new Float64Array(n);
@@ -599,6 +616,29 @@
   }
 
   /**
+   * 八度层选择（纯函数，可单测）：在候选层里找出该把主峰提升到的 2× 层。
+   *
+   * 规则：主峰本身低于守卫值（先验：本语料 94% 的曲子 ≥120 BPM，主峰 <120
+   * 基本可判为半速误判）时，若存在 ≈2× 主峰、强度 rel ≥ OCT_REL、落在
+   * [OCT_MIN_TARGET, OCTAVE_CAP] 的候选层，则提升到其中最强者。
+   *
+   * @param {number|null} mainBpm 宽扫主峰
+   * @param {Array<{bpm:number, rel:number}>} cands 竞争层候选
+   * @returns {number|null} 提升后的 BPM；不需要提升返回 null
+   */
+  function pickOctaveLayer(mainBpm, cands) {
+    if (mainBpm == null || mainBpm >= OCTAVE_GUARD_BPM) return null;
+    let best = null;
+    for (const c of cands || []) {
+      if (Math.abs(c.bpm / mainBpm - 2) > OCT_RATIO_TOL) continue; // 只认 ≈2× 层
+      if (c.bpm < OCT_MIN_TARGET || c.bpm > OCTAVE_CAP) continue;
+      if (c.rel < OCT_REL) continue;
+      if (!best || c.rel > best.rel) best = c;
+    }
+    return best ? best.bpm : null;
+  }
+
+  /**
    * 窗口 RMS 能量（用于无声/近无声源的快速预检，避免全窗分析空转）。
    * @param {Float32Array|ArrayLike<number>} samples
    * @returns {number}
@@ -652,6 +692,24 @@
         ceilExtended = true;
       }
     }
+    // —— 八度判定（1.19.0）——
+    // 扫描上限放宽到 300 才能看到 2× 层：真值 242 的曲子主峰落在 121，
+    // 242 根本不在默认 60–200 的窗内（当年 P1 只在原窗内找候选，对目标群体形同虚设）。
+    // 守卫与倍数关系都以**宽扫主峰**为准（与评估口径一致，不能换成当前 bpm）。
+    // 外层 `bpm < OCTAVE_GUARD_BPM` 只是省开销的门控——全量验证过：用当前值门控
+    // 与用宽扫主峰门控的结果完全相同（都是 71.7% / 低档 21%），因为主峰 ≥120 时
+    // 宽扫主峰也几乎不可能 <120。
+    let octavePromoted = false;
+    const bpmBeforeOctave = bpm;
+    if (bpm != null && bpm < OCTAVE_GUARD_BPM && !opts.noOctave) {
+      const wide = scanBpm(onsets, Object.assign({}, opts, { maxBpm: Math.max(opts.maxBpm || 200, OCTAVE_CAP) }));
+      const promoted = pickOctaveLayer(wide.bpm, wide.cands);
+      if (promoted != null) {
+        bpm = promoted;
+        scan = wide; // 候选列表换成宽扫的，UI 里仍能看到"另一半"（用户可一键切回）
+        octavePromoted = true;
+      }
+    }
     // offset = 首条网格线位置 = 第一个 onset（开头第一个可听见的瞬态）。
     // 用户按听感校准（心予報 mp3：0.46s ≈ 首个 onset 0.464s）时首线就是音乐实际
     // 开始处，无需相位换算；首个 onset 若为弱装饰音可在设置窗口手动微调。
@@ -661,7 +719,8 @@
     }
     // bpmCandidates：竞争层 BPM 候选（v1.11.0，供 UI 展示「其他可能 BPM」）
     // ceilExtended：本次是否走了触顶重扫（供 UI 提示扫描范围被放宽）
-    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands, ceilExtended };
+    // octavePromoted / bpmBeforeOctave：八度判定是否提升过、提升前的值（供 UI 提示可切回）
+    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands, ceilExtended, octavePromoted, bpmBeforeOctave };
   }
 
   return {
@@ -680,6 +739,7 @@
     resample,
     toMono,
     rmsOf,
+    pickOctaveLayer,
     analyze,
   };
 });

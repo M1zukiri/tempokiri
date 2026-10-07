@@ -34,8 +34,10 @@ const SEED = parseInt(arg('seed', '42'), 10);
 const VARIANTS = arg('variants', 'base,baseRep,interp').split(',');
 const WINDOW = arg('window', 'default');
 const DEDUP = arg('dedup', 'title');
-// 文件名必须带变体标签：否则换变体重跑会被断点续跑逻辑跳过（结果里根本没有新变体字段）
-const OUT = `C:/Users/M1zukuro/Desktop/个人/tempokiri/eval/adx/eval_${WINDOW}_n${N}_s${SEED}_${VARIANTS.join('-')}.jsonl`;
+// 文件名必须带变体标签与版本号：否则换变体/换产品版本重跑会被断点续跑逻辑
+// 整批跳过（结果里根本没有新字段，还静默返回"已完成"）——已经踩过两次。
+const VER = (() => { try { return fs.readFileSync(path.resolve('VERSION'), 'utf8').trim(); } catch { return 'dev'; } })();
+const OUT = `C:/Users/M1zukuro/Desktop/个人/tempokiri/eval/adx/eval_v${VER}_${WINDOW}_n${N}_s${SEED}_${VARIANTS.join('-')}.jsonl`;
 
 const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
 let items = db.items.filter((e) => e.hasAudio);
@@ -185,6 +187,31 @@ const PAGE_JS = `(async () => {
     if (trig3) hi3 = scan3(minBpm, Math.max(maxBpm, Math.min(maxBpm * 2, 300))).bpm;
     out.adaptive300 = trig3 ? hi3 : r0c.bpm;
   }
+  if (VARIANTS.has('wide300') || VARIANTS.has('oct55') || VARIANTS.has('oct70') || VARIANTS.has('oct85')) {
+    // P1 八度判定（半频归一）。关键修正：当年的规则只在原扫描窗内找 2× 候选，
+    // 但真值 242 的曲子主峰落在 121、242 不在窗内 → 候选必须来自一次放宽到
+    // 300（应用校验域顶）的扫描，否则规则对目标群体形同虚设。
+    const CAP = 300;
+    const r0 = MC.analyze(p22, { sampleRate: 22050, hop, frameSize: frame, delta, minBpm, maxBpm });
+    const w = MC.estimateBpmCands(r0.onsets, { minBpm, maxBpm: Math.max(maxBpm, CAP) });
+    if (VARIANTS.has('wide300')) out.wide300 = w.bpm;              // 参照：仅用宽扫描主峰（不做八度判定）
+    const pick = (theta) => {
+      const m = w.bpm;
+      if (m == null) return null;
+      let best = null;
+      for (const c of w.cands || []) {
+        if (Math.abs(c.bpm / m - 2) > 0.08) continue;               // 只认 ≈2× 层
+        if (c.bpm < 90 || c.bpm > CAP) continue;
+        if (c.rel < theta) continue;
+        if (!best || c.rel > best.rel) best = c;
+      }
+      return best ? best.bpm : m;
+    };
+    if (VARIANTS.has('oct55')) out.oct55 = pick(0.55);
+    if (VARIANTS.has('oct70')) out.oct70 = pick(0.70);
+    if (VARIANTS.has('oct85')) out.oct85 = pick(0.85);
+    out.__promo = { 55: pick(0.55) !== w.bpm, 70: pick(0.70) !== w.bpm, 85: pick(0.85) !== w.bpm };
+  }
   if (VARIANTS.has('aa')) out.aa = MC.analyze(aaResample(raw, srcSr, 22050), { sampleRate: 22050, hop, frameSize: frame, delta, minBpm, maxBpm }).bpm;
   if (VARIANTS.has('sr44')) out.sr44 = MC.analyze(lin(raw, srcSr, 44100), { sampleRate: 44100, hop: hop * 2, frameSize: frame * 2, delta, minBpm, maxBpm }).bpm;
   return JSON.stringify(out);
@@ -283,6 +310,20 @@ function report() {
     const half = rs.filter((r) => cls(r[v], r.truth) === 'x0.5').length;
     console.log(`  ${v.padEnd(13)} ≤0.1:${hit(0.1).padStart(5)}%  ≤0.6:${hit(0.6).padStart(5)}%  ≤1.0:${hit(1).padStart(5)}%  层正确:${layer.padStart(5)}%  半频:${String(half).padStart(3)}  中位误差:${errs[Math.floor(errs.length / 2)].toFixed(2)}  分档:${JSON.stringify(bands)}`);
   }
+  // 每个变体对 base 的损益台账（只看绝对值误差的变化，避免被聚合指标掩盖）
+  const hasBase = recs.every((r) => r.base != null);
+  if (hasBase) {
+    console.log('\n  对 base 的损益（按 |误差| 比较）:');
+    for (const v of VARIANTS) {
+      if (v === 'base') continue;
+      const rs = recs.filter((r) => r[v] != null);
+      if (!rs.length) continue;
+      const imp = rs.filter((r) => Math.abs(r[v] - r.truth) < Math.abs(r.base - r.truth) - 0.05).length;
+      const wor = rs.filter((r) => Math.abs(r[v] - r.truth) > Math.abs(r.base - r.truth) + 0.05).length;
+      const chg = rs.filter((r) => Math.abs(r[v] - r.base) > 0.05).length;
+      console.log(`    ${v.padEnd(13)} 改动 ${String(chg).padStart(4)} 首 → 更准 ${String(imp).padStart(4)} / 变差 ${String(wor).padStart(3)} / 净值 ${(imp - wor >= 0 ? '+' : '') + (imp - wor)}`);
+    }
+  }
   // 自适应变体的触发统计：只看被触发的子集，避免被未触发样本稀释
   const trig = recs.filter((r) => r.__trig === 1);
   if (trig.length && recs[0].adaptive !== undefined) {
@@ -290,6 +331,5 @@ function report() {
     const wor = (k) => trig.filter((r) => Math.abs(r[k] - r.truth) > Math.abs(r.base - r.truth) + 0.05).length;
     console.log(`\n  触顶触发 ${trig.length}/${recs.length} 首（其中真值 >200 的 ${trig.filter((r) => r.truth > 200).length} 首）`);
     console.log(`    adaptive     更准 ${imp('adaptive')} / 变差 ${wor('adaptive')}`);
-    if (recs[0].adaptiveKeep !== undefined) console.log(`    adaptiveKeep 更准 ${imp('adaptiveKeep')} / 变差 ${wor('adaptiveKeep')}`);
   }
 }

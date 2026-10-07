@@ -211,6 +211,39 @@ test('触顶自适应上限: 已知局限——落次谐波的真值 >200 救不
   assert.ok(Math.abs(r.bpm - 120) <= 2, '实际 ' + r.bpm);
 });
 
+test('pickOctaveLayer: 2× 层够强且主峰低时提升到该层', () => {
+  // 主峰 84（<120 守卫），候选 168 层 rel 0.9 → 提升到 168
+  assert.equal(A.pickOctaveLayer(84, [{ bpm: 168, rel: 0.9 }]), 168);
+  // 多个 2× 层取最强者
+  assert.equal(A.pickOctaveLayer(70, [{ bpm: 141.5, rel: 0.86 }, { bpm: 140.2, rel: 0.95 }]), 140.2);
+});
+
+test('pickOctaveLayer: rel 太弱 / 非 2× 关系 / 越界时不提升', () => {
+  assert.equal(A.pickOctaveLayer(84, [{ bpm: 168, rel: 0.4 }]), null, 'rel 低于 0.55');
+  assert.equal(A.pickOctaveLayer(84, [{ bpm: 120, rel: 0.99 }]), null, '1.43× 不是 2× 层');
+  assert.equal(A.pickOctaveLayer(84, [{ bpm: 175, rel: 0.99 }]), null, '2.08× 超出 ±0.08 容差');
+  assert.equal(A.pickOctaveLayer(84, [{ bpm: 80, rel: 0.99 }]), null, '目标低于 90 下限');
+  assert.equal(A.pickOctaveLayer(160, [{ bpm: 320, rel: 0.99 }]), null, '目标超过 300 校验域顶');
+  assert.equal(A.pickOctaveLayer(84, []), null, '无候选');
+  assert.equal(A.pickOctaveLayer(84, null), null, '候选为空值');
+  assert.equal(A.pickOctaveLayer(null, [{ bpm: 168, rel: 0.9 }]), null, '主峰为空');
+});
+
+test('pickOctaveLayer: 主峰 ≥120 时不提升（守卫，保护真正的低 BPM 曲目）', () => {
+  assert.equal(A.pickOctaveLayer(120, [{ bpm: 240, rel: 0.99 }]), null);
+  assert.equal(A.pickOctaveLayer(140, [{ bpm: 280, rel: 0.99 }]), null);
+  assert.equal(A.pickOctaveLayer(119.9, [{ bpm: 239.8, rel: 0.99 }]), 239.8, '刚好低于守卫应可提升');
+});
+
+test('八度判定: noOctave 可关闭（评估脚本对拍用）', () => {
+  const pcm = makeBeatSignalDet(150, 30);
+  const on = A.analyze(pcm, { sampleRate: 22050, minBpm: 60, maxBpm: 200 });
+  const off = A.analyze(pcm, { sampleRate: 22050, minBpm: 60, maxBpm: 200, noOctave: true });
+  assert.equal(off.bpm, on.bpm, '该样本本就不触发提升，两者应一致');
+  assert.equal(off.octavePromoted, false);
+  assert.equal(off.bpmBeforeOctave, off.bpm, '关闭时提升前值等于结果值');
+});
+
 test('resample: 长度与端点保持', () => {
   const src = new Float32Array([0, 1, 0, -1]);
   const out = A.resample(src, 4, 8);

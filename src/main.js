@@ -720,9 +720,11 @@
       status(T('hint.noBeat'));
       return null;
     }
-    status(r.ceilExtended
-      ? T('hint.autoDoneExtended', { bpm: r.bpm.toFixed(1) })
-      : T('hint.autoDone', { bpm: r.bpm.toFixed(1) }));
+    status(r.octavePromoted
+      ? T('hint.autoDoneOctave', { bpm: r.bpm.toFixed(1), orig: r.bpmBeforeOctave.toFixed(1) })
+      : r.ceilExtended
+        ? T('hint.autoDoneExtended', { bpm: r.bpm.toFixed(1) })
+        : T('hint.autoDone', { bpm: r.bpm.toFixed(1) }));
     // 第 1 段返回段内偏移（相对段起点）；后续段只填 BPM（相位按前段衔接）。
     // cands：竞争层 BPM 候选（v1.11.0，识别弹窗展示「其他可能 BPM」）
     const out = segIndex === 0 ? { bpm: r.bpm, offset: r.offset } : { bpm: r.bpm };
