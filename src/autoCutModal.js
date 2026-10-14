@@ -109,7 +109,7 @@
       '.ac-table th{text-align:left;color:var(--text-secondary);font-weight:600;padding:3px 8px;border-bottom:1px solid var(--border-muted)}' +
       '.ac-table td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.12);font-variant-numeric:tabular-nums}' +
       '.ac-table tr:last-child td{border-bottom:none}' +
-      '.ac-score{display:inline-block;min-width:44px;text-align:center;padding:1px 6px;border-radius:8px;font-size:11px}' +
+      '.ac-score{display:inline-block;min-width:44px;text-align:center;padding:1px 6px;border-radius:3px;font-size:11px}' +
       '.ac-score.high{background:rgba(34,211,238,.18);color:var(--accent)}' +
       '.ac-score.mid{background:rgba(250,204,21,.16);color:var(--warning)}' +
       '.ac-score.low{background:rgba(148,163,184,.14);color:var(--text-secondary)}' +

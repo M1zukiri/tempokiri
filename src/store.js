@@ -81,19 +81,52 @@
     writeAll(all);
   }
 
-  /**
-   * 保存元数据编辑值（6 文本字段对象；经合并语义，节拍/序列键保留）。
-   * @param {File} file
-   * @param {object} meta 仅含 title/artist/album/composer/year/genre 的字符串对象
-   */
-  function saveMetadata(file, meta) {
-    saveSettings(file, { metadata: meta });
+  // 封面随 metadata 进 localStorage：Uint8Array 直接 JSON 化会变成逐字节对象，
+  // 故存 base64。超过上限则不落缓存（本次会话仍有效），避免撑爆配额——
+  // writeAll 会静默吞掉 QuotaExceededError，一旦超限会连带文本字段一起写不进去。
+  const COVER_MAX_BYTES = 1024 * 1024;
+
+  function bytesToB64(u8) {
+    let s = '';
+    const CH = 0x8000;
+    for (let i = 0; i < u8.length; i += CH) {
+      s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    }
+    return btoa(s);
   }
 
-  /** 读取元数据编辑值（无则返回 null）。 */
+  function b64ToBytes(b64) {
+    const s = atob(b64);
+    const u8 = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+    return u8;
+  }
+
+  /**
+   * 保存元数据编辑值（6 文本字段 + 可选封面；经合并语义，节拍/序列键保留）。
+   * @param {File} file
+   * @param {object} meta 文本字段对象，可含 cover:{data:Uint8Array,mime:string}
+   */
+  function saveMetadata(file, meta) {
+    const m = { ...(meta || {}) };
+    const cover = m.cover;
+    // 不写 cover 键 = 重开文件时回落解析值；仅超限或本就无封面时如此
+    delete m.cover;
+    if (cover && cover.data && cover.data.length && cover.data.length <= COVER_MAX_BYTES) {
+      m.cover = { b64: bytesToB64(cover.data), mime: cover.mime || '' };
+    }
+    saveSettings(file, { metadata: m });
+  }
+
+  /** 读取元数据编辑值（无则返回 null）；cover 还原为 {data,mime} 形状。 */
   function loadMetadata(file) {
     const s = loadSettings(file);
-    return (s && s.metadata) || null;
+    const m = (s && s.metadata) || null;
+    if (!m) return null;
+    if (m.cover && m.cover.b64) {
+      return { ...m, cover: { data: b64ToBytes(m.cover.b64), mime: m.cover.mime || '' } };
+    }
+    return m;
   }
 
   const GLOBAL_KEY = 'tempokiri.remix.global.v1';

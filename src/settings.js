@@ -257,17 +257,17 @@
     // 弹窗自身样式（自包含，避免侵入 index.html 的 style 块）
     const style = document.createElement('style');
     style.textContent =
-      '.as-form{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding:2px}' +
-      '.as-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid rgba(128,128,128,.25);border-radius:8px}' +
+      '.as-form{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto;padding:2px}' +
+      '.as-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 10px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--surface-raised)}' +
       '.as-head{display:flex;flex-direction:column;gap:2px;min-width:0}' +
       '.as-label{font-weight:600}' +
-      '.as-desc{font-size:12px;color:var(--text-secondary)}' +
+      '.as-desc{font-size:11.5px;color:var(--text-secondary)}' +
       '.as-ctrl{display:flex;align-items:center;gap:8px;position:relative}' +
       '.as-ctrl select{max-width:230px}' +
       '.as-ctrl input[type=number]{width:110px}' +
       '.as-ctrl input[type=range]{width:110px}' +
       '.as-ctrl input.invalid{border-color:#e05555;background:rgba(224,85,85,.12)}' +
-      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:var(--surface-overlay);border:1px solid var(--border-muted);color:var(--text-primary);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
+      '.help-pop{position:fixed;width:300px;max-width:calc(100vw - 16px);z-index:1000;background:var(--surface-overlay);border:1px solid var(--border-muted);color:var(--text-primary);border-radius:4px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.5)}' +
       '.help-pop b{display:block;color:var(--text-primary);font-weight:600}';
     document.head.appendChild(style);
 

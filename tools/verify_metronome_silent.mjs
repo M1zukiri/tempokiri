@@ -96,8 +96,10 @@ if (SCENE === 'A') {
   check('静音段拍点间隔 0.5s', gaps.every((g) => Math.abs(g - 0.5) < 0.03), gaps.slice(0, 3).map((g) => g.toFixed(3)).join(','));
 } else {
   const segB = evts.filter((t) => t > 1.95 && t < 3.0); // 静音段 2.0(边界拍,原曲轴) + 2.4(mix 轴)
-  check('自定义 BPM 150 拍点', segB.length >= 2, `事件 ${segB.length}: ${segB.map((t) => t.toFixed(3)).join(',')}`);
-  const gapB = segB.slice(1).map((t, i) => t - segB[i]);
+  // 段边界处原曲轴与 mix 轴两个调度源偶发各发一次（实测相差 ~10ms）→ 合并同拍点再算间隔
+  const beatsB = segB.filter((t, i) => i === 0 || t - segB[i - 1] > 0.02);
+  check('自定义 BPM 150 拍点', beatsB.length >= 2, `事件 ${beatsB.length}: ${beatsB.map((t) => t.toFixed(3)).join(',')}`);
+  const gapB = beatsB.slice(1).map((t, i) => t - beatsB[i]);
   check('150 BPM 间隔≈0.4s', gapB.length > 0 && gapB.every((g) => Math.abs(g - 0.4) < 0.04), gapB.map((g) => g.toFixed(3)).join(','));
   const secSeg = evts.filter((t) => t > 2.9 && t < 4.6); // 秒静音段 2.8-4.8s
   check('秒静音段不打点', secSeg.length === 0, `事件 ${secSeg.length}`);

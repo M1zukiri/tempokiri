@@ -6,7 +6,8 @@
  *   - 导入文件后 main.js 调 setData({ fileName, meta }) 推送当前文件元数据；
  *   - 6 个文本字段可编辑，input 事件防抖 200ms 调 onEdit（main.js 里更新
  *     state.meta 并持久化到 per-file 缓存）；空串保留为「清空该字段」语义；
- *   - 封面只读展示（缩略图，blob URL；无封面显示占位文案）；
+ *   - 封面可经「选择图片」替换（缩略图走 blob URL；无封面显示占位文案），
+ *     改动与文本字段同路径持久化（store 内转 base64，超过 1 MB 不落缓存）；
  *   - 未导入文件时打开：空表单、输入禁用；
  *   - Esc 由 main.js 统一处理（close()）。
  */
@@ -46,15 +47,16 @@
     overlay.className = 'modal-overlay';
     overlay.hidden = true;
     overlay.innerHTML =
-      '<div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="' + T('metadata.aria') + '">' +
+      '<div class="modal meta-modal" role="dialog" aria-modal="true" aria-label="' + T('metadata.aria') + '">' +
       '<h3>' + T('metadata.title') + '</h3>' +
-      '<p class="modal-sub">' + T('metadata.sub') + '</p>' +
       '<div class="meta-file"><span class="meta-file-label">' + T('metadata.fileLabel') + '</span>' +
       '<span id="metaFileName" class="meta-file-name"></span></div>' +
       '<div class="meta-cover-row">' +
       '<span class="meta-file-label">' + T('metadata.coverLabel') + '</span>' +
       '<img id="metaCover" class="meta-cover" alt="cover" hidden />' +
       '<span id="metaNoCover" class="meta-nocover">' + T('metadata.noCover') + '</span>' +
+      '<button id="metaCoverPick" class="btn btn-mini">' + T('metadata.pickCover') + '</button>' +
+      '<input id="metaCoverFile" type="file" accept="image/*" hidden />' +
       '</div>' +
       '<div class="meta-form">' +
       FIELDS.map((f) =>
@@ -73,20 +75,41 @@
 
     const style = document.createElement('style');
     style.textContent =
-      '.meta-form{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;padding:2px}' +
-      '.meta-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 10px;border:1px solid rgba(128,128,128,.25);border-radius:8px}' +
+      '.meta-modal{width:560px;max-width:calc(100vw - 40px)}' +
+      '.meta-form{display:flex;flex-direction:column;gap:6px;max-height:48vh;overflow:auto;padding:2px}' +
+      '.meta-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 10px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--surface-raised)}' +
       '.meta-label{font-weight:600;min-width:70px}' +
       '.meta-row input[type=text]{flex:1;min-width:0;max-width:340px}' +
       '.meta-row input:disabled{opacity:.55}' +
-      '.meta-file{display:flex;gap:8px;align-items:center;padding:4px 10px;font-size:13px}' +
+      '.meta-file{display:flex;gap:8px;align-items:center;padding:4px 10px;font-size:12px}' +
       '.meta-file-label{color:var(--text-secondary);font-weight:600}' +
       '.meta-file-name{word-break:break-all}' +
       '.meta-cover-row{display:flex;gap:8px;align-items:center;padding:4px 10px}' +
-      '.meta-cover{max-width:120px;max-height:120px;object-fit:contain;border-radius:6px;border:1px solid var(--border-muted)}' +
+      '.meta-cover{max-width:120px;max-height:120px;object-fit:contain;border-radius:4px;border:1px solid var(--border-muted)}' +
       '.meta-nocover{font-size:12px;color:var(--text-secondary)}';
     document.head.appendChild(style);
 
     document.getElementById('metaClose').addEventListener('click', () => { overlay.hidden = true; });
+
+    // 封面：选择图片后立即生效（导出 MP3 时经 attachToMp3 写入 APIC 帧），
+    // 与文本字段同一防抖路径持久化。
+    const coverFile = document.getElementById('metaCoverFile');
+    document.getElementById('metaCoverPick').addEventListener('click', () => {
+      if (data && data.meta && onEdit) coverFile.click();
+    });
+    coverFile.addEventListener('change', () => {
+      const f = coverFile.files && coverFile.files[0];
+      coverFile.value = '';
+      if (!f || !data || !data.meta || !onEdit) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        data.meta.cover = { data: new Uint8Array(reader.result), mime: f.type || 'image/jpeg' };
+        renderCover();
+        clearTimeout(debTimer);
+        debTimer = setTimeout(() => onEdit({ ...data.meta }), 200);
+      };
+      reader.readAsArrayBuffer(f);
+    });
 
     FIELDS.forEach((f) => {
       const input = document.getElementById('meta-' + f.key);
@@ -125,6 +148,8 @@
       input.value = meta && meta[f.key] != null ? meta[f.key] : '';
       input.disabled = !meta;
     });
+    const coverPick = document.getElementById('metaCoverPick');
+    if (coverPick) coverPick.disabled = !meta;
     renderCover();
   }
 

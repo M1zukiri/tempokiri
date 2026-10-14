@@ -380,9 +380,9 @@
   "metadata": {
     "aria": "元数据",
     "title": "元数据",
-    "sub": "导入文件时自动读取元数据，导出音频时自动附加。修改即时保存，重新打开同一文件可恢复。",
     "fileLabel": "来源文件",
     "coverLabel": "封面",
+    "pickCover": "选择图片",
     "noCover": "无封面",
     "close": "关闭",
     "labels": {

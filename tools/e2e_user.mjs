@@ -131,12 +131,11 @@ async function stageCore() {
   await cdp.click('#btnManualAdd');
   await sleep(300);
   await tryRec('手动添加-表单可见', () => cdp.evalJs("document.getElementById('manualForm').hidden"));
-  await tryRec('手动添加-单位按钮', () => cdp.evalJs("(document.querySelector('#maStart .unit-mode-btn') || {}).textContent || null"));
-  await cdp.click('#maStart .unit-mode-btn');
-  await sleep(120);
-  await cdp.click('#maEnd .unit-mode-btn');
-  await sleep(120);
-  await cdp.evalJs("(() => { const set = (sel, v) => { const i = document.querySelector(sel + ' .unit-time'); i.value = String(v); i.dispatchEvent(new Event('change', {bubbles:true})); }; set('#maStart', 0.5); set('#maEnd', 2.5); return true; })()");
+  // 1.17.0 起手动添加表单改用 rangeInput 双语义组件（#maRange .range-input），旧 UnitInput（#maStart/#maEnd）已移除
+  await tryRec('手动添加-双语义组件', () => cdp.evalJs("!!document.querySelector('#maRange .range-input')"));
+  await cdp.evalJs("(() => { const r = document.querySelector('#maRange .ri-block-time input[type=radio]'); r.checked = true; r.dispatchEvent(new Event('change', {bubbles:true})); return true; })()");
+  await sleep(150);
+  await cdp.evalJs("(() => { const set = (sel, v) => { const i = document.querySelector(sel); i.value = String(v); i.dispatchEvent(new Event('change', {bubbles:true})); }; set('#maRange .ri-ts', 0.5); set('#maRange .ri-te', 2.5); return true; })()");
   await sleep(200);
   await cdp.click('#btnManualOk');
   await sleep(400);

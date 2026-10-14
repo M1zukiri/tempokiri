@@ -295,7 +295,7 @@ test('attachToWav: 非空 meta 插入 LIST/INFO 且结构完好', () => {
 });
 
 // ---------- 合并 ----------
-test('mergeMeta: 编辑值覆盖解析值、空串清空、cover 恒取解析值', () => {
+test('mergeMeta: 编辑值覆盖解析值、空串清空、未带 cover 时保持解析值', () => {
   const parsed = { title: '解析值', artist: '解析值', album: null, composer: null, year: null, genre: null, cover: { data: new Uint8Array(PNG), mime: 'image/png' } };
   const merged = M.mergeMeta(parsed, { title: '编辑值', artist: '', album: '编辑专辑' });
   assert.equal(merged.title, '编辑值');
@@ -303,4 +303,15 @@ test('mergeMeta: 编辑值覆盖解析值、空串清空、cover 恒取解析值
   assert.equal(merged.album, '编辑专辑');
   assert.equal(merged.composer, null);
   assert.equal(merged.cover, parsed.cover);
+});
+
+test('mergeMeta: 编辑值显式带 cover 时覆盖解析值（封面可编辑）', () => {
+  const parsed = { title: 'a', cover: { data: new Uint8Array(PNG), mime: 'image/png' } };
+  const mine = { data: new Uint8Array([1, 2, 3]), mime: 'image/jpeg' };
+  assert.equal(M.mergeMeta(parsed, { title: 'a', cover: mine }).cover, mine);
+});
+
+test('mergeMeta: 编辑值 cover 为 null 时清空解析值', () => {
+  const parsed = { title: 'a', cover: { data: new Uint8Array(PNG), mime: 'image/png' } };
+  assert.equal(M.mergeMeta(parsed, { title: 'a', cover: null }).cover, null);
 });

@@ -498,7 +498,8 @@
   }
 
   /**
-   * 合并解析值与编辑值：编辑值（可能含空串）逐字段覆盖，cover 恒取解析值。
+   * 合并解析值与编辑值：编辑值（可能含空串）逐字段覆盖；
+   * cover 在编辑值显式带该键时覆盖（null 表示清空），否则保持解析值。
    * @param {object} parsed
    * @param {object} edited
    * @returns {object}
@@ -510,7 +511,7 @@
     for (const f of TEXT_FIELDS) {
       if (f in e) out[f] = e[f] == null ? null : String(e[f]);
     }
-    out.cover = p.cover || null;
+    out.cover = ('cover' in e) ? (e.cover || null) : (p.cover || null);
     return out;
   }
 

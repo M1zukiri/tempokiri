@@ -1790,13 +1790,16 @@
       const q = parseFloat(silentQtySec.value);
       silentQty.value = Number.isFinite(q) && q > 0 ? String(+(q / silentBarDur()).toFixed(3)) : '';
     }
-    /** radio 切换：应用当前缓存值到选中语义，另一侧禁用（只读派生随后单向往上更新）。 */
-    function setSilentModeSection(mode) {
+    /** radio 切换：应用当前缓存值到选中语义，另一侧禁用（只读派生随后单向往上更新）。
+     *  deriveFrom='mus' 时以音乐单位为基准派生精确时长（表单初始化用，见 toggleSilentForm）。 */
+    function setSilentModeSection(mode, deriveFrom) {
       const mus = mode === 'mus';
       silentQty.disabled = !mus;
       silentUnit.disabled = !mus;
       silentQtySec.disabled = mus;
-      if (mus) syncSilentFromSec(); else syncSilentFromMus();
+      if (deriveFrom === 'mus') syncSilentFromMus();
+      else if (mus) syncSilentFromSec();
+      else syncSilentFromMus();
     }
     function silBpmOrDefault() {
       const v = parseFloat(silentBpm.value);
@@ -1820,9 +1823,9 @@
         // 音乐单位不再依赖网格：静音段自带 BPM/拍号（跟随前段 > 网格首段 > 120/4-4）
         silentMus.checked = true;
         silentSec.checked = false;
+        // 默认 1 小节：以音乐单位为基准派生精确时长（原先以 1 秒反推小节，154 BPM 下得 0.642）
         silentQty.value = '1';
-        silentQtySec.value = '1';
-        setSilentModeSection('mus');
+        setSilentModeSection('mus', 'mus');
         const prev = state.sequence[state.sequence.length - 1];
         const bpmHint = prev && prev.silent ? prev.bpm
           : (prev && state.grid && state.grid.segments ? (MC.metronome.segmentAt(state.grid.segments, prev.startTime) || {}).bpm
@@ -2120,10 +2123,8 @@
     MC.metaModal.init({
       onEdit: (meta) => {
         state.meta = meta;
-        if (state.file) {
-          const { cover, ...fields } = meta; // cover 只读，不持久化
-          store.saveMetadata(state.file, fields);
-        }
+        // cover 一并交给 store（内部转 base64 并限幅），文本字段与封面的持久化路径一致
+        if (state.file) store.saveMetadata(state.file, meta);
       },
     });
     refreshAdvancedSettings();

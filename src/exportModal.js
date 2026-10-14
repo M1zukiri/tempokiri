@@ -217,13 +217,13 @@
     // Tab 栏与行内布局样式（自包含）
     const style = document.createElement('style');
     style.textContent =
-      '.exp-tabs{display:flex;gap:8px;margin-bottom:14px}' +
-      '.exp-tab{padding:6px 14px;border-radius:8px;border:1px solid var(--border-muted);background:var(--surface-raised);color:var(--text-secondary);cursor:pointer;font-size:13px}' +
+      '.exp-tabs{display:flex;gap:4px;margin-bottom:12px}' +
+      '.exp-tab{padding:5px 13px;border-radius:3px;border:1px solid var(--border-muted);background:var(--surface-raised);color:var(--text-secondary);cursor:pointer;font-size:12px}' +
       '.exp-tab.active{color:var(--accent);border-color:var(--accent);background:var(--accent-muted)}' +
       '.exp-tab:disabled{opacity:.4;cursor:not-allowed}' +
       '.exp-check{flex-direction:row !important;gap:6px !important;cursor:pointer}' +
-      '.exp-group{display:flex;flex-direction:column;gap:10px;padding:10px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-md)}' +
-      '.exp-group-title{font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.5px}';
+      '.exp-group{display:flex;flex-direction:column;gap:8px;padding:9px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-md)}' +
+      '.exp-group-title{font-size:10px;font-weight:600;color:var(--text-tertiary);letter-spacing:.8px;text-transform:uppercase}';
     document.head.appendChild(style);
     return overlay;
   }

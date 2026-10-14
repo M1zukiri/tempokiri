@@ -80,3 +80,32 @@ test('全局设置：主题默认 aurora 且可保存切换（主题系统）', 
   S.saveGlobalSettings({ theme: 'x' });
   assert.equal(S.loadGlobalSettings().theme, 'x');
 });
+
+test('文件设置：metadata 封面经 base64 往返（不逐字节 JSON 化）', () => {
+  mem.clear();
+  const file = { name: 'cover.mp3', size: 10, lastModified: 7 };
+  S.saveMetadata(file, { title: 't', cover: { data: new Uint8Array([0, 1, 2, 253, 254, 255]), mime: 'image/png' } });
+  const raw = JSON.parse(mem.get(S.KEY))[S.fingerprint(file)].metadata;
+  assert.equal(typeof raw.cover.b64, 'string', '落盘应为 base64 字符串');
+  assert.equal(raw.cover.mime, 'image/png');
+  const back = S.loadMetadata(file);
+  assert.deepEqual(Array.from(back.cover.data), [0, 1, 2, 253, 254, 255]);
+  assert.equal(back.cover.mime, 'image/png');
+  assert.equal(back.title, 't');
+});
+
+test('文件设置：封面超过上限不落缓存，文本字段仍保存', () => {
+  mem.clear();
+  const file = { name: 'big.mp3', size: 10, lastModified: 8 };
+  S.saveMetadata(file, { title: 't', cover: { data: new Uint8Array(1024 * 1024 + 1), mime: 'image/png' } });
+  const back = S.loadMetadata(file);
+  assert.equal('cover' in back, false, '超限封面不写 cover 键，重开时回落解析值');
+  assert.equal(back.title, 't');
+});
+
+test('文件设置：无封面时不写 cover 键', () => {
+  mem.clear();
+  const file = { name: 'nocover.mp3', size: 10, lastModified: 9 };
+  S.saveMetadata(file, { title: 't' });
+  assert.equal('cover' in S.loadMetadata(file), false);
+});

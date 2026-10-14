@@ -338,9 +338,13 @@ async function s11() {
   await boot();
   await cdp.click('#btnManualAdd');
   await sleep(300);
-  await evalJs("document.querySelector('#maStart .unit-mode-btn').click(); document.querySelector('#maEnd .unit-mode-btn').click()");
+  // 1.17.0 起手动添加为 rangeInput 双语义组件（#maRange .range-input，旧 #maStart/#maEnd UnitInput 已移除）；
+  // warn 路径改走「空段落拦截」：时间模式填超出曲长的区间 → manualAddEmpty → status-warn
+  await evalJs("(() => { const r = document.querySelector('#maRange .ri-block-time input[type=radio]'); r.checked = true; r.dispatchEvent(new Event('change', {bubbles:true})); return true; })()");
   await sleep(150);
-  await evalJs("(() => { const set=(sel,v)=>{const i=document.querySelector(sel+' .unit-time'); i.value=String(v); i.dispatchEvent(new Event('change',{bubbles:true}));}; set('#maStart',5); set('#maEnd',2); return true; })()");
+  // rangeInput.commit 按字段校验：只填起点即 change 会被判无效整行重置；
+  // 模拟真实「两格填完再失焦」——两 input 先赋值，最后对终点派发一次 change
+  await evalJs("(() => { const ts = document.querySelector('#maRange .ri-ts'); const te = document.querySelector('#maRange .ri-te'); ts.value = '500'; te.value = '600'; te.dispatchEvent(new Event('change', {bubbles:true})); return true; })()");
   await sleep(150);
   await cdp.click('#btnManualOk');
   await sleep(400);
@@ -448,10 +452,12 @@ async function s15() {
   await boot(); // 无网格：手动添加走时间模式
   await cdp.click('#btnManualAdd');
   await sleep(300);
-  await evalJs("document.querySelector('#maStart .unit-mode-btn').click(); document.querySelector('#maEnd .unit-mode-btn').click()");
+  // 1.17.0 起手动添加为 rangeInput 双语义组件（#maRange .range-input，旧 #maStart/#maEnd UnitInput 已移除）
+  await evalJs("(() => { const r = document.querySelector('#maRange .ri-block-time input[type=radio]'); r.checked = true; r.dispatchEvent(new Event('change', {bubbles:true})); return true; })()");
   await sleep(150);
   const setRange = async (s, e) => {
-    await evalJs(`(() => { const set=(sel,v)=>{const i=document.querySelector(sel+' .unit-time'); i.value=String(v); i.dispatchEvent(new Event('change',{bubbles:true}));}; set('#maStart',${s}); set('#maEnd',${e}); return true; })()`);
+    // 两格先赋值、终点一次性 change（见 S11 注：commit 按字段校验，逐字段 change 会整行重置）
+    await evalJs(`(() => { const ts = document.querySelector('#maRange .ri-ts'); const te = document.querySelector('#maRange .ri-te'); ts.value = '${s}'; te.value = '${e}'; te.dispatchEvent(new Event('change', {bubbles:true})); return true; })()`);
     await sleep(150);
     await cdp.click('#btnManualOk');
     await sleep(350);
@@ -461,12 +467,16 @@ async function s15() {
   check('S15 [20,22] 卡片数 0', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 0, 'cards=0');
   await setRange(16, 17); // 起点在曲尾
   check('S15 [16,17] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
-  await setRange(-5, -1); // 完全在曲前：unitInput 层拒绝负值（提示「请检查」或「无法添加」均可）
-  check('S15 [-5,-1] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1 || (await evalJs("document.getElementById('statusBar').textContent")).indexOf('手动添加失败') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
+  await setRange(-5, -1); // 完全在曲前（负时间合法，1.17.3）：空段落拦截拒绝
+  check('S15 [-5,-1] 拒绝', (await evalJs("document.getElementById('statusBar').textContent")).indexOf('无法添加') !== -1, await evalJs("document.getElementById('statusBar').textContent"));
   await setRange(15.5, 100); // 部分重叠（用户用例）→ 允许
   check('S15 [15.5,100] 允许', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 1, 'cards=1');
-  await setRange(2, 1); // 倒置
-  check('S15 [2,1] 倒置拒绝', (await evalJs("document.querySelectorAll('#seqList .seq-card').length")) === 1, 'cards 保持 1');
+  // 倒置：rangeInput 组件层静默拒绝——commit 按字段提交，ts=2 单独合法即生效，
+  // te=1 违反 te>ts 被拒后回退到内部语义（上一合法区间），不产生新卡片
+  await evalJs("(() => { const set=(sel,v)=>{const i=document.querySelector(sel); i.value=String(v); i.dispatchEvent(new Event('change',{bubbles:true}));}; set('#maRange .ri-ts',2); set('#maRange .ri-te',1); return true; })()");
+  await sleep(250);
+  const inverted = await evalJs("(() => { const ts = parseFloat(document.querySelector('#maRange .ri-ts').value); const te = parseFloat(document.querySelector('#maRange .ri-te').value); const n = document.querySelectorAll('#seqList .seq-card').length; return JSON.stringify({ legal: te > ts, n }); })()");
+  check('S15 [2,1] 倒置拒绝（保持上一合法区间+卡片不增）', inverted === JSON.stringify({ legal: true, n: 1 }), inverted);
   const f = await shot('empty_item_reject');
   check('S15 截图已保存', !!f, f);
 }
