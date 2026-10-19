@@ -247,9 +247,10 @@
         "nebula": "Meltyland's Nightmare",
         "paper": "Kamikiri",
         "seigaiha": "Seigaiha",
-        "kurenai": "Kurenai"
+        "kurenai": "Kurenai",
+        "mono": "Monochrome"
       },
-      "helpRange": "五选一",
+      "helpRange": "六选一",
       "helpRecommend": "Aoi Aurora"
     },
     "hop": {

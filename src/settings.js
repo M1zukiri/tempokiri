@@ -66,6 +66,7 @@
         { label: T('settings.theme.presets.paper'), value: 'paper' },
         { label: T('settings.theme.presets.seigaiha'), value: 'seigaiha' },
         { label: T('settings.theme.presets.kurenai'), value: 'kurenai' },
+        { label: T('settings.theme.presets.mono'), value: 'mono' },
       ],
       help: { range: T('settings.theme.helpRange'), recommend: T('settings.theme.helpRecommend') },
     },
@@ -169,7 +170,7 @@
     followMs: [1, 5000],
     renderScale: [0.1, 4],
   };
-  const EXTRACT_SET = { auto: 1, webcodecs: 1, capture: 1, aurora: 1, nebula: 1, paper: 1, seigaiha: 1, kurenai: 1 };
+  const EXTRACT_SET = { auto: 1, webcodecs: 1, capture: 1, aurora: 1, nebula: 1, paper: 1, seigaiha: 1, kurenai: 1, mono: 1 };
 
   function validateField(key, value) {
     if (key === 'videoExtract' || key === 'theme') return !!EXTRACT_SET[value];

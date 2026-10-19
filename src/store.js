@@ -140,7 +140,7 @@
     captureRate: 4,         // captureStream 采集倍速（1–16）
     followMs: 90,           // 视频跟随 seek 节流间隔（毫秒）
     renderScale: 1.0,       // 波形渲染 DPR 系数（0.1–4）
-    theme: 'aurora',        // 界面主题：'aurora' | 'nebula' | 'paper' | 'seigaiha' | 'kurenai'
+    theme: 'aurora',        // 界面主题：'aurora' | 'nebula' | 'paper' | 'seigaiha' | 'kurenai' | 'mono'
     metronomeOn: false,     // 节拍器开关（播放时跟随小节线）
     metronomeSeqOn: true,   // 拼接序列播放时启用节拍器（默认开）
     metronomeUnit: 0,       // 几分音符（0 = 自动取拍号分母）

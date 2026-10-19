@@ -8,12 +8,12 @@
  * 覆盖：
  *   S1 载入 WAV 后零 JS 错误
  *   S2 走带条（#controlBar）几何位置必须在波形（#waveWrap）下方
- *   S3 五主题切换后 --accent 实际生效且不堪 Silver 回退
+ *   S3 六主题切换后 --accent 实际生效且不堪 Silver 回退
  *   S4 快捷微调、播放、添加选中区间可用（序列卡片渲染）；高密度行（19px 方形序号、4×18 进度条 knob）
  *   S5 六个弹窗（节拍设置/导出/元数据/自动剪辑/高级设置/README）零错误打开且圆角统一 ≤4px
  *   S6 360px 窄屏无横向溢出
  *   S8 舞台布局：波形 300px 高、视频预览位于波形右侧（360px 转上下堆叠）；已有网格时切文件走工作区确认
- *   S9 五主题下被引用的 CSS 变量全部可解析（令牌补齐回归防护）
+ *   S9 六主题下被引用的 CSS 变量全部可解析（令牌补齐回归防护）
  *   S10 页脚吸底（空态贴视口底部）
  * 输出：tools/ui_shots/v20/*.png + assertions.json
  */
@@ -82,8 +82,8 @@ const density = await cdp.evalJs(`(() => {
 })()`);
 ok('S2-4 首屏可见 波形+走带+序列 三区', density.visibleBands === 3, JSON.stringify(density));
 
-// ---------- S3 五主题切换 ----------
-const themes = ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai'];
+// ---------- S3 六主题切换 ----------
+const themes = ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai', 'mono'];
 const accents = {};
 for (const t of themes) {
   await cdp.evalJs(`document.documentElement.setAttribute('data-theme','${t}')`);
@@ -92,8 +92,8 @@ for (const t of themes) {
   await shot(cdp, 'theme-' + t);
 }
 const uniq = new Set(Object.values(accents));
-ok('S3-1 五主题 accent 各不相同', uniq.size === 5, JSON.stringify(accents));
-ok('S3-2 五主题均取到有效色值', Object.values(accents).every(v => /^#|^rgb/.test(v)), JSON.stringify(accents));
+ok('S3-1 六主题 accent 各不相同', uniq.size === 6, JSON.stringify(accents));
+ok('S3-2 六主题均取到有效色值', Object.values(accents).every(v => /^#|^rgb/.test(v)), JSON.stringify(accents));
 await cdp.evalJs(`document.documentElement.setAttribute('data-theme','aurora')`);
 await sleep(200);
 
@@ -246,7 +246,7 @@ for (const t of themes) {
   const bad = Object.entries(vals).filter(([, v]) => !v).map(([k]) => k);
   if (bad.length) missingVars[t] = bad;
 }
-ok('S9-1 五主题下 CSS 变量引用全部可解析', Object.keys(missingVars).length === 0, `引用 ${cssRefs.length} 个 · 缺失 ${JSON.stringify(missingVars)}`);
+ok('S9-1 六主题下 CSS 变量引用全部可解析', Object.keys(missingVars).length === 0, `引用 ${cssRefs.length} 个 · 缺失 ${JSON.stringify(missingVars)}`);
 await cdp.evalJs(`document.documentElement.setAttribute('data-theme','aurora')`);
 await sleep(200);
 

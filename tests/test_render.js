@@ -293,14 +293,17 @@ test('setTheme: 切换 canvas 主题色并回退未知主题（主题系统）',
   R.setTheme('kurenai');
   assert.equal(R.THEME.bg, 'transparent');
   assert.equal(R.THEME.wave, '#b44751');
+  R.setTheme('mono');
+  assert.equal(R.THEME.bg, 'transparent');
+  assert.equal(R.THEME.wave, '#d9d9d9');
   R.setTheme('unknown-theme');
   assert.equal(R.THEME.wave, '#22d3ee', '未知主题应回退 aurora');
   R.setTheme('aurora'); // 恢复默认，避免污染后续用例
 });
 
-test('CANVAS_THEMES: 五套主题各含 13 个绘制字段（主题系统）', () => {
+test('CANVAS_THEMES: 六套主题各含 13 个绘制字段（主题系统）', () => {
   const fields = ['bg', 'gridBg', 'wave', 'waveHigh', 'waveDim', 'barLine', 'beatLine', 'selFill', 'selBorder', 'playLine', 'cutLine', 'axis', 'barLabel'];
-  for (const name of ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai']) {
+  for (const name of ['aurora', 'nebula', 'paper', 'seigaiha', 'kurenai', 'mono']) {
     assert.ok(R.CANVAS_THEMES[name], '缺少主题：' + name);
     for (const f of fields) {
       assert.ok(R.CANVAS_THEMES[name][f], `${name}.${f} 缺失`);

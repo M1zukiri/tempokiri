@@ -277,7 +277,7 @@ async function s8() {
   await record('S8.主题按钮初始', () => evalJs("(() => { const b = document.getElementById('btnTheme'); return JSON.stringify({exists: !!b, label: b ? b.textContent : null, theme: document.documentElement.dataset.theme}); })()"));
   check('S8 页脚主题按钮存在（M8）', await evalJs("!!document.getElementById('btnTheme')"), 'btnTheme');
   if (await evalJs("!!document.getElementById('btnTheme')")) {
-    const expectOrder = ['nebula', 'paper', 'seigaiha', 'kurenai', 'aurora'];
+    const expectOrder = ['nebula', 'paper', 'seigaiha', 'kurenai', 'mono', 'aurora'];
     let shots = [];
     for (const expect of expectOrder) {
       await cdp.click('#btnTheme');

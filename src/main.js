@@ -236,7 +236,7 @@
 
   /** 应用界面主题：切 `data-theme` 属性 + 同步波形 canvas 色值。 */
   function applyTheme(name) {
-    const n = (name === 'nebula' || name === 'paper' || name === 'seigaiha' || name === 'kurenai') ? name : 'aurora';
+    const n = (name === 'nebula' || name === 'paper' || name === 'seigaiha' || name === 'kurenai' || name === 'mono') ? name : 'aurora';
     document.documentElement.dataset.theme = n;
     render.setTheme(n);
     pulseColor = null; // 律动条颜色缓存失效，下次绘制重读新 accent

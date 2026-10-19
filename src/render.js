@@ -234,6 +234,21 @@
       axis: '#a0837b',
       barLabel: '#b79a90',
     },
+    mono: {
+      bg: 'transparent',
+      gridBg: 'transparent',
+      wave: '#d9d9d9',
+      waveHigh: '#ffffff',
+      waveDim: 'rgba(217,217,217,0.45)',
+      barLine: 'rgba(255,255,255,0.80)',
+      beatLine: 'rgba(255,255,255,0.16)',
+      selFill: 'rgba(255,255,255,0.20)',
+      selBorder: '#ffffff',
+      playLine: '#f5f5f5',
+      cutLine: '#8a8a8a',
+      axis: '#6f6f6f',
+      barLabel: '#b5b5b5',
+    },
   };
 
   // ---------- 波形平移增量渲染（P0）----------
