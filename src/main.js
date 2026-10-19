@@ -1585,7 +1585,7 @@
 
   // ---------- 导出 ----------
   function openExportDialog() {
-    if (!state.sequence.length) {
+    if (!state.sequence.length && !state.grid) {
       status(T('status.nothingToExport'));
       return;
     }
@@ -1595,12 +1595,31 @@
       typeof window.VideoEncoder === 'function' &&
       typeof window.VideoDecoder === 'function';
     MC.openExport(
-      { baseName: base + '_remix', kind: state.kind, canVideo, sampleRate: state.sampleRate },
+      { baseName: base + '_remix', kind: state.kind, canVideo, canData: !!state.grid, sampleRate: state.sampleRate },
       { onExport: doExport }
     );
   }
 
   function doExport(opts) {
+    // 数据 Tab：只依赖网格，不要求音轨/序列
+    if (opts.tab === 'data') {
+      const data = MC.buildGridData({
+        grid: state.grid,
+        offset: state.offset,
+        duration: state.duration,
+        meta: state.meta,
+      });
+      if (!data) {
+        status(T('status.noGrid'), 'warn');
+        return;
+      }
+      const isJson = opts.format === 'json';
+      const text = isJson ? MC.gridDataToJSON(data) : MC.gridDataToCSV(data);
+      const ext = isJson ? '.json' : '.csv';
+      exp.downloadBlob(text, opts.fileName + ext, isJson ? 'application/json' : 'text/csv;charset=utf-8');
+      status(T('status.exportedData', { name: opts.fileName + ext }));
+      return;
+    }
     if (!state.rawMono) {
       status(T('status.noTrack'));
       return;

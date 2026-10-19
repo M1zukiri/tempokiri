@@ -172,7 +172,9 @@
     "posDesc": "（第 {bar} 小节 {cell} 格）",
     "majRendering": "bg.mp4 合成中…{pct}%",
     "majDoneVideo": "Majdata 导出完成：bg.mp4 + track.mp3",
-    "majDoneAudio": "track.mp3 导出完成"
+    "majDoneAudio": "track.mp3 导出完成",
+    "noGrid": "请先设置节拍网格",
+    "exportedData": "节拍数据导出完成：{name}"
   },
   "metronome": {
     "aria": "节拍器设置",
@@ -374,6 +376,10 @@
     "majPadBarDesc": "自动在导出时为音/视频补充一个静音小节",
     "groupCodec": "编码",
     "groupOptions": "选项",
+    "groupData": "节拍数据",
+    "tabData": "节拍数据",
+    "dataFormat": "导出格式",
+    "dataNote": "CSV：每小节一行（bar/start_sec/end_sec/duration_sec/bpm/beats_per_bar）；JSON：含 segments/bars/beats 全量数据。",
     "statusEmptyName": "请填写文件名",
     "aacEnvHint": "当前环境不支持 AAC 音频编码，视频导出无法带音轨。可改用 Majdata 导出（bg.mp4 纯视频 + 独立 track.mp3），或换用 Chrome/Edge 完整环境。",
     "aacBitrateHint": "当前采样率下该 AAC 码率不受支持，请选择更低码率。",

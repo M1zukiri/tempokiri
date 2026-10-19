@@ -54,6 +54,7 @@
           <button type="button" class="exp-tab" data-tab="video">${T('export.tabVideo')}</button>
           <button type="button" class="exp-tab active" data-tab="audio">${T('export.tabAudio')}</button>
           <button type="button" class="exp-tab" data-tab="majdata">${T('export.tabMajdata')}</button>
+          <button type="button" class="exp-tab" data-tab="data">${T('export.tabData')}</button>
         </div>
 
         <div class="exp-panel" data-panel="audio">
@@ -205,6 +206,24 @@
           </div>
         </div>
 
+        <div class="exp-panel" data-panel="data" hidden>
+          <div class="modal-form">
+            <div class="exp-group">
+              <div class="exp-group-title">${T('export.groupData')}</div>
+              <label>${T('export.dataFormat')}
+                <select id="dFormat">
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                </select>
+              </label>
+              <p class="modal-sub">${T('export.dataNote')}</p>
+            </div>
+            <label>${T('export.fileName')}
+              <input id="dName" type="text" />
+            </label>
+          </div>
+        </div>
+
         <div id="xStatus" class="modal-status" hidden></div>
         <div class="modal-actions">
           <span class="spacer"></span>
@@ -309,6 +328,7 @@
     el('mCrossfade').value = String(g.crossfadeMs);
     el('aName').value = opts.baseName || 'remix';
     el('vName').value = opts.baseName || 'remix';
+    el('dName').value = (opts.baseName || 'remix') + '_grid';
     // 视频 AAC 码率按源采样率动态约束（22050 Hz 不支持 256k）
     refreshAacBitrate(opts.sampleRate || 48000);
     // 「跟随源」标注实际解码采样率（非 WAV 源按设备率解码，消除误导）
@@ -317,6 +337,8 @@
     // Tab 可用性：视频 Tab 仅视频源 + WebCodecs
     const canVideoTab = opts.kind === 'video' && !!opts.canVideo;
     overlay.querySelector('.exp-tab[data-tab="video"]').disabled = !canVideoTab;
+    // 数据 Tab 仅在有网格时可用（节拍/网格导出的输入）
+    overlay.querySelector('.exp-tab[data-tab="data"]').disabled = !opts.canData;
     // Majdata：纯音频源隐藏 bg.mp4 码率并提示
     const isAudioOnly = opts.kind !== 'video';
     el('mVideoRow').hidden = isAudioOnly;
@@ -360,8 +382,8 @@
     el('xOk').addEventListener('click', () => {
       if (!exportCb) return;
       const tab = currentTab();
-      if (tab === 'audio' || tab === 'video') {
-        const name = el(tab === 'audio' ? 'aName' : 'vName').value.trim();
+      if (tab === 'audio' || tab === 'video' || tab === 'data') {
+        const name = el(tab === 'audio' ? 'aName' : tab === 'video' ? 'vName' : 'dName').value.trim();
         if (!name) {
           el('xStatus').hidden = false;
           el('xStatus').textContent = T('export.statusEmptyName');
@@ -393,6 +415,12 @@
           mute: !el('vAudio').checked,
           crossfadeMs,
           fileName: el('vName').value.trim(),
+        });
+      } else if (tab === 'data') {
+        exportCb({
+          tab: 'data',
+          format: el('dFormat').value,
+          fileName: el('dName').value.trim(),
         });
       } else {
         exportCb({
