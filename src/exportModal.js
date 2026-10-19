@@ -328,6 +328,102 @@
     return sel.value === 'custom' ? fallback : parseFloat(sel.value);
   }
 
+  /** 码率双轨回填：数字框设值，档位命中预设则选中，否则切「自定义」。 */
+  function setDualTrack(selId, numId, value, presets) {
+    const sel = el(selId);
+    const num = el(numId);
+    if (!sel || !num || !isFinite(value)) return;
+    num.value = String(value);
+    num.classList.remove('invalid');
+    sel.value = presets.indexOf(value) >= 0 ? String(value) : 'custom';
+  }
+
+  /** 上次导出参数 → 控件（全局设置里的 exportPrefs，读取前已 sanitize）。 */
+  function applyPrefs(p) {
+    if (!p) return;
+    if (p.audio) {
+      const a = p.audio;
+      el('aFormat').value = a.format;
+      el('aBitDepth').value = String(a.bitDepth);
+      setDualTrack('aMp3BitrateSel', 'aMp3BitrateNum', a.mp3Bitrate, BITRATE_PRESETS.mp3);
+      el('aSampleRate').value = a.sampleRate;
+      el('aNormalize').checked = a.normalize;
+      el('aPeak').value = String(a.peakDb);
+      el('aLufs').value = a.lufsTarget == null ? '' : String(a.lufsTarget);
+      el('aCrossfade').value = String(a.crossfadeMs);
+      el('aFadeIn').value = String(a.fadeInMs);
+      el('aFadeOut').value = String(a.fadeOutMs);
+      updateAudioVisibility();
+    }
+    if (p.video) {
+      const v = p.video;
+      setDualTrack('vBitrateSel', 'vBitrateNum', v.videoBitrate / 1e6, BITRATE_PRESETS.video);
+      el('vFramerate').value = v.framerate;
+      el('vResolution').value = v.resolution;
+      el('vAudioBitrate').value = String(v.audioBitrate / 1000);
+      el('vAudio').checked = v.includeAudio;
+      el('vCrossfade').value = String(v.crossfadeMs);
+      el('vFadeIn').value = String(v.fadeInMs);
+      el('vFadeOut').value = String(v.fadeOutMs);
+    }
+    if (p.majdata) {
+      const m = p.majdata;
+      setDualTrack('mVideoBitrateSel', 'mVideoBitrateNum', m.videoBitrate / 1e6, BITRATE_PRESETS.video);
+      el('mMp3Bitrate').value = String(m.mp3Bitrate);
+      el('mNormalize').checked = m.normalize;
+      el('mPeak').value = String(m.peakDb);
+      el('mLufs').value = m.lufsTarget == null ? '' : String(m.lufsTarget);
+      el('mCrossfade').value = String(m.crossfadeMs);
+      el('mFadeIn').value = String(m.fadeInMs);
+      el('mFadeOut').value = String(m.fadeOutMs);
+      el('mPadBar').checked = m.padBar;
+      el('mPeakRow').hidden = !m.normalize;
+    }
+    if (p.data) el('dFormat').value = p.data.format;
+  }
+
+  /** 当前控件 → 可持久化的参数对象（不含文件名字段，名字每次按源文件重新生成）。 */
+  function snapshotPrefs() {
+    const crossfadeOf = (id) => Math.max(0, parseInt(el(id).value, 10) || 0);
+    const fadeOf = (id) => Math.max(0, parseFloat(el(id).value) || 0);
+    return {
+      audio: {
+        format: el('aFormat').value,
+        bitDepth: parseInt(el('aBitDepth').value, 10),
+        mp3Bitrate: readBitrate(el('aMp3BitrateSel'), el('aMp3BitrateNum'), 8, 320, 192),
+        sampleRate: el('aSampleRate').value,
+        normalize: el('aNormalize').checked,
+        peakDb: parseFloat(el('aPeak').value),
+        lufsTarget: el('aLufs').value ? parseFloat(el('aLufs').value) : null,
+        crossfadeMs: crossfadeOf('aCrossfade'),
+        fadeInMs: fadeOf('aFadeIn'),
+        fadeOutMs: fadeOf('aFadeOut'),
+      },
+      video: {
+        videoBitrate: Math.round(readBitrate(el('vBitrateSel'), el('vBitrateNum'), 0.5, 50, 6) * 1e6),
+        framerate: el('vFramerate').value,
+        resolution: el('vResolution').value,
+        audioBitrate: parseInt(el('vAudioBitrate').value, 10) * 1000,
+        includeAudio: el('vAudio').checked,
+        crossfadeMs: crossfadeOf('vCrossfade'),
+        fadeInMs: fadeOf('vFadeIn'),
+        fadeOutMs: fadeOf('vFadeOut'),
+      },
+      majdata: {
+        videoBitrate: Math.round(readBitrate(el('mVideoBitrateSel'), el('mVideoBitrateNum'), 0.5, 50, 6) * 1e6),
+        mp3Bitrate: parseInt(el('mMp3Bitrate').value, 10),
+        normalize: el('mNormalize').checked,
+        peakDb: parseFloat(el('mPeak').value),
+        lufsTarget: el('mLufs').value ? parseFloat(el('mLufs').value) : null,
+        crossfadeMs: crossfadeOf('mCrossfade'),
+        fadeInMs: fadeOf('mFadeIn'),
+        fadeOutMs: fadeOf('mFadeOut'),
+        padBar: el('mPadBar').checked,
+      },
+      data: { format: el('dFormat').value },
+    };
+  }
+
   /**
    * AAC 码率档位按源采样率动态约束（22050 Hz 下 Chromium 编码器不支持 256k）。
    * 当前值不合法时回退到 128k。
@@ -368,6 +464,11 @@
     // 「跟随源」标注实际解码采样率（非 WAV 源按设备率解码，消除误导）
     const srcOpt = el('aSampleRate').querySelector('option[value="src"]');
     if (srcOpt) srcOpt.textContent = T('export.followSourceActual', { sr: opts.sampleRate || 48000 });
+    // 上次导出参数（A5-4）：在默认值之后覆盖；文件名字段仍按源文件重新生成
+    const savedPrefs = (typeof MC.sanitizeExportPrefs === 'function')
+      ? MC.sanitizeExportPrefs(g.exportPrefs)
+      : null;
+    if (savedPrefs) applyPrefs(savedPrefs);
     // Tab 可用性：视频 Tab 仅视频源 + WebCodecs
     const canVideoTab = opts.kind === 'video' && !!opts.canVideo;
     overlay.querySelector('.exp-tab[data-tab="video"]').disabled = !canVideoTab;
@@ -437,6 +538,10 @@
         }
       }
       const crossfadeMs = Math.max(0, parseInt(el(tab === 'audio' ? 'aCrossfade' : tab === 'video' ? 'vCrossfade' : 'mCrossfade').value, 10) || 0);
+      // 记住本次参数（A5-4）：下次打开预填
+      if (typeof MC.saveGlobalSettings === 'function') {
+        MC.saveGlobalSettings({ exportPrefs: snapshotPrefs() });
+      }
       if (tab === 'audio') {
         exportCb({
           tab: 'audio',
