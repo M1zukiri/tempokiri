@@ -639,6 +639,38 @@
   }
 
   /**
+   * 候选 BPM 列表以「最终采用值」为基准（1.22.0 批注 a3）。
+   *
+   * 背景：八度提升后 scan 换成宽扫结果，而宽扫候选是按**提升前主峰**（如 80）生成的，
+   * 于是列表里会出现「已采用值自己（标成 2×）」，真正的另一半（80）反被
+   * 「距主峰 <2 BPM」过滤掉——用户看到的选项里没有可切回的低八度。
+   * 这里显式补回提升前的值，并去掉与最终值同值的项；近值同样去重。
+   * 倍频标签不再展示（×2 / ½× 对用户是干扰，取值本身已经足够）。
+   *
+   * @param {number|null} finalBpm 最终采用的 BPM
+   * @param {Array<{bpm:number, score:number, rel:number, harm:null|string}>} cands 竞争层候选
+   * @param {number|null} beforeBpm 八度提升前的值（未提升传 null）
+   * @returns {Array} 以最终值为基准的候选列表（≤5 项，按强度降序）
+   */
+  function finalBpmCandidates(finalBpm, cands, beforeBpm) {
+    if (finalBpm == null) return [];
+    const pool = (cands || []).slice();
+    if (beforeBpm != null && Math.abs(beforeBpm - finalBpm) > 0.6) {
+      // 提升前的八度层：强度按 1 计，排在最前——它是最可能被切回的选项
+      pool.push({ bpm: beforeBpm, score: null, rel: 1, harm: null });
+    }
+    const out = [];
+    for (const c of pool) {
+      if (!c || c.bpm == null) continue;
+      if (Math.abs(c.bpm - finalBpm) <= 0.6) continue;              // 已采用值不再作为「其他可能」
+      if (out.some((x) => Math.abs(x.bpm - c.bpm) <= 0.6)) continue; // 近值去重（同一峰的多点细化）
+      out.push(c);
+    }
+    out.sort((a, b) => (b.rel || 0) - (a.rel || 0));
+    return out.slice(0, 5);
+  }
+
+  /**
    * 窗口 RMS 能量（用于无声/近无声源的快速预检，避免全窗分析空转）。
    * @param {Float32Array|ArrayLike<number>} samples
    * @returns {number}
@@ -717,10 +749,19 @@
     if (bpm && onsets.length) {
       offset = Math.round(onsets[0] * 1000) / 1000;
     }
-    // bpmCandidates：竞争层 BPM 候选（v1.11.0，供 UI 展示「其他可能 BPM」）
+    // bpmCandidates：竞争层 BPM 候选（供 UI 展示「其他可能 BPM」）——以**最终采用值**为基准
     // ceilExtended：本次是否走了触顶重扫（供 UI 提示扫描范围被放宽）
-    // octavePromoted / bpmBeforeOctave：八度判定是否提升过、提升前的值（供 UI 提示可切回）
-    return { bpm, offset, onsets, flux, bpmCandidates: scan.cands, ceilExtended, octavePromoted, bpmBeforeOctave };
+    // octavePromoted / bpmBeforeOctave：八度判定是否提升过、提升前的值
+    return {
+      bpm,
+      offset,
+      onsets,
+      flux,
+      bpmCandidates: finalBpmCandidates(bpm, scan.cands, octavePromoted ? bpmBeforeOctave : null),
+      ceilExtended,
+      octavePromoted,
+      bpmBeforeOctave,
+    };
   }
 
   return {
@@ -740,6 +781,7 @@
     toMono,
     rmsOf,
     pickOctaveLayer,
+    finalBpmCandidates,
     analyze,
   };
 });

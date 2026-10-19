@@ -92,6 +92,33 @@ test('estimateBpmCands: onset 不足返回空候选', () => {
   assert.deepEqual(r.cands, []);
 });
 
+test('finalBpmCandidates: 八度提升后补回提升前值、剔除已采用值', () => {
+  // 真实场景：宽扫主峰 80，候选 159.9 被提升为最终值 → 选项里应有 80，且不应再有 159.9
+  const cands = [
+    { bpm: 159.9, score: 900, rel: 0.95, harm: '2x' },
+    { bpm: 110.8, score: 400, rel: 0.42, harm: null },
+    { bpm: 66.3, score: 300, rel: 0.31, harm: null },
+  ];
+  const out = A.finalBpmCandidates(159.9, cands, 80);
+  assert.deepEqual(out.map((c) => c.bpm).sort((a, b) => a - b), [66.3, 80, 110.8]);
+  assert.equal(out[0].bpm, 80, '提升前的八度层应排在最前（最可能被切回）');
+});
+
+test('finalBpmCandidates: 未提升时不补值，仅近值去重并剔除当前值', () => {
+  const cands = [
+    { bpm: 130.1, score: 800, rel: 0.9, harm: null },  // 与最终值同值（130）
+    { bpm: 260.0, score: 500, rel: 0.5, harm: null },
+    { bpm: 260.4, score: 480, rel: 0.48, harm: null },  // 近值重复
+    { bpm: 91.6, score: 300, rel: 0.3, harm: null },
+  ];
+  const out = A.finalBpmCandidates(130, cands, null);
+  assert.deepEqual(out.map((c) => c.bpm), [260.0, 91.6]);
+});
+
+test('finalBpmCandidates: 无 BPM 时返回空列表', () => {
+  assert.deepEqual(A.finalBpmCandidates(null, [{ bpm: 120, rel: 0.5 }], 60), []);
+});
+
 test('buildGrid: 120 BPM 4/4 小节边界', () => {
   const g = A.buildGrid({
     segments: [{ bpm: 120, beatsPerBar: 4, bars: 10 }],

@@ -246,8 +246,9 @@
   }
 
   /**
-   * 竞争层 BPM 候选渲染（v1.11.0）：识别结果旁展示「其他可能 BPM」，点击即采用该值。
-   * @param {Array<{bpm:number, harm:null|string}>} cands
+   * 竞争层 BPM 候选渲染：识别结果旁展示「其他可能 BPM」，点击即采用该值。
+   * 只显示数值，不显示倍频标签（×2/½× 是干扰项——批注 a3）。
+   * @param {Array<{bpm:number}>} cands 以最终采用值为基准的候选
    * @param {number} rowIndex 对应段落行
    */
   function renderCands(cands, rowIndex) {
@@ -258,18 +259,19 @@
       box.hidden = true;
       return;
     }
-    const harmLabel = { '2x': '2×', '0.5x': '½×', '3x': '3×', '0.33x': '⅓×' };
     // 候选去重：同一 BPM 值（如多峰同值不同相位）只保留首个，避免按钮重复
     const uniq = cands.filter((c, i, arr) => arr.findIndex((x) => x.bpm === c.bpm) === i);
     box.hidden = false;
     const label = document.createElement('span');
     label.className = 'auto-cand-label';
     label.textContent = T('modal.candsHint');
-    box.appendChild(label);    for (const c of uniq) {
+    box.appendChild(label);
+    for (const c of uniq) {
       const b = document.createElement('button');
       b.className = 'btn-mini auto-cand-bpm';
-      b.textContent = c.bpm + (c.harm && harmLabel[c.harm] ? '（' + harmLabel[c.harm] + '）' : '');
-      b.title = '采用 ' + c.bpm;
+      // 数值保留到 0.1（识别链路精度）；不附加倍频说明
+      b.textContent = String(Number(c.bpm.toFixed(2)));
+      b.title = '采用 ' + b.textContent;
       b.addEventListener('click', () => {
         const rr = rows[rowIndex];
         if (!rr) return;
