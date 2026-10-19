@@ -178,4 +178,14 @@ function report() {
     console.log(`\n  超出 ≤0.6 的样本（${miss.length}）:`);
     for (const r of miss) console.log(`    ${r.bpm} vs ${r.truth} (${r.variants}) ${r.title} | ${r.id}`);
   }
+  // 整洁化（a2）口径：整数真值里「识别值精确等于真值」的比例；分数真值单独列出，不能被吸附
+  const ints = recs.filter((r) => Math.abs(r.truth - Math.round(r.truth)) < 1e-9);
+  const exact = ints.filter((r) => Math.abs(r.bpm - r.truth) <= 1e-6).length;
+  if (ints.length) {
+    console.log(`\n  整数真值 ${ints.length} 首：识别值精确等于真值 ${exact} 首（${((exact / ints.length) * 100).toFixed(1)}%）`);
+  }
+  const frac = recs.filter((r) => Math.abs(r.truth - Math.round(r.truth)) >= 1e-9);
+  for (const r of frac) {
+    console.log(`    分数真值 ${r.id}：truth=${r.truth} bpm=${r.bpm} ${Math.abs(r.bpm - r.truth) <= 1e-6 ? '✅ 保持' : (Math.abs(r.bpm - r.truth) <= 0.6 ? '≈ 近似' : '❌ 偏离')}`);
+  }
 }

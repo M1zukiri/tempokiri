@@ -245,6 +245,11 @@
     return (60 / bpm) * beats * (4 / unit);
   }
 
+  /** BPM 显示规范化：最多 2 位小数，去掉了无意义的 .0（160 而非 160.0）。 */
+  function fmtBpm(v) {
+    return String(Number(Number(v).toFixed(2)));
+  }
+
   /**
    * 竞争层 BPM 候选渲染：识别结果旁展示「其他可能 BPM」，点击即采用该值。
    * 只显示数值，不显示倍频标签（×2/½× 是干扰项——批注 a3）。
@@ -279,7 +284,7 @@
         // 切换候选 BPM 后网格分辨率同步为每小节拍数（与识别一致的默认）
         if (rr.res == null || rr.res === '') rr.res = rr.beats;
         renderRows();
-        el('mAutoStatus').textContent = '已切换为 BPM ' + c.bpm + '，确认后生效。';
+        el('mAutoStatus').textContent = '已切换为 BPM ' + fmtBpm(c.bpm) + '，确认后生效。';
       });
       box.appendChild(b);
     }
@@ -303,7 +308,7 @@
         return;
       }
       if (result && result.bpm) {
-        r.bpm = result.bpm.toFixed(1);
+        r.bpm = fmtBpm(result.bpm);
         r.tapBpm = null; // 一次性：tap 范围仅本次识别生效
         // 自动识别默认网格分辨率 = 每小节拍数（每拍一条线），可手动修改
         if (r.res == null || r.res === '') r.res = r.beats;
@@ -312,7 +317,7 @@
           el('mOffset').value = String(Number(result.offset.toFixed(3)));
         }
         renderRows();
-        status.textContent = '第 ' + (i + 1) + ' 段识别完成：BPM ' + result.bpm.toFixed(1) +
+        status.textContent = '第 ' + (i + 1) + ' 段识别完成：BPM ' + fmtBpm(result.bpm) +
           (result.offset != null ? '，偏移 ' + Number(result.offset.toFixed(3)) + 's' : '') + '。确认后生效。';
         renderCands(result.cands, i);
       } else {

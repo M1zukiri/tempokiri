@@ -40,6 +40,41 @@
   const OCTAVE_GUARD_BPM = 120;
   const OCTAVE_CAP = 300;      // 提升目标上限 = modal.js 的 BPM 校验域顶
 
+  // —— BPM 整洁化（1.22.0 批注 a2）——
+  // 识别结果常带 0.x 小数（160 的曲子给出 159.9；八度提升还会把误差乘 2）。
+  // 不做一刀切取整（真 159.5 的曲子会被拉走），而是以**网格拟合代价**为门槛：
+  // 只有在整数/半整数处的代价与最优值相差 ≤2% 时才吸附，否则保留原值。
+  const NORM_MAX_DELTA = 0.6;  // 与整洁值的最大距离（超过就不是“同一个数”）
+  // 代价容差按实测标定（Majproject 语料，400 onset 拟合）：
+  //   偏离 0.1 BPM ≈ +2.6% 代价（127.9 vs 128：rms 115.1→116.6ms，1.5ms 不可闻）
+  //   偏离 0.3 BPM ≈ +21% 代价（160.3 vs 160：rms 66.8→73.4ms）
+  // 取 5% 只覆盖“显示精度级”的 0.1 偏差，真分数 BPM（如 159.5）不会被拉走。
+  const NORM_COST_TOL = 0.05;
+
+  /**
+   * 把 BPM 吸附到更“整洁”的值（整数或半整数），返回吸附后的值。
+   * 判据：候选整洁值 q 与 v 相距 ≤NORM_MAX_DELTA，且 cost(q) ≤ cost(v)×(1+NORM_COST_TOL)；
+   * 在通过的候选里取**拟合代价最低**者（不是离 v 最近者——真值 160 时 160 的代价应低于 159.5）。
+   * @param {number} v 原始 BPM 估计
+   * @param {(b:number)=>number} costAt 任意 BPM 的网格拟合代价
+   * @param {number} [tol=0.02] 相对代价容差
+   * @returns {number}
+   */
+  function normalizeBpm(v, costAt, tol = NORM_COST_TOL) {
+    if (v == null || !isFinite(v) || typeof costAt !== 'function') return v;
+    const c0 = costAt(v);
+    if (!isFinite(c0)) return v;
+    // 先整数、后半整数：两者都达标时优先更“整”的那个（谱面声明的 BPM 绝大多数是整数）
+    for (const q of [Math.round(v), Math.round(v * 2) / 2]) {
+      if (q === v || Math.abs(q - v) > NORM_MAX_DELTA) continue;
+      const cq = costAt(q);
+      if (!isFinite(cq)) continue;
+      if (cq > c0 * (1 + tol) + 1e-12) continue; // 整洁值必须同样“贴合”网格
+      return q;
+    }
+    return v;
+  }
+
   /** 生成 Hann 窗（对称，length 个点）。 */
   function hannWindow(n) {
     const w = new Float64Array(n);
@@ -749,18 +784,30 @@
     if (bpm && onsets.length) {
       offset = Math.round(onsets[0] * 1000) / 1000;
     }
+    // —— BPM 整洁化（批注 a2）——
+    // 必须在八度判定**之后**做：提前把主峰（如 67.5）吸附成 68 会破坏
+    // pickOctaveLayer 的倍频比例检查（130/68=1.91 不再被认作 2× 层）。
+    let bpmOut = bpm;
+    let beforeOut = bpmBeforeOctave;
+    let candsOut = scan.cands;
+    if (bpm != null && onsets.length) {
+      const costOf = (b) => gridCost(onsets.slice(0, 400), b);
+      bpmOut = normalizeBpm(bpm, costOf);
+      beforeOut = normalizeBpm(bpmBeforeOctave, costOf);
+      candsOut = (scan.cands || []).map((c) => Object.assign({}, c, { bpm: normalizeBpm(c.bpm, costOf) }));
+    }
     // bpmCandidates：竞争层 BPM 候选（供 UI 展示「其他可能 BPM」）——以**最终采用值**为基准
     // ceilExtended：本次是否走了触顶重扫（供 UI 提示扫描范围被放宽）
     // octavePromoted / bpmBeforeOctave：八度判定是否提升过、提升前的值
     return {
-      bpm,
+      bpm: bpmOut,
       offset,
       onsets,
       flux,
-      bpmCandidates: finalBpmCandidates(bpm, scan.cands, octavePromoted ? bpmBeforeOctave : null),
+      bpmCandidates: finalBpmCandidates(bpmOut, candsOut, octavePromoted ? beforeOut : null),
       ceilExtended,
       octavePromoted,
-      bpmBeforeOctave,
+      bpmBeforeOctave: beforeOut,
     };
   }
 
@@ -782,6 +829,7 @@
     rmsOf,
     pickOctaveLayer,
     finalBpmCandidates,
+    normalizeBpm,
     analyze,
   };
 });

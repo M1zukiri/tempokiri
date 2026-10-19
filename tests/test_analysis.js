@@ -119,6 +119,37 @@ test('finalBpmCandidates: 无 BPM 时返回空列表', () => {
   assert.deepEqual(A.finalBpmCandidates(null, [{ bpm: 120, rel: 0.5 }], 60), []);
 });
 
+test('normalizeBpm: 整洁值代价更低时吸附（159.9 → 160）', () => {
+  const cost = (b) => (b === 160 ? 1.0 : b === 159.9 ? 1.005 : 1.2);
+  assert.equal(A.normalizeBpm(159.9, cost), 160);
+});
+
+test('normalizeBpm: 整数处代价明显更差时保留分数（真 159.5 不被拉走）', () => {
+  const cost = (b) => (b === 160 ? 1.5 : 1.0);
+  assert.equal(A.normalizeBpm(159.5, cost), 159.5);
+});
+
+test('normalizeBpm: 半整数候选一起参与（159.4 → 159.5）', () => {
+  const cost = (b) => (b === 159.5 ? 0.9 : b === 159 ? 1.1 : 1.0);
+  assert.equal(A.normalizeBpm(159.4, cost), 159.5);
+});
+
+test('normalizeBpm: 整洁值代价略高但在容差内也吸附（129.9 → 130）', () => {
+  const cost = (b) => (b === 130 ? 1.01 : 1.0); // 实测 129.9→130 代价 +0.13%
+  assert.equal(A.normalizeBpm(129.9, cost), 130);
+});
+
+test('normalizeBpm: 整数与半整数都达标时优先整数（140.4 → 140）', () => {
+  const cost = (b) => (b === 140 ? 1.02 : b === 140.5 ? 0.99 : 1.0);
+  assert.equal(A.normalizeBpm(140.4, cost), 140);
+});
+
+test('normalizeBpm: 已是整数原样返回、空值不动', () => {
+  const cost = () => 1;
+  assert.equal(A.normalizeBpm(160, cost), 160);
+  assert.equal(A.normalizeBpm(null, cost), null);
+});
+
 test('buildGrid: 120 BPM 4/4 小节边界', () => {
   const g = A.buildGrid({
     segments: [{ bpm: 120, beatsPerBar: 4, bars: 10 }],
