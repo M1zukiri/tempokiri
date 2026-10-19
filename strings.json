@@ -356,6 +356,8 @@
     "normalize": "响度归一化（峰值）",
     "peak": "目标峰值",
     "crossfade": "交叉淡化",
+    "fadeIn": "淡入",
+    "fadeOut": "淡出",
     "fileName": "文件名",
     "videoBitrate": "视频码率",
     "mbps": "Mbps",

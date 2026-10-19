@@ -228,3 +228,28 @@ test('padSilenceStart: 开头插入静音小节（Majdata 补空小节）', () =
   assert.equal(E.padSilenceStart(mix, 0, 4), mix);
   assert.equal(E.padSilenceStart(mix, -1, 4), mix);
 });
+
+test('applyEdgeFades: 淡入淡出线性斜坡与端点归零（A5-2）', () => {
+  const n = 100;
+  const sig = new Float32Array(n).fill(1);
+  const out = E.applyEdgeFades(sig, 1000, 10, 10); // 1000Hz → 10ms = 10 样本
+  assert.equal(out[0], 0);
+  assert.ok(Math.abs(out[9] - 0.9) < 1e-6, '淡入第 10 个样本 = 0.9');
+  assert.equal(out[10], 1, '斜坡之后保持原值');
+  assert.equal(out[n - 1], 0);
+  assert.ok(Math.abs(out[n - 10] - 0.9) < 1e-6, '淡出第 10 个样本 = 0.9');
+  assert.equal(sig[0], 1, '不修改原数组');
+  assert.notEqual(out, sig);
+});
+
+test('applyEdgeFades: 时长为 0 返回原引用；超长淡入淡出各限半段', () => {
+  const sig = new Float32Array(100).fill(1);
+  assert.equal(E.applyEdgeFades(sig, 1000, 0, 0), sig);
+  assert.equal(E.applyEdgeFades(sig, 1000, -5, -5), sig);
+  // 各 200ms @1000Hz = 200 样本 > 半段 50 → clamp 到 50
+  const out = E.applyEdgeFades(sig, 1000, 200, 200);
+  assert.ok(Math.abs(out[49] - 0.98) < 1e-6);
+  assert.ok(Math.abs(out[50] - 0.98) < 1e-6, '两端各占半段，中缝相接');
+  assert.ok(Math.abs(out[50 + 49]) < 1e-6, '末样本归零');
+  assert.equal(out[0], 0);
+});

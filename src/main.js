@@ -1637,6 +1637,10 @@
             mix = analysis.resample(mix, state.sampleRate, sr);
           }
           if (opts.normalize) mix = exp.peakNormalize(mix, opts.peakDb);
+          // 首尾淡入淡出（A5-2）：作用在最终拼接结果上，归一化之后做，避免增益破坏斜坡
+          if (opts.fadeInMs > 0 || opts.fadeOutMs > 0) {
+            mix = exp.applyEdgeFades(mix, sr, opts.fadeInMs, opts.fadeOutMs);
+          }
           const name = opts.fileName;
           if (opts.format === 'wav') {
             let buf = exp.encodeWav(mix, sr, opts.bitDepth);
@@ -1650,10 +1654,14 @@
             status(T('status.exportedMp3', { name: name }));
           }
         } else if (opts.tab === 'video') {
+          // 音轨首尾淡入淡出（A5-2）：画面不做淡化，只作用在混入的音频上
+          const vMix = (opts.fadeInMs > 0 || opts.fadeOutMs > 0)
+            ? exp.applyEdgeFades(mix, state.sampleRate, opts.fadeInMs, opts.fadeOutMs)
+            : mix;
           await MC.exportVideo({
             file: state.file,
             parts,
-            mix,
+            mix: vMix,
             mixSampleRate: state.sampleRate,
             fileName: opts.fileName,
             videoBitrate: opts.videoBitrate,
@@ -1689,6 +1697,9 @@
           }
           let tMix = analysis.resample(majMix, state.sampleRate, 44100);
           if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
+          if (opts.fadeInMs > 0 || opts.fadeOutMs > 0) {
+            tMix = exp.applyEdgeFades(tMix, 44100, opts.fadeInMs, opts.fadeOutMs);
+          }
           const buf = MC.attachToMp3(exp.encodeMp3(tMix, 44100, opts.mp3Bitrate), state.meta || {});
           exp.downloadBlob(buf, 'track.mp3', 'audio/mpeg');
           status(state.kind === 'video' ? T('status.majDoneVideo') : T('status.majDoneAudio'));

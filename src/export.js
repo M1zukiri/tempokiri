@@ -174,6 +174,29 @@
     return out;
   }
 
+  /**
+   * 导出首尾淡入淡出（整段拼接结果，线性斜率，与段落淡化同一曲线族）。
+   * @param {Float32Array} samples
+   * @param {number} sampleRate
+   * @param {number} fadeInMs 淡入时长（毫秒，≤0 不处理）
+   * @param {number} fadeOutMs 淡出时长（毫秒，≤0 不处理）
+   * @returns {Float32Array} 新数组；两个时长都 ≤0 时返回原引用
+   */
+  function applyEdgeFades(samples, sampleRate, fadeInMs, fadeOutMs) {
+    const fiMs = Math.max(0, Number(fadeInMs) || 0);
+    const foMs = Math.max(0, Number(fadeOutMs) || 0);
+    if (!(fiMs > 0) && !(foMs > 0)) return samples;
+    const n = samples.length;
+    // 两端各最多占一半，避免两个斜坡互相覆盖后整段被压成三角
+    const half = Math.floor(n / 2);
+    const fi = Math.min(Math.round((fiMs / 1000) * sampleRate), half);
+    const fo = Math.min(Math.round((foMs / 1000) * sampleRate), half);
+    const out = samples.slice();
+    for (let i = 0; i < fi; i++) out[i] *= i / fi;
+    for (let i = 0; i < fo; i++) out[n - 1 - i] *= i / fo;
+    return out;
+  }
+
   const MP3_SUPPORTED_SR = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
 
   /**
@@ -243,6 +266,7 @@
     encodeMp3,
     peakNormalize,
     padSilenceStart,
+    applyEdgeFades,
     toInt16,
     downloadBlob,
   };

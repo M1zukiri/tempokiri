@@ -105,6 +105,12 @@
               <label>${T('export.crossfade')}
                 <input id="aCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
               </label>
+              <label>${T('export.fadeIn')}
+                <input id="aFadeIn" type="number" min="0" max="10000" step="10" value="0" /> ms
+              </label>
+              <label>${T('export.fadeOut')}
+                <input id="aFadeOut" type="number" min="0" max="10000" step="10" value="0" /> ms
+              </label>
             </div>
             <label>${T('export.fileName')}
               <input id="aName" type="text" />
@@ -156,6 +162,12 @@
               <label>${T('export.crossfade')}
                 <input id="vCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
               </label>
+              <label>${T('export.fadeIn')}
+                <input id="vFadeIn" type="number" min="0" max="10000" step="10" value="0" /> ms
+              </label>
+              <label>${T('export.fadeOut')}
+                <input id="vFadeOut" type="number" min="0" max="10000" step="10" value="0" /> ms
+              </label>
             </div>
             <label>${T('export.fileName')}
               <input id="vName" type="text" />
@@ -197,6 +209,12 @@
               </label>
               <label>${T('export.crossfade')}
                 <input id="mCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
+              </label>
+              <label>${T('export.fadeIn')}
+                <input id="mFadeIn" type="number" min="0" max="10000" step="10" value="0" /> ms
+              </label>
+              <label>${T('export.fadeOut')}
+                <input id="mFadeOut" type="number" min="0" max="10000" step="10" value="0" /> ms
               </label>
               <label class="exp-check">
                 <input id="mPadBar" type="checkbox" /> ${T('export.majPadBar')}
@@ -401,6 +419,8 @@
           normalize: el('aNormalize').checked,
           peakDb: parseFloat(el('aPeak').value),
           crossfadeMs,
+          fadeInMs: Math.max(0, parseFloat(el('aFadeIn').value) || 0),
+          fadeOutMs: Math.max(0, parseFloat(el('aFadeOut').value) || 0),
           fileName: el('aName').value.trim(),
         });
       } else if (tab === 'video') {
@@ -414,6 +434,8 @@
           audioBitrate: parseInt(el('vAudioBitrate').value, 10) * 1000,
           mute: !el('vAudio').checked,
           crossfadeMs,
+          fadeInMs: Math.max(0, parseFloat(el('vFadeIn').value) || 0),
+          fadeOutMs: Math.max(0, parseFloat(el('vFadeOut').value) || 0),
           fileName: el('vName').value.trim(),
         });
       } else if (tab === 'data') {
@@ -430,6 +452,8 @@
           normalize: el('mNormalize').checked,
           peakDb: parseFloat(el('mPeak').value),
           crossfadeMs,
+          fadeInMs: Math.max(0, parseFloat(el('mFadeIn').value) || 0),
+          fadeOutMs: Math.max(0, parseFloat(el('mFadeOut').value) || 0),
           padBar: el('mPadBar').checked,
         });
       }
