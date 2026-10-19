@@ -355,6 +355,8 @@
     "followSourceActual": "跟随源（实际 {sr} Hz）",
     "normalize": "响度归一化（峰值）",
     "peak": "目标峰值",
+    "normLufs": "响度归一化（LUFS）",
+    "lufsOff": "关闭",
     "crossfade": "交叉淡化",
     "fadeIn": "淡入",
     "fadeOut": "淡出",

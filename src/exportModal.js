@@ -102,6 +102,14 @@
                   <option value="-3">-3 dBFS</option>
                 </select>
               </label>
+              <label>${T('export.normLufs')}
+                <select id="aLufs">
+                  <option value="" selected>${T('export.lufsOff')}</option>
+                  <option value="-14">-14 LUFS</option>
+                  <option value="-16">-16 LUFS</option>
+                  <option value="-23">-23 LUFS</option>
+                </select>
+              </label>
               <label>${T('export.crossfade')}
                 <input id="aCrossfade" type="number" min="0" max="1000" step="5" value="10" /> ms
               </label>
@@ -205,6 +213,14 @@
                   <option value="-0.5">-0.5 dBFS</option>
                   <option value="-1" selected>-1 dBFS</option>
                   <option value="-3">-3 dBFS</option>
+                </select>
+              </label>
+              <label>${T('export.normLufs')}
+                <select id="mLufs">
+                  <option value="" selected>${T('export.lufsOff')}</option>
+                  <option value="-14">-14 LUFS</option>
+                  <option value="-16">-16 LUFS</option>
+                  <option value="-23">-23 LUFS</option>
                 </select>
               </label>
               <label>${T('export.crossfade')}
@@ -386,8 +402,20 @@
       b.addEventListener('click', () => switchTab(b.dataset.tab));
     });
     el('aFormat').addEventListener('change', updateAudioVisibility);
-    el('aNormalize').addEventListener('change', updateAudioVisibility);
+    el('aNormalize').addEventListener('change', () => {
+      if (el('aNormalize').checked) el('aLufs').value = ''; // 峰值归一化与 LUFS 互斥
+      updateAudioVisibility();
+    });
+    el('aLufs').addEventListener('change', () => {
+      if (el('aLufs').value) el('aNormalize').checked = false;
+      updateAudioVisibility();
+    });
     el('mNormalize').addEventListener('change', () => {
+      if (el('mNormalize').checked) el('mLufs').value = '';
+      el('mPeakRow').hidden = !el('mNormalize').checked;
+    });
+    el('mLufs').addEventListener('change', () => {
+      if (el('mLufs').value) el('mNormalize').checked = false;
       el('mPeakRow').hidden = !el('mNormalize').checked;
     });
     bindDualTrack('aMp3BitrateSel', 'aMp3BitrateNum', 8, 320, 192);
@@ -418,6 +446,7 @@
           sampleRate: el('aSampleRate').value,
           normalize: el('aNormalize').checked,
           peakDb: parseFloat(el('aPeak').value),
+          lufsTarget: el('aLufs').value ? parseFloat(el('aLufs').value) : null,
           crossfadeMs,
           fadeInMs: Math.max(0, parseFloat(el('aFadeIn').value) || 0),
           fadeOutMs: Math.max(0, parseFloat(el('aFadeOut').value) || 0),
@@ -451,6 +480,7 @@
           mp3Bitrate: parseInt(el('mMp3Bitrate').value, 10),
           normalize: el('mNormalize').checked,
           peakDb: parseFloat(el('mPeak').value),
+          lufsTarget: el('mLufs').value ? parseFloat(el('mLufs').value) : null,
           crossfadeMs,
           fadeInMs: Math.max(0, parseFloat(el('mFadeIn').value) || 0),
           fadeOutMs: Math.max(0, parseFloat(el('mFadeOut').value) || 0),

@@ -88,6 +88,7 @@
   const store = MC;
   const exp = MC;
   const ui = MC;
+  const loudness = MC;
 
   // ---------- 状态辅助 ----------
   function showHint(msg) {
@@ -1636,7 +1637,11 @@
             sr = parseInt(opts.sampleRate, 10);
             mix = analysis.resample(mix, state.sampleRate, sr);
           }
-          if (opts.normalize) mix = exp.peakNormalize(mix, opts.peakDb);
+          if (opts.lufsTarget) {
+            mix = loudness.normalizeToLufs(mix, sr, opts.lufsTarget).samples;
+          } else if (opts.normalize) {
+            mix = exp.peakNormalize(mix, opts.peakDb);
+          }
           // 首尾淡入淡出（A5-2）：作用在最终拼接结果上，归一化之后做，避免增益破坏斜坡
           if (opts.fadeInMs > 0 || opts.fadeOutMs > 0) {
             mix = exp.applyEdgeFades(mix, sr, opts.fadeInMs, opts.fadeOutMs);
@@ -1696,7 +1701,8 @@
             });
           }
           let tMix = analysis.resample(majMix, state.sampleRate, 44100);
-          if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
+          if (opts.lufsTarget) tMix = loudness.normalizeToLufs(tMix, 44100, opts.lufsTarget).samples;
+          else if (opts.normalize) tMix = exp.peakNormalize(tMix, opts.peakDb);
           if (opts.fadeInMs > 0 || opts.fadeOutMs > 0) {
             tMix = exp.applyEdgeFades(tMix, 44100, opts.fadeInMs, opts.fadeOutMs);
           }
