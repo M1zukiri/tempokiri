@@ -706,6 +706,31 @@
   }
 
   /**
+   * 自动识别「额外留空一小节」（批注 a4）：把首条网格线提前一个小节。
+   *
+   * 现有 offset 语义是「首条网格线 = 第一个 onset」，网格贴齐波形起点；
+   * 该选项把网格起点再提前 barDur = 60/bpm × beatsPerBar，使音乐落在第 2 小节。
+   * 拍号未识别（当前无拍号检测）时按 4/4 计。
+   *
+   * 下界：buildGrid 要求 offset > −barDur（首小节须与音频有重叠）。首个 onset
+   * 恰为 0 时提前量等于该边界，clamp 到 −barDur + ε（首小节 99.9% 为空）。
+   *
+   * @param {number} onset 首个 onset（秒，= 现有自动识别 offset）
+   * @param {number} bpm 识别出的 BPM（用于算一小节时长）
+   * @param {number} [beatsPerBar=4] 拍号分子（缺省 4/4）
+   * @param {number} [epsilon=0.001]
+   * @returns {number} 提前一小节后的 offset（秒，保留 3 位小数）
+   */
+  function padBarOffset(onset, bpm, beatsPerBar = 4, epsilon = 0.001) {
+    const beats = beatsPerBar || 4;
+    if (!(bpm > 0) || !isFinite(onset)) return onset;
+    const barDur = (60 / bpm) * beats;
+    let out = onset - barDur;
+    if (out <= -barDur) out = -barDur + epsilon;
+    return Math.round(out * 1000) / 1000;
+  }
+
+  /**
    * 窗口 RMS 能量（用于无声/近无声源的快速预检，避免全窗分析空转）。
    * @param {Float32Array|ArrayLike<number>} samples
    * @returns {number}
@@ -830,6 +855,7 @@
     pickOctaveLayer,
     finalBpmCandidates,
     normalizeBpm,
+    padBarOffset,
     analyze,
   };
 });

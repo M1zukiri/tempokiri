@@ -302,6 +302,25 @@ test('八度判定: noOctave 可关闭（评估脚本对拍用）', () => {
   assert.equal(off.bpmBeforeOctave, off.bpm, '关闭时提升前值等于结果值');
 });
 
+test('padBarOffset: 192 BPM 4/4 提前一个小节（1.25s）', () => {
+  assert.equal(A.padBarOffset(2.74, 192, 4), 1.49);
+});
+
+test('padBarOffset: 拍号缺省 4/4，按段拍号换算小节长', () => {
+  assert.equal(A.padBarOffset(3.0, 120), 1.0);   // 4/4 @120 → 2s 小节
+  assert.equal(A.padBarOffset(3.0, 120, 3), 1.5); // 3/4 @120 → 1.5s 小节
+});
+
+test('padBarOffset: onset=0 时 clamp 到下界内侧（首小节不整段空）', () => {
+  const v = A.padBarOffset(0, 120, 4);
+  assert.ok(v > -2 && v <= -1.999, '实际 ' + v);
+});
+
+test('padBarOffset: 非法 BPM / 偏移原样返回', () => {
+  assert.equal(A.padBarOffset(1.5, 0), 1.5);
+  assert.equal(A.padBarOffset(NaN, 120), NaN);
+});
+
 test('resample: 长度与端点保持', () => {
   const src = new Float32Array([0, 1, 0, -1]);
   const out = A.resample(src, 4, 8);

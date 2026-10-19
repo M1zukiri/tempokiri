@@ -683,7 +683,7 @@
    * @param {number} segIndex
    * @param {object} seg 该行当前输入（可能未填全）
    */
-  async function autoDetect(segIndex, seg, allSegs, range) {
+  async function autoDetect(segIndex, seg, allSegs, range, autoOpts) {
     if (state.kind === 'video' && !state.pcm) {
       status(T('hint.extractRapid'));
       await captureVideoPcm();
@@ -727,7 +727,12 @@
         : T('hint.autoDone', { bpm: r.bpm.toFixed(1) }));
     // 第 1 段返回段内偏移（相对段起点）；后续段只填 BPM（相位按前段衔接）。
     // cands：竞争层 BPM 候选（v1.11.0，识别弹窗展示「其他可能 BPM」）
+    // autoOpts.padBar：识别后额外留空一小节（批注 a4，仅第 1 段生效）
     const out = segIndex === 0 ? { bpm: r.bpm, offset: r.offset } : { bpm: r.bpm };
+    if (segIndex === 0 && autoOpts && autoOpts.padBar && out.offset != null) {
+      out.offset = analysis.padBarOffset(out.offset, r.bpm, seg.beatsPerBar || 4);
+      out.padded = true;
+    }
     if (r.bpmCandidates && r.bpmCandidates.length) out.cands = r.bpmCandidates;
     return out;
   }

@@ -37,6 +37,9 @@
           <label>第 1 段起点偏移（秒）
             <input id="mOffset" type="number" step="0.001" placeholder="如 0" />
           </label>
+          <label class="exp-check" title="${T('modal.padBarTitle')}">
+            <input id="mPadBar" type="checkbox" /> ${T('modal.padBar')}
+          </label>
         </div>
         <div class="seg-header">段落</div>
         <p class="seg-note">${T('modal.lengthNote')}</p>
@@ -302,7 +305,7 @@
       const range = r.tapBpm != null
         ? { minBpm: Math.max(40, Math.round(r.tapBpm * TAP_LO)), maxBpm: Math.min(300, Math.round(r.tapBpm * TAP_HI)) }
         : null;
-      const result = await autoCb(i, rowToSeg(r, i === rows.length - 1), rows.map((x, j) => rowToSeg(x, j === rows.length - 1)), range);
+      const result = await autoCb(i, rowToSeg(r, i === rows.length - 1), rows.map((x, j) => rowToSeg(x, j === rows.length - 1)), range, { padBar: !!el('mPadBar').checked });
       if (result && result.error) {
         status.textContent = result.error;
         return;
@@ -318,7 +321,8 @@
         }
         renderRows();
         status.textContent = '第 ' + (i + 1) + ' 段识别完成：BPM ' + fmtBpm(result.bpm) +
-          (result.offset != null ? '，偏移 ' + Number(result.offset.toFixed(3)) + 's' : '') + '。确认后生效。';
+          (result.offset != null ? '，偏移 ' + Number(result.offset.toFixed(3)) + 's' : '') +
+          (result.padded ? '（已留空一小节）' : '') + '。确认后生效。';
         renderCands(result.cands, i);
       } else {
         status.textContent = '未能识别出清晰节拍，请手动输入 BPM。';
@@ -362,6 +366,7 @@
     okCb = callbacks.onConfirm || null;
     autoCb = callbacks.onAutoDetect || null;
     el('mOffset').value = current.offset != null ? current.offset : 0;
+    el('mPadBar').checked = false; // 默认不勾（批注 a4：用户要求默认关）
     rows = (current.segments && current.segments.length
       ? current.segments
       : [{ bpm: null, beatsPerBar: 4, beatUnit: 4 }]
