@@ -246,7 +246,7 @@ async function s6() {
   const bj = JSON.parse(btnRects);
   check('S6 识别按钮横排（非竖排）', bj.auto[0] >= 32 && bj.auto[1] <= 30, '识别 尺寸=' + bj.auto.join('x'));
   check('S6 Tap 按钮横排', bj.tap[0] >= 44 && bj.tap[1] <= 30, 'Tap 尺寸=' + bj.tap.join('x'));
-  check('S6 候选按钮横排完整', bj.cands.every((c) => c[0] >= 40 && c[1] <= 30 && c[2].length > 0), JSON.stringify(bj.cands));
+  check('S6 候选按钮横排完整（去倍频标签后仅数值，最小宽 26）', bj.cands.every((c) => c[0] >= 26 && c[1] <= 30 && c[2].length > 0), JSON.stringify(bj.cands));
   const texts = bj.cands.map((c) => c[2].split('（')[0]);
   check('S6 候选 BPM 去重', new Set(texts).size === texts.length, JSON.stringify(texts));
   const f = await shot('bpm_modal_cands');
