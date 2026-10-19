@@ -245,5 +245,12 @@
       if (cur) cur.classList.add('playing');
     }
   }
-  return { renderSequenceList, setPlayingCard, updateSeqInfo, fmtRange, fmtTime };
+  /** 视频预览面板宽度 clamp（批注 a1）：拖动范围 180–640px，非法值回落默认 260。 */
+  function clampVideoPaneWidth(px) {
+    if (px == null) return 260;
+    const n = Number(px);
+    if (!isFinite(n)) return 260;
+    return Math.min(640, Math.max(180, Math.round(n)));
+  }
+  return { renderSequenceList, setPlayingCard, updateSeqInfo, fmtRange, fmtTime, clampVideoPaneWidth };
 });

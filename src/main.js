@@ -44,6 +44,7 @@
   const waveLegend = $('waveLegend');
   const videoEl = $('video');
   const videoWrap = $('videoWrap');
+  const videoResizer = $('videoResizer');
   const statusBar = $('statusBar');
   const seqList = $('seqList');
   const seqInfo = $('seqInfo');
@@ -243,6 +244,43 @@
     drawBrandPulse(PULSE_IDLE); // 立即用新主题重绘静态律动条（播放中由下一帧 tick 覆盖）
   }
 
+  /** 视频预览面板宽度（批注 a1）：应用到 DOM；persist 时写入全局设置。 */
+  let videoPaneWidth = 260;
+  function applyVideoPaneWidth(px, persist) {
+    videoPaneWidth = ui.clampVideoPaneWidth(px);
+    // 宽度走 CSS 变量：窄屏媒体查询用 width:100% 覆盖时不会被行内样式压住
+    if (videoWrap) videoWrap.style.setProperty('--video-pane-w', videoPaneWidth + 'px');
+    if (persist) store.saveGlobalSettings({ videoPaneWidth: videoPaneWidth });
+  }
+
+  /** 视频预览与波形之间的拖拽条：拖动改宽度（180–640），双击复位 260（批注 a1）。 */
+  function initVideoResizer() {
+    if (!videoResizer) return;
+    const gs = store.loadGlobalSettings();
+    applyVideoPaneWidth(gs.videoPaneWidth, false);
+    let drag = null;
+    videoResizer.addEventListener('pointerdown', (e) => {
+      if (videoWrap.hidden) return;
+      drag = { x: e.clientX, width: videoWrap.getBoundingClientRect().width };
+      videoResizer.classList.add('dragging');
+      try { videoResizer.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+      e.preventDefault();
+    });
+    videoResizer.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      applyVideoPaneWidth(drag.width - (e.clientX - drag.x), false); // 向左拖 = 视频更宽
+    });
+    const end = () => {
+      if (!drag) return;
+      drag = null;
+      videoResizer.classList.remove('dragging');
+      applyVideoPaneWidth(videoPaneWidth, true);
+    };
+    videoResizer.addEventListener('pointerup', end);
+    videoResizer.addEventListener('pointercancel', end);
+    videoResizer.addEventListener('dblclick', () => applyVideoPaneWidth(260, true));
+  }
+
   /** 序列中是否有非法项（空段落：无时长或与音频完全无重叠；部分重叠合法，渲染补静音）。 */
   function anyInvalid() {
     return state.sequence.some((it) => seq.isEmptyItem(it, state.duration || 0));
@@ -331,6 +369,8 @@
       if (videoEl.src && videoEl.src.startsWith('blob:')) URL.revokeObjectURL(videoEl.src);
       videoEl.src = URL.createObjectURL(file);
       videoWrap.hidden = false;
+      videoResizer.hidden = false;
+      applyVideoPaneWidth(videoPaneWidth, false);
       await videoEl.load();
       // 等待元数据以便知道时长
       if (!videoEl.duration && !videoEl.readyState) {
@@ -394,6 +434,7 @@
       status(cached ? T('status.appliedCached', { name: file.name }) : T('status.videoReady', { name: file.name }));
     } else {
       videoWrap.hidden = true;
+      if (videoResizer) videoResizer.hidden = true;
       videoEl.removeAttribute('src');
       showHint(T('hint.decoding'));
       try {
@@ -1679,6 +1720,7 @@
 
     btnOpenFile.addEventListener('click', () => fileInput.click());
     if (btnHintOpen) btnHintOpen.addEventListener('click', () => fileInput.click()); // 空态引导卡主按钮
+    initVideoResizer(); // 视频预览宽度拖拽条（批注 a1）
     btnSettings.addEventListener('click', openSettings);
     btnAutoCut.addEventListener('click', runAutoCut);
     btnPlay.addEventListener('click', playOriginal);

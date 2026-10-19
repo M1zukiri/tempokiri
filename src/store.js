@@ -140,6 +140,7 @@
     captureRate: 4,         // captureStream 采集倍速（1–16）
     followMs: 90,           // 视频跟随 seek 节流间隔（毫秒）
     renderScale: 1.0,       // 波形渲染 DPR 系数（0.1–4）
+    videoPaneWidth: 260,    // 视频预览面板宽度（px，180–640；批注 a1）
     theme: 'aurora',        // 界面主题：'aurora' | 'nebula' | 'paper' | 'seigaiha' | 'kurenai' | 'mono'
     metronomeOn: false,     // 节拍器开关（播放时跟随小节线）
     metronomeSeqOn: true,   // 拼接序列播放时启用节拍器（默认开）

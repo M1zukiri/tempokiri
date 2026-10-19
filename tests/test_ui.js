@@ -139,3 +139,12 @@ test('setPlayingCard: prevId 为 null 时只新增高亮、不报错', () => {
   U.setPlayingCard(container, 'a', null);
   assert.ok(cards[0].classList.contains('playing'), '卡片 a 应新增 playing');
 });
+
+test('clampVideoPaneWidth: 180–640 夹取、非法值回落 260（批注 a1）', () => {
+  assert.equal(U.clampVideoPaneWidth(260), 260);
+  assert.equal(U.clampVideoPaneWidth(120), 180);
+  assert.equal(U.clampVideoPaneWidth(900), 640);
+  assert.equal(U.clampVideoPaneWidth(333.6), 334, '四舍五入到整数像素');
+  assert.equal(U.clampVideoPaneWidth(null), 260);
+  assert.equal(U.clampVideoPaneWidth('abc'), 260);
+});
