@@ -1628,6 +1628,43 @@
     status(T('status.rendering'));
     setTimeout(async () => {
       try {
+        // 分段/选区批量导出（A5-5）：逐张序列卡片单独渲染 → ZIP（不再计算整条拼接）
+        if (opts.tab === 'audio' && opts.split) {
+          if (!state.sequence.length) {
+            status(T('status.seqEmpty'), 'warn');
+            return;
+          }
+          let sr = state.sampleRate;
+          if (opts.sampleRate !== 'src') sr = parseInt(opts.sampleRate, 10);
+          const files = [];
+          const base = opts.fileName;
+          for (let i = 0; i < state.sequence.length; i++) {
+            const parts = seq.itemsToParts([state.sequence[i]], state.sampleRate);
+            let seg = exp.renderMix(state.rawMono, parts, 0); // 单段无需交叉淡化
+            if (sr !== state.sampleRate) seg = analysis.resample(seg, state.sampleRate, sr);
+            if (opts.lufsTarget) seg = loudness.normalizeToLufs(seg, sr, opts.lufsTarget).samples;
+            else if (opts.normalize) seg = exp.peakNormalize(seg, opts.peakDb);
+            if (opts.fadeInMs > 0 || opts.fadeOutMs > 0) {
+              seg = exp.applyEdgeFades(seg, sr, opts.fadeInMs, opts.fadeOutMs);
+            }
+            const num = String(i + 1).padStart(2, '0');
+            let buf;
+            let ext;
+            if (opts.format === 'wav') {
+              buf = MC.attachToWav(exp.encodeWav(seg, sr, opts.bitDepth), state.meta || {});
+              ext = '.wav';
+            } else {
+              buf = MC.attachToMp3(exp.encodeMp3(seg, sr, opts.mp3Bitrate), state.meta || {});
+              ext = '.mp3';
+            }
+            files.push({ name: base + '_' + num + ext, data: new Uint8Array(buf) });
+            status(T('status.rendering'));
+            await new Promise((r) => setTimeout(r, 0)); // 让出主线程，避免大序列卡死
+          }
+          exp.downloadBlob(MC.createZip(files), base + '.zip', 'application/zip');
+          status(T('status.exportedZip', { name: base, count: files.length }));
+          return;
+        }
         const parts = seq.itemsToParts(state.sequence, state.sampleRate);
         const crossfade = (opts.crossfadeMs / 1000) * state.sampleRate;
         let mix = exp.renderMix(state.rawMono, parts, crossfade);

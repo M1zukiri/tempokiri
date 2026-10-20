@@ -42,6 +42,7 @@
         crossfadeMs: num(a.crossfadeMs, 0, 1000, 30),
         fadeInMs: num(a.fadeInMs, 0, 10000, 0),
         fadeOutMs: num(a.fadeOutMs, 0, 10000, 0),
+        range: oneOf(a.range, ['all', 'split'], 'all'),
       };
     }
     const v = raw.video;

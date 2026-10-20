@@ -89,6 +89,12 @@
                   <option value="22050">22050 Hz</option>
                 </select>
               </label>
+              <label>${T('export.range')}
+                <select id="aRange">
+                  <option value="all" selected>${T('export.rangeAll')}</option>
+                  <option value="split">${T('export.rangeSplit')}</option>
+                </select>
+              </label>
             </div>
             <div class="exp-group">
               <div class="exp-group-title">${T('export.groupOptions')}</div>
@@ -353,6 +359,7 @@
       el('aCrossfade').value = String(a.crossfadeMs);
       el('aFadeIn').value = String(a.fadeInMs);
       el('aFadeOut').value = String(a.fadeOutMs);
+      el('aRange').value = a.range;
       updateAudioVisibility();
     }
     if (p.video) {
@@ -398,6 +405,7 @@
         crossfadeMs: crossfadeOf('aCrossfade'),
         fadeInMs: fadeOf('aFadeIn'),
         fadeOutMs: fadeOf('aFadeOut'),
+        range: el('aRange').value,
       },
       video: {
         videoBitrate: Math.round(readBitrate(el('vBitrateSel'), el('vBitrateNum'), 0.5, 50, 6) * 1e6),
@@ -555,6 +563,7 @@
           crossfadeMs,
           fadeInMs: Math.max(0, parseFloat(el('aFadeIn').value) || 0),
           fadeOutMs: Math.max(0, parseFloat(el('aFadeOut').value) || 0),
+          split: el('aRange').value === 'split',
           fileName: el('aName').value.trim(),
         });
       } else if (tab === 'video') {
